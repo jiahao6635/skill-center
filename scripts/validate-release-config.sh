@@ -168,11 +168,20 @@ case "$storage_provider" in
   s3)
     require_non_empty SKILLHUB_STORAGE_S3_ENDPOINT
     require_non_empty SKILLHUB_STORAGE_S3_BUCKET
-    require_non_empty SKILLHUB_STORAGE_S3_ACCESS_KEY
-    require_non_empty SKILLHUB_STORAGE_S3_SECRET_KEY
     require_non_empty SKILLHUB_STORAGE_S3_REGION
     validate_url SKILLHUB_STORAGE_S3_ENDPOINT
     validate_url SKILLHUB_STORAGE_S3_PUBLIC_ENDPOINT
+
+    # Empty access key + secret key means using IAM / instance profile / ECS task role / RAM Role.
+    # If one is provided, both must be provided.
+    s3_access_key="${SKILLHUB_STORAGE_S3_ACCESS_KEY:-}"
+    s3_secret_key="${SKILLHUB_STORAGE_S3_SECRET_KEY:-}"
+    if [ -n "$s3_access_key" ] || [ -n "$s3_secret_key" ]; then
+      require_non_empty SKILLHUB_STORAGE_S3_ACCESS_KEY
+      require_non_empty SKILLHUB_STORAGE_S3_SECRET_KEY
+    else
+      warn "SKILLHUB_STORAGE_S3_ACCESS_KEY and SKILLHUB_STORAGE_S3_SECRET_KEY are empty; using IAM / ECS RAM Role credentials"
+    fi
     ;;
   local)
     warn "SKILLHUB_STORAGE_PROVIDER=local is only suitable for non-production or temporary validation"
