@@ -122,8 +122,7 @@ services:
       context: ./web
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      - "${WEB_PORT:-80}:80"
+    network_mode: host
     environment:
       SKILLHUB_API_UPSTREAM: ${SKILLHUB_API_UPSTREAM:-http://127.0.0.1:${API_PORT:-8080}}
       SKILLHUB_WEB_API_BASE_URL: ${SKILLHUB_WEB_API_BASE_URL:-}
