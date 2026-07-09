@@ -147,7 +147,8 @@ class AdminUserAppServiceTest {
         when(userAccountRepository.findById("user-1"))
                 .thenReturn(Optional.of(user("user-1", "alice", "alice@example.com", UserStatus.ACTIVE)));
 
-        assertThrows(DomainBadRequestException.class, () -> service.updateUserStatus("user-1", "MERGED"));
+        assertThrows(DomainBadRequestException.class,
+                () -> service.updateUserStatus("user-1", "MERGED", Set.of("USER_ADMIN")));
     }
 
     @Test
@@ -156,7 +157,7 @@ class AdminUserAppServiceTest {
         when(userAccountRepository.findById("user-1")).thenReturn(Optional.of(user));
         when(userAccountRepository.save(user)).thenReturn(user);
 
-        var response = service.updateUserStatus("user-1", "DISABLED");
+        var response = service.updateUserStatus("user-1", "DISABLED", Set.of("USER_ADMIN"));
 
         verify(userAccountRepository).save(user);
         assertThat(user.getStatus()).isEqualTo(UserStatus.DISABLED);
@@ -169,7 +170,7 @@ class AdminUserAppServiceTest {
                 .thenReturn(Optional.of(systemUser()));
 
         assertThrows(DomainForbiddenException.class,
-                () -> service.updateUserStatus("builtin-skill-publisher", "DISABLED"));
+                () -> service.updateUserStatus("builtin-skill-publisher", "DISABLED", Set.of("SUPER_ADMIN")));
 
         verify(userAccountRepository, never()).save(any(UserAccount.class));
     }
@@ -178,7 +179,36 @@ class AdminUserAppServiceTest {
     void updateUserStatus_withUnknownUser_throwsNotFound() {
         when(userAccountRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThrows(DomainNotFoundException.class, () -> service.updateUserStatus("missing", "DISABLED"));
+        assertThrows(DomainNotFoundException.class,
+                () -> service.updateUserStatus("missing", "DISABLED", Set.of("USER_ADMIN")));
+    }
+
+    @Test
+    void updateUserStatus_nonSuperAdminCannotDisableSuperAdmin() {
+        UserAccount superAdmin = user("user-sa", "superadmin", "sa@example.com", UserStatus.ACTIVE);
+        when(userAccountRepository.findById("user-sa")).thenReturn(Optional.of(superAdmin));
+        when(userRoleBindingRepository.findByUserId("user-sa"))
+                .thenReturn(List.of(new UserRoleBinding("user-sa", role("SUPER_ADMIN"))));
+
+        assertThrows(DomainForbiddenException.class,
+                () -> service.updateUserStatus("user-sa", "DISABLED", Set.of("USER_ADMIN")));
+
+        verify(userAccountRepository, never()).save(any(UserAccount.class));
+    }
+
+    @Test
+    void updateUserStatus_superAdminCanDisableSuperAdmin() {
+        UserAccount superAdmin = user("user-sa", "superadmin", "sa@example.com", UserStatus.ACTIVE);
+        when(userAccountRepository.findById("user-sa")).thenReturn(Optional.of(superAdmin));
+        when(userRoleBindingRepository.findByUserId("user-sa"))
+                .thenReturn(List.of(new UserRoleBinding("user-sa", role("SUPER_ADMIN"))));
+        when(userAccountRepository.save(superAdmin)).thenReturn(superAdmin);
+
+        var response = service.updateUserStatus("user-sa", "DISABLED", Set.of("SUPER_ADMIN"));
+
+        verify(userAccountRepository).save(superAdmin);
+        assertThat(superAdmin.getStatus()).isEqualTo(UserStatus.DISABLED);
+        assertThat(response.status()).isEqualTo("DISABLED");
     }
 
     private UserAccount user(String id, String displayName, String email, UserStatus status) {

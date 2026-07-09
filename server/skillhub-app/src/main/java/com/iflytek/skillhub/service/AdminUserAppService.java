@@ -105,9 +105,10 @@ public class AdminUserAppService {
     }
 
     @Transactional
-    public AdminUserMutationResponse updateUserStatus(String userId, String status) {
+    public AdminUserMutationResponse updateUserStatus(String userId, String status, Set<String> actorPlatformRoles) {
         UserAccount user = loadUser(userId);
         rejectSystemAccountMutation(user);
+        rejectSuperAdminMutation(user, actorPlatformRoles);
         UserStatus nextStatus = parseManageableStatus(status);
         user.setStatus(nextStatus);
         userAccountRepository.save(user);
@@ -174,6 +175,15 @@ public class AdminUserAppService {
     private void rejectSystemAccountMutation(UserAccount user) {
         if (user.isSystemAccount()) {
             throw new DomainForbiddenException("error.admin.user.systemAccount.immutable");
+        }
+    }
+
+    private void rejectSuperAdminMutation(UserAccount user, Set<String> actorPlatformRoles) {
+        boolean targetHasSuperAdminRole = userRoleBindingRepository.findByUserId(user.getId()).stream()
+                .anyMatch(binding -> SUPER_ADMIN_ROLE.equals(binding.getRole().getCode()));
+        if (targetHasSuperAdminRole
+                && (actorPlatformRoles == null || !actorPlatformRoles.contains(SUPER_ADMIN_ROLE))) {
+            throw new DomainForbiddenException("error.admin.user.superAdmin.immutable");
         }
     }
 }

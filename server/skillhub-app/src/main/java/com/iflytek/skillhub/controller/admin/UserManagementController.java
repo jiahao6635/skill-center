@@ -60,26 +60,37 @@ public class UserManagementController extends BaseApiController {
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
     public ApiResponse<AdminUserMutationResponse> updateUserStatus(
             @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal,
             @Valid @RequestBody AdminUserStatusUpdateRequest request) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, request.status()));
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(userId, request.status(), principal.platformRoles()));
     }
 
     @PostMapping("/{userId}/approve")
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
-    public ApiResponse<AdminUserMutationResponse> approveUser(@PathVariable String userId) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, "ACTIVE"));
+    public ApiResponse<AdminUserMutationResponse> approveUser(
+            @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(userId, "ACTIVE", principal.platformRoles()));
     }
 
     @PostMapping("/{userId}/disable")
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
-    public ApiResponse<AdminUserMutationResponse> disableUser(@PathVariable String userId) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, "DISABLED"));
+    public ApiResponse<AdminUserMutationResponse> disableUser(
+            @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(userId, "DISABLED", principal.platformRoles()));
     }
 
     @PostMapping("/{userId}/enable")
     @PreAuthorize("hasAnyRole('USER_ADMIN', 'SUPER_ADMIN')")
-    public ApiResponse<AdminUserMutationResponse> enableUser(@PathVariable String userId) {
-        return ok("response.success.updated", adminUserAppService.updateUserStatus(userId, "ACTIVE"));
+    public ApiResponse<AdminUserMutationResponse> enableUser(
+            @PathVariable String userId,
+            @AuthenticationPrincipal PlatformPrincipal principal) {
+        return ok("response.success.updated",
+                adminUserAppService.updateUserStatus(userId, "ACTIVE", principal.platformRoles()));
     }
 
     @PostMapping("/{userId}/password-reset")

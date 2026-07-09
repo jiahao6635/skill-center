@@ -165,7 +165,7 @@ class UserManagementControllerTest {
 
         String requestBody = "{\"status\":\"DISABLED\"}";
 
-        when(adminUserAppService.updateUserStatus("user-123", "DISABLED"))
+        when(adminUserAppService.updateUserStatus("user-123", "DISABLED", Set.of("USER_ADMIN")))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "DISABLED"));
 
         mockMvc.perform(put("/api/v1/admin/users/user-123/status")
@@ -188,7 +188,7 @@ class UserManagementControllerTest {
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER_ADMIN"))
         );
 
-        when(adminUserAppService.updateUserStatus("user-123", "ACTIVE"))
+        when(adminUserAppService.updateUserStatus("user-123", "ACTIVE", Set.of("USER_ADMIN")))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "ACTIVE"));
 
         mockMvc.perform(post("/api/v1/admin/users/user-123/approve")
@@ -199,7 +199,7 @@ class UserManagementControllerTest {
                 .andExpect(jsonPath("$.data.userId").value("user-123"))
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
-        verify(adminUserAppService).updateUserStatus("user-123", "ACTIVE");
+        verify(adminUserAppService).updateUserStatus("user-123", "ACTIVE", Set.of("USER_ADMIN"));
     }
 
     @Test
@@ -211,7 +211,7 @@ class UserManagementControllerTest {
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER_ADMIN"))
         );
 
-        when(adminUserAppService.updateUserStatus("user-123", "DISABLED"))
+        when(adminUserAppService.updateUserStatus("user-123", "DISABLED", Set.of("USER_ADMIN")))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "DISABLED"));
 
         mockMvc.perform(post("/api/v1/admin/users/user-123/disable")
@@ -222,7 +222,7 @@ class UserManagementControllerTest {
                 .andExpect(jsonPath("$.data.userId").value("user-123"))
                 .andExpect(jsonPath("$.data.status").value("DISABLED"));
 
-        verify(adminUserAppService).updateUserStatus("user-123", "DISABLED");
+        verify(adminUserAppService).updateUserStatus("user-123", "DISABLED", Set.of("USER_ADMIN"));
     }
 
     @Test
@@ -234,7 +234,7 @@ class UserManagementControllerTest {
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_USER_ADMIN"))
         );
 
-        when(adminUserAppService.updateUserStatus("user-123", "ACTIVE"))
+        when(adminUserAppService.updateUserStatus("user-123", "ACTIVE", Set.of("USER_ADMIN")))
                 .thenReturn(new AdminUserMutationResponse("user-123", null, "ACTIVE"));
 
         mockMvc.perform(post("/api/v1/admin/users/user-123/enable")
@@ -245,7 +245,7 @@ class UserManagementControllerTest {
                 .andExpect(jsonPath("$.data.userId").value("user-123"))
                 .andExpect(jsonPath("$.data.status").value("ACTIVE"));
 
-        verify(adminUserAppService).updateUserStatus("user-123", "ACTIVE");
+        verify(adminUserAppService).updateUserStatus("user-123", "ACTIVE", Set.of("USER_ADMIN"));
     }
 
     @Test
