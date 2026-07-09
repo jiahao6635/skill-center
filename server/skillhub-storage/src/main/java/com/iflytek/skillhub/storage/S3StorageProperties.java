@@ -17,6 +17,8 @@ public class S3StorageProperties {
     private boolean forcePathStyle = true;
     private boolean disableChunkedEncoding = false;
     private boolean autoCreateBucket = false;
+    private String metadataEndpoint = "http://100.100.100.200";
+    private String metadataRoleName;
     private Duration presignExpiry = Duration.ofMinutes(10);
     private Integer maxConnections = 100;
     private Duration connectionAcquisitionTimeout = Duration.ofSeconds(2);
@@ -51,4 +53,8 @@ public class S3StorageProperties {
     public void setApiCallAttemptTimeout(Duration apiCallAttemptTimeout) { this.apiCallAttemptTimeout = apiCallAttemptTimeout; }
     public Duration getApiCallTimeout() { return apiCallTimeout; }
     public void setApiCallTimeout(Duration apiCallTimeout) { this.apiCallTimeout = apiCallTimeout; }
+    public String getMetadataEndpoint() { return metadataEndpoint; }
+    public void setMetadataEndpoint(String metadataEndpoint) { this.metadataEndpoint = metadataEndpoint; }
+    public String getMetadataRoleName() { return metadataRoleName; }
+    public void setMetadataRoleName(String metadataRoleName) { this.metadataRoleName = metadataRoleName; }
 }

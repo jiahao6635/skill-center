@@ -52,7 +52,7 @@ public class S3StorageService implements ObjectStorageService {
                 .connectionAcquisitionTimeout(properties.getConnectionAcquisitionTimeout());
         this.s3Client = buildS3Client(httpClientBuilder);
         this.s3Presigner = buildPresigner();
-        String authMode = isStaticCredentials() ? "static credentials" : "IAM credentials (default provider chain)";
+        String authMode = describeAuthMode();
         if (properties.isAutoCreateBucket()) {
             log.info("Initialized S3 storage client for bucket '{}' using {} (bucket auto-creation is deferred until first write)",
                     properties.getBucket(), authMode);
@@ -61,15 +61,34 @@ public class S3StorageService implements ObjectStorageService {
         }
     }
 
+    private String describeAuthMode() {
+        if (isStaticCredentials()) {
+            return "static credentials";
+        }
+        if (isAlibabaCloudEcsCredentials()) {
+            return "Alibaba Cloud ECS RAM Role (IMDS at " + properties.getMetadataEndpoint() + ", role: " + properties.getMetadataRoleName() + ")";
+        }
+        return "IAM credentials (default provider chain)";
+    }
+
     private boolean isStaticCredentials() {
         return properties.getAccessKey() != null && !properties.getAccessKey().isBlank()
                 && properties.getSecretKey() != null && !properties.getSecretKey().isBlank();
+    }
+
+    private boolean isAlibabaCloudEcsCredentials() {
+        return properties.getMetadataRoleName() != null && !properties.getMetadataRoleName().isBlank();
     }
 
     AwsCredentialsProvider buildCredentialsProvider() {
         if (isStaticCredentials()) {
             return StaticCredentialsProvider.create(
                     AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey()));
+        }
+        if (isAlibabaCloudEcsCredentials()) {
+            return new AlibabaCloudEcsCredentialsProvider(
+                    properties.getMetadataEndpoint(),
+                    properties.getMetadataRoleName());
         }
         return DefaultCredentialsProvider.create();
     }

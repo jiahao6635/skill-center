@@ -176,9 +176,12 @@ case "$storage_provider" in
     # If one is provided, both must be provided.
     s3_access_key="${SKILLHUB_STORAGE_S3_ACCESS_KEY:-}"
     s3_secret_key="${SKILLHUB_STORAGE_S3_SECRET_KEY:-}"
+    s3_metadata_role="${SKILLHUB_STORAGE_S3_METADATA_ROLE_NAME:-}"
     if [ -n "$s3_access_key" ] || [ -n "$s3_secret_key" ]; then
       require_non_empty SKILLHUB_STORAGE_S3_ACCESS_KEY
       require_non_empty SKILLHUB_STORAGE_S3_SECRET_KEY
+    elif [ -n "$s3_metadata_role" ]; then
+      echo "INFO: Using Alibaba Cloud ECS RAM Role '$s3_metadata_role' for STS credentials"
     else
       warn "SKILLHUB_STORAGE_S3_ACCESS_KEY and SKILLHUB_STORAGE_S3_SECRET_KEY are empty; using IAM / ECS RAM Role credentials"
     fi
