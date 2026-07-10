@@ -1,5 +1,3 @@
-import { useTranslation } from 'react-i18next'
-import { Button } from '@/shared/ui/button.tsx'
 import { useAuthMethods } from './use-auth-methods.ts'
 
 interface LoginButtonProps {
@@ -7,53 +5,57 @@ interface LoginButtonProps {
 }
 
 /**
- * Returns the appropriate icon for a given OAuth provider.
+ * Renders a single OAuth provider as a circular icon with label below,
+ * matching the "其他登录方式" style shown in the reference design.
  */
-function OAuthIcon({ provider }: { provider: string }) {
+function OAuthProviderItem({ provider, actionUrl }: { provider: string, displayName: string, actionUrl: string }) {
   const normalizedProvider = provider.toLowerCase()
   return (
-    <img
-      src={`/${normalizedProvider}-logo.svg`}
-      alt={provider}
-      className="w-5 h-5 mr-3"
-    />
+    <button
+      type="button"
+      className="flex flex-col items-center gap-2 group cursor-pointer"
+      onClick={() => { window.location.href = actionUrl }}
+    >
+      <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center transition-colors group-hover:border-primary/50 group-hover:bg-primary/5">
+        <img
+          src={`/${normalizedProvider}-logo.png`}
+          alt={provider}
+          className="w-6 h-6 object-contain"
+        />
+      </div>
+      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+        {provider}
+      </span>
+    </button>
   )
 }
 
 /**
- * Renders OAuth login buttons from the auth-method catalog returned by the backend.
+ * Renders OAuth login providers as circular icon buttons with labels,
+ * styled like the "其他登录方式" section in the reference design.
  */
 export function LoginButton({ returnTo }: LoginButtonProps) {
-  const { t } = useTranslation()
   const { data, isLoading } = useAuthMethods(returnTo)
 
   const providers = (data ?? []).filter((method) => method.methodType === 'OAUTH_REDIRECT')
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <Button className="w-full h-12" disabled>
-          <div className="w-5 h-5 rounded-full animate-shimmer mr-3" />
-          {t('loginButton.loading')}
-        </Button>
+      <div className="flex items-center justify-center py-4">
+        <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center animate-shimmer" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex items-center justify-center gap-8">
       {providers.map((provider) => (
-        <Button
+        <OAuthProviderItem
           key={provider.id}
-          className="w-full h-12 text-base"
-          variant="outline"
-          onClick={() => {
-            window.location.href = provider.actionUrl
-          }}
-        >
-          <OAuthIcon provider={provider.provider} />
-          {t('loginButton.loginWith', { name: provider.displayName })}
-        </Button>
+          provider={provider.provider}
+          displayName={provider.displayName}
+          actionUrl={provider.actionUrl}
+        />
       ))}
     </div>
   )

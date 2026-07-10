@@ -180,8 +180,8 @@ export function LoginPage() {
               </TabsContent>
 
               <TabsContent value="oauth" className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {t('login.oauthHint')}
+                <p className="text-center text-sm text-muted-foreground">
+                  {t('login.otherLoginMethods')}
                 </p>
                 <LoginButton returnTo={returnTo} />
               </TabsContent>
