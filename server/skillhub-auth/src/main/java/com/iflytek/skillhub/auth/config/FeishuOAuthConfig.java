@@ -3,6 +3,7 @@ package com.iflytek.skillhub.auth.config;
 import com.iflytek.skillhub.auth.oauth.FeishuOAuthProperties;
 import com.iflytek.skillhub.auth.oauth.FeishuOAuthService;
 import com.iflytek.skillhub.auth.oauth.OAuthLoginFlowService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -22,7 +23,8 @@ public class FeishuOAuthConfig {
     @ConditionalOnMissingBean
     public FeishuOAuthService feishuOAuthService(FeishuOAuthProperties properties,
                                                   OAuthLoginFlowService oauthLoginFlowService,
-                                                  RestClient.Builder restClientBuilder) {
-        return new FeishuOAuthService(properties, oauthLoginFlowService, restClientBuilder);
+                                                  RestClient.Builder restClientBuilder,
+                                                  @Value("${skillhub.public.base-url:}") String publicBaseUrl) {
+        return new FeishuOAuthService(properties, oauthLoginFlowService, restClientBuilder, publicBaseUrl);
     }
 }

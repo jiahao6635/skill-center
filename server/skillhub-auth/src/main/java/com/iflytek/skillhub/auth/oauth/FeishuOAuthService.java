@@ -52,6 +52,7 @@ public class FeishuOAuthService {
     private final FeishuOAuthProperties properties;
     private final OAuthLoginFlowService oauthLoginFlowService;
     private final RestClient restClient;
+    private final String publicBaseUrl;
 
     /** Cached app access token. */
     private volatile String cachedAppAccessToken;
@@ -60,13 +61,15 @@ public class FeishuOAuthService {
 
     public FeishuOAuthService(FeishuOAuthProperties properties,
                               OAuthLoginFlowService oauthLoginFlowService,
-                              RestClient.Builder restClientBuilder) {
+                              RestClient.Builder restClientBuilder,
+                              String publicBaseUrl) {
         this.properties = properties;
         this.oauthLoginFlowService = oauthLoginFlowService;
         this.restClient = restClientBuilder
             .baseUrl(FEISHU_BASE_URL)
             .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
             .build();
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     /**
@@ -132,6 +135,10 @@ public class FeishuOAuthService {
     }
 
     private String buildRedirectUri(HttpServletRequest request) {
+        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
+            return publicBaseUrl + CALLBACK_PATH;
+        }
+
         String scheme = request.getScheme();
         String serverName = request.getServerName();
         int serverPort = request.getServerPort();
