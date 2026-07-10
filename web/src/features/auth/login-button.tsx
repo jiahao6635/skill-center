@@ -24,7 +24,7 @@ function OAuthProviderItem({ provider, actionUrl }: { provider: string, displayN
         />
       </div>
       <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-        {provider}
+        {displayName}
       </span>
     </button>
   )
