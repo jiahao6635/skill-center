@@ -88,7 +88,7 @@ function SearchCard({ onSearch }: { onSearch?: (query: string) => void }) {
         style={{ color: 'hsl(var(--text-secondary))' }}
       >
         {t('landing.quickStart.description', {
-          defaultValue: '在同一个工作区里完成搜索和使用说明复制，减少切换步骤，直接把 SkillHub 接入你的 Agent 或 CLI。',
+          defaultValue: '在同一个工作区里完成搜索和使用说明复制，减少切换步骤，直接把 Skill Center 接入你的 Agent 或 CLI。',
         })}
       </p>
 
@@ -151,7 +151,7 @@ function SearchCard({ onSearch }: { onSearch?: (query: string) => void }) {
       >
         <p className="text-sm font-medium mb-2" style={{ color: 'hsl(var(--foreground))' }}>
           {activeTab === 'agent'
-            ? t('landing.quickStart.agent.description', { defaultValue: '发送提示词给你的 Agent，以设置 SkillHub Registry' })
+            ? t('landing.quickStart.agent.description', { defaultValue: '发送提示词给你的 Agent，以设置 Skill Center Registry' })
             : t('landing.quickStart.human.description', { defaultValue: '使用 CLI 工具安装 Skills' })}
         </p>
         <div className="flex items-center gap-3">
@@ -167,7 +167,7 @@ function SearchCard({ onSearch }: { onSearch?: (query: string) => void }) {
                 >
                   {registryUrl}
                 </a>
-                ，并按照说明完成 SkillHub Skills Registry 配置
+                ，并按照说明完成 Skill Center Skills Registry 配置
               </>
             ) : (
               <code className="font-mono text-sm" style={{ color: '#0F172A' }}>

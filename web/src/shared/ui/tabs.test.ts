@@ -40,7 +40,7 @@ describe('Tabs components', () => {
             key: 'list',
             children: [
               createElement(TabsTrigger, { key: 'clawhub', value: 'clawhub', children: 'ClawHub CLI' }),
-              createElement(TabsTrigger, { key: 'skillhub', value: 'skillhub', children: 'SkillHub CLI' }),
+              createElement(TabsTrigger, { key: 'skillhub', value: 'skillhub', children: 'Skill Center CLI' }),
             ],
           }),
           createElement(TabsContent, { key: 'clawhub-content', value: 'clawhub', children: 'clawhub command' }),

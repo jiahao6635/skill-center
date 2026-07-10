@@ -68,13 +68,13 @@ describe('install-command', () => {
     )
   })
 
-  it('builds a one-line SkillHub npx command for the global namespace', () => {
+  it('builds a one-line Skill Center npx command for the global namespace', () => {
     expect(buildSkillhubInstallCommand('global', 'my-skill', 'https://skill.xfyun.cn')).toBe(
       'npx @astron-team/skillhub@latest install my-skill --registry https://skill.xfyun.cn',
     )
   })
 
-  it('builds a one-line SkillHub npx command with namespace for team skills', () => {
+  it('builds a one-line Skill Center npx command with namespace for team skills', () => {
     expect(buildSkillhubInstallCommand('team-alpha', 'my-skill', 'https://skill.xfyun.cn')).toBe(
       'npx @astron-team/skillhub@latest install my-skill --namespace team-alpha --registry https://skill.xfyun.cn',
     )

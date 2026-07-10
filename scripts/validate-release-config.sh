@@ -167,6 +167,7 @@ storage_provider="${SKILLHUB_STORAGE_PROVIDER:-}"
 case "$storage_provider" in
   s3)
     require_non_empty SKILLHUB_STORAGE_S3_ENDPOINT
+    require_non_empty SKILLHUB_STORAGE_S3_PUBLIC_ENDPOINT
     require_non_empty SKILLHUB_STORAGE_S3_BUCKET
     require_non_empty SKILLHUB_STORAGE_S3_REGION
     validate_url SKILLHUB_STORAGE_S3_ENDPOINT

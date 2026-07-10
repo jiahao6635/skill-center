@@ -9,7 +9,7 @@ test.describe('Auth Entry (Real API)', () => {
   test('validates required fields and preserves returnTo on register link', async ({ page }) => {
     await page.goto('/login?returnTo=%2Fdashboard%2Ftokens')
 
-    await expect(page.getByRole('heading', { name: 'Login to SkillHub' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Login to Skill Center' })).toBeVisible()
 
     await page.getByRole('button', { name: 'Login' }).click()
     await expect(page.getByText('Username is required')).toBeVisible()
