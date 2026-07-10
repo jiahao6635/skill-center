@@ -36,13 +36,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
     "spring.security.oauth2.client.registration.github.client-name=GitHub",
-    "spring.security.oauth2.client.registration.gitee.client-id=placeholder",
-    "spring.security.oauth2.client.registration.gitee.client-secret=placeholder",
+    "spring.security.oauth2.client.registration.gitee.client-id=test-gitee-client-id",
+    "spring.security.oauth2.client.registration.gitee.client-secret=test-gitee-secret",
     "spring.security.oauth2.client.registration.gitee.provider=gitee",
     "spring.security.oauth2.client.registration.gitee.authorization-grant-type=authorization_code",
     "spring.security.oauth2.client.registration.gitee.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}",
     "spring.security.oauth2.client.registration.gitee.scope=user_info",
     "spring.security.oauth2.client.registration.gitee.client-name=Gitee",
+    "spring.security.oauth2.client.registration.gitlab.client-id=test-gitlab-client-id",
+    "spring.security.oauth2.client.registration.gitlab.client-secret=test-gitlab-secret",
     "spring.security.oauth2.client.provider.gitee.authorization-uri=https://gitee.com/oauth/authorize",
     "spring.security.oauth2.client.provider.gitee.token-uri=https://gitee.com/oauth/token",
     "spring.security.oauth2.client.provider.gitee.user-info-uri=https://gitee.com/api/v5/user",

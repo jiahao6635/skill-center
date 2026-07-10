@@ -26,15 +26,15 @@ import java.io.IOException;
  *
  * <p>Exposes two endpoints:
  * <ul>
- *   <li>{@code GET /login/feishu} — redirects the user to the Feishu authorization page</li>
- *   <li>{@code GET /login/feishu/callback} — handles the OAuth callback and establishes a session</li>
+ *   <li>{@code GET /login/oauth2/feishu} — redirects the user to the Feishu authorization page</li>
+ *   <li>{@code GET /login/oauth2/feishu/callback} — handles the OAuth callback and establishes a session</li>
  * </ul>
  *
  * <p>The controller is always registered, but delegates to {@link FeishuOAuthService}
  * which is only available when Feishu login is enabled.
  */
 @Controller
-@RequestMapping("/login/feishu")
+@RequestMapping("/login/oauth2/feishu")
 public class FeishuAuthController {
 
     private static final Logger log = LoggerFactory.getLogger(FeishuAuthController.class);

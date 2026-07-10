@@ -47,7 +47,7 @@ public class FeishuOAuthService {
     private static final String USER_INFO_PATH = "/open-apis/authen/v1/user_info";
 
     private static final String SESSION_STATE_ATTRIBUTE = "skillhub.feishu.oauth.state";
-    private static final String CALLBACK_PATH = "/login/feishu/callback";
+    private static final String CALLBACK_PATH = "/login/oauth2/feishu/callback";
 
     private final FeishuOAuthProperties properties;
     private final OAuthLoginFlowService oauthLoginFlowService;

@@ -48,6 +48,7 @@ public class AuthMethodCatalog {
     public List<AuthProviderResponse> listOAuthProviders(String returnTo) {
         String sanitizedReturnTo = OAuthLoginRedirectSupport.sanitizeReturnTo(returnTo);
         List<AuthProviderResponse> providers = new ArrayList<>(oAuth2ClientProperties.getRegistration().entrySet().stream()
+            .filter(entry -> !isPlaceholderClient(entry.getValue().getClientId()))
             .sorted(Comparator.comparing(entry -> entry.getKey()))
             .map(entry -> new AuthProviderResponse(
                 entry.getKey(),
@@ -83,6 +84,7 @@ public class AuthMethodCatalog {
         ));
 
         oAuth2ClientProperties.getRegistration().entrySet().stream()
+            .filter(entry -> !isPlaceholderClient(entry.getValue().getClientId()))
             .sorted(Comparator.comparing(entry -> entry.getKey()))
             .forEach(entry -> methods.add(new AuthMethodResponse(
                 "oauth-" + entry.getKey(),
@@ -141,10 +143,21 @@ public class AuthMethodCatalog {
     }
 
     private String buildFeishuLoginUrl(String returnTo) {
-        String baseUrl = "/login/feishu";
+        String baseUrl = "/login/oauth2/feishu";
         if (returnTo == null) {
             return baseUrl;
         }
         return baseUrl + "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Returns true when the OAuth2 client ID is a known placeholder value,
+     * meaning the provider has not been configured with real credentials.
+     */
+    private boolean isPlaceholderClient(String clientId) {
+        if (clientId == null || clientId.isBlank()) {
+            return true;
+        }
+        return "placeholder".equals(clientId) || "local-placeholder".equals(clientId);
     }
 }
