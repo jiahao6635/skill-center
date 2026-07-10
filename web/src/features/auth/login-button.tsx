@@ -8,7 +8,7 @@ interface LoginButtonProps {
  * Renders a single OAuth provider as a circular icon with label below,
  * matching the "其他登录方式" style shown in the reference design.
  */
-function OAuthProviderItem({ provider, actionUrl }: { provider: string, displayName: string, actionUrl: string }) {
+function OAuthProviderItem({ provider, displayName, actionUrl }: { provider: string, displayName: string, actionUrl: string }) {
   const normalizedProvider = provider.toLowerCase()
   return (
     <button
