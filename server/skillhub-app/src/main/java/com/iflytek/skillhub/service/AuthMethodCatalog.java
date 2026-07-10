@@ -2,6 +2,7 @@ package com.iflytek.skillhub.service;
 
 import com.iflytek.skillhub.auth.bootstrap.PassiveSessionAuthenticator;
 import com.iflytek.skillhub.auth.direct.DirectAuthProvider;
+import com.iflytek.skillhub.auth.oauth.FeishuOAuthProperties;
 import com.iflytek.skillhub.auth.oauth.OAuthLoginRedirectSupport;
 import com.iflytek.skillhub.config.AuthSessionBootstrapProperties;
 import com.iflytek.skillhub.config.DirectAuthProperties;
@@ -12,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientProperties;
 import org.springframework.stereotype.Service;
 
@@ -27,22 +29,25 @@ public class AuthMethodCatalog {
     private final AuthSessionBootstrapProperties sessionBootstrapProperties;
     private final List<DirectAuthProvider> directAuthProviders;
     private final List<PassiveSessionAuthenticator> passiveSessionAuthenticators;
+    private final ObjectProvider<FeishuOAuthProperties> feishuOAuthPropertiesProvider;
 
     public AuthMethodCatalog(OAuth2ClientProperties oAuth2ClientProperties,
                              DirectAuthProperties directAuthProperties,
                              AuthSessionBootstrapProperties sessionBootstrapProperties,
                              List<DirectAuthProvider> directAuthProviders,
-                             List<PassiveSessionAuthenticator> passiveSessionAuthenticators) {
+                             List<PassiveSessionAuthenticator> passiveSessionAuthenticators,
+                             ObjectProvider<FeishuOAuthProperties> feishuOAuthPropertiesProvider) {
         this.oAuth2ClientProperties = oAuth2ClientProperties;
         this.directAuthProperties = directAuthProperties;
         this.sessionBootstrapProperties = sessionBootstrapProperties;
         this.directAuthProviders = directAuthProviders;
         this.passiveSessionAuthenticators = passiveSessionAuthenticators;
+        this.feishuOAuthPropertiesProvider = feishuOAuthPropertiesProvider;
     }
 
     public List<AuthProviderResponse> listOAuthProviders(String returnTo) {
         String sanitizedReturnTo = OAuthLoginRedirectSupport.sanitizeReturnTo(returnTo);
-        return new ArrayList<>(oAuth2ClientProperties.getRegistration().entrySet().stream()
+        List<AuthProviderResponse> providers = new ArrayList<>(oAuth2ClientProperties.getRegistration().entrySet().stream()
             .sorted(Comparator.comparing(entry -> entry.getKey()))
             .map(entry -> new AuthProviderResponse(
                 entry.getKey(),
@@ -52,6 +57,17 @@ public class AuthMethodCatalog {
                 buildAuthorizationUrl(entry.getKey(), sanitizedReturnTo)
             ))
             .toList());
+
+        FeishuOAuthProperties feishuProps = feishuOAuthPropertiesProvider.getIfAvailable();
+        if (feishuProps != null && feishuProps.isEnabled()) {
+            providers.add(new AuthProviderResponse(
+                "feishu",
+                feishuProps.getDisplayName(),
+                buildFeishuLoginUrl(sanitizedReturnTo)
+            ));
+        }
+
+        return providers;
     }
 
     public List<AuthMethodResponse> listMethods(String returnTo) {
@@ -77,6 +93,17 @@ public class AuthMethodCatalog {
                     : entry.getKey(),
                 buildAuthorizationUrl(entry.getKey(), sanitizedReturnTo)
             )));
+
+        FeishuOAuthProperties feishuProps = feishuOAuthPropertiesProvider.getIfAvailable();
+        if (feishuProps != null && feishuProps.isEnabled()) {
+            methods.add(new AuthMethodResponse(
+                "oauth-feishu",
+                "OAUTH_REDIRECT",
+                "feishu",
+                feishuProps.getDisplayName(),
+                buildFeishuLoginUrl(sanitizedReturnTo)
+            ));
+        }
 
         if (directAuthProperties.isEnabled()) {
             directAuthProviders.stream()
@@ -107,6 +134,14 @@ public class AuthMethodCatalog {
 
     private String buildAuthorizationUrl(String registrationId, String returnTo) {
         String baseUrl = "/oauth2/authorization/" + registrationId;
+        if (returnTo == null) {
+            return baseUrl;
+        }
+        return baseUrl + "?returnTo=" + URLEncoder.encode(returnTo, StandardCharsets.UTF_8);
+    }
+
+    private String buildFeishuLoginUrl(String returnTo) {
+        String baseUrl = "/login/feishu";
         if (returnTo == null) {
             return baseUrl;
         }

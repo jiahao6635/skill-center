@@ -6,12 +6,14 @@ import static org.mockito.Mockito.mock;
 import com.iflytek.skillhub.auth.bootstrap.PassiveSessionAuthenticator;
 import com.iflytek.skillhub.auth.direct.DirectAuthProvider;
 import com.iflytek.skillhub.auth.direct.DirectAuthRequest;
+import com.iflytek.skillhub.auth.oauth.FeishuOAuthProperties;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.config.AuthSessionBootstrapProperties;
 import com.iflytek.skillhub.config.DirectAuthProperties;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientProperties;
 
 class AuthMethodCatalogTest {
@@ -63,7 +65,8 @@ class AuthMethodCatalogTest {
             directAuthProperties,
             bootstrapProperties,
             List.of(directProvider),
-            List.of(bootstrapProvider)
+            List.of(bootstrapProvider),
+            mock(ObjectProvider.class)
         );
 
         assertThat(catalog.listMethods(null))
@@ -112,7 +115,8 @@ class AuthMethodCatalogTest {
             directAuthProperties,
             bootstrapProperties,
             List.of(directProvider),
-            List.of(bootstrapProvider)
+            List.of(bootstrapProvider),
+            mock(ObjectProvider.class)
         );
 
         assertThat(catalog.listMethods(null))
