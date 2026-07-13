@@ -14,37 +14,6 @@ services:
       timeout: 5s
       retries: 10
 
-  postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
-    restart: unless-stopped
-    ports:
-      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-skillhub}
-      POSTGRES_USER: ${POSTGRES_USER:-skillhub}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-skillhub_demo}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skillhub} -d ${POSTGRES_DB:-skillhub}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: ${REDIS_IMAGE:-redis:7-alpine}
-    restart: unless-stopped
-    ports:
-      - "${REDIS_BIND_ADDRESS:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   server:
     image: skillhub-server:local
     build:
@@ -54,11 +23,12 @@ services:
     network_mode: host
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-skillhub}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${POSTGRES_HOST:-127.0.0.1}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-skillhub}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-skillhub}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-skillhub_demo}
-      REDIS_HOST: 127.0.0.1
+      REDIS_HOST: ${REDIS_HOST:-127.0.0.1}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
       SKILLHUB_PUBLIC_BASE_URL: ${SKILLHUB_PUBLIC_BASE_URL:-}
       DEVICE_AUTH_VERIFICATION_URI: ${DEVICE_AUTH_VERIFICATION_URI:-}
@@ -107,10 +77,6 @@ services:
     volumes:
       - skillhub_storage:/var/lib/skillhub/storage
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       skill-scanner:
         condition: service_healthy
     healthcheck:
@@ -145,6 +111,4 @@ services:
       start_period: 10s
 
 volumes:
-  postgres_data:
-  redis_data:
   skillhub_storage:
