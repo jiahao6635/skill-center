@@ -248,8 +248,9 @@ public class FeishuOAuthService {
     /**
      * Converts Feishu user info into normalized {@link OAuthClaims}.
      *
-     * <p>Feishu user info does not include an email field, so {@code email}
-     * and {@code emailVerified} are set to {@code null} and {@code false}.
+     * <p>When the Feishu user info includes an email, it is passed through as the
+     * claims email with {@code emailVerified} set to {@code true}; otherwise both
+     * are left as {@code null} and {@code false}.
      */
     private OAuthClaims toClaims(FeishuUserInfo userInfo) {
         Map<String, Object> extra = new HashMap<>();
@@ -258,11 +259,14 @@ public class FeishuOAuthService {
         extra.put("union_id", userInfo.unionId());
         extra.put("user_id", userInfo.userId());
 
+        String email = userInfo.email() != null && !userInfo.email().isBlank()
+            ? userInfo.email() : null;
+
         return new OAuthClaims(
             "feishu",
             userInfo.openId(),
-            null,
-            false,
+            email,
+            email != null,
             userInfo.name(),
             extra
         );
@@ -301,6 +305,7 @@ public class FeishuOAuthService {
         @JsonProperty("open_id") String openId,
         @JsonProperty("union_id") String unionId,
         @JsonProperty("user_id") String userId,
+        String email,
         @JsonProperty("avatar_url") String avatarUrl,
         @JsonProperty("avatar_big") String avatarBig,
         @JsonProperty("avatar_middle") String avatarMiddle,
