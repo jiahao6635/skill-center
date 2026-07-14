@@ -64,7 +64,6 @@ function createRoleProtectedRouteComponent<TModule extends Record<string, unknow
 const LandingPage = createLazyRouteComponent(() => import('@/pages/landing.tsx'), 'LandingPage')
 const HomePage = createLazyRouteComponent(() => import('@/pages/home.tsx'), 'HomePage')
 const LoginPage = createLazyRouteComponent(() => import('@/pages/login.tsx'), 'LoginPage')
-const RegisterPage = createLazyRouteComponent(() => import('@/pages/register.tsx'), 'RegisterPage')
 const ResetPasswordPage = createLazyRouteComponent(() => import('@/pages/reset-password.tsx'), 'ResetPasswordPage')
 const PrivacyPolicyPage = createLazyRouteComponent(() => import('@/pages/privacy.tsx'), 'PrivacyPolicyPage')
 const SearchPage = createLazyRouteComponent(() => import('@/pages/search.tsx'), 'SearchPage')
@@ -177,10 +176,10 @@ const loginRoute = createRoute({
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'register',
-  validateSearch: (search: Record<string, unknown>) => ({
-    returnTo: typeof search.returnTo === 'string' ? search.returnTo : '',
-  }),
-  component: RegisterPage,
+  beforeLoad: () => {
+    throw redirect({ to: '/login' })
+  },
+  component: () => null,
 })
 
 const resetPasswordRoute = createRoute({
