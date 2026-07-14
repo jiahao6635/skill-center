@@ -176,8 +176,11 @@ const loginRoute = createRoute({
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'register',
+  validateSearch: (search: Record<string, unknown>) => ({
+    returnTo: typeof search.returnTo === 'string' ? search.returnTo : '',
+  }),
   beforeLoad: () => {
-    throw redirect({ to: '/login' })
+    throw redirect({ to: '/login', search: { returnTo: '' } })
   },
   component: () => null,
 })
