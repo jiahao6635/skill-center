@@ -5,25 +5,25 @@ interface LoginButtonProps {
 }
 
 /**
- * Renders a single OAuth provider as a circular icon with label below,
- * matching the "其他登录方式" style shown in the reference design.
+ * Renders a single OAuth provider as a prominent button with icon and label,
+ * designed for primary login display.
  */
 function OAuthProviderItem({ provider, displayName, actionUrl }: { provider: string, displayName: string, actionUrl: string }) {
   const normalizedProvider = provider.toLowerCase()
   return (
     <button
       type="button"
-      className="flex flex-col items-center gap-2 group cursor-pointer"
+      className="flex items-center justify-center gap-3 w-full px-6 py-3 rounded-xl border border-border bg-background hover:bg-muted hover:border-primary/50 transition-all group cursor-pointer"
       onClick={() => { window.location.href = actionUrl }}
     >
-      <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center transition-colors group-hover:border-primary/50 group-hover:bg-primary/5">
+      <div className="w-10 h-10 rounded-full flex items-center justify-center">
         <img
           src={`/${normalizedProvider}-logo.png`}
           alt={provider}
-          className="w-6 h-6 object-contain"
+          className="w-8 h-8 object-contain"
         />
       </div>
-      <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+      <span className="text-base font-medium text-foreground group-hover:text-primary transition-colors">
         {displayName}
       </span>
     </button>
@@ -31,8 +31,8 @@ function OAuthProviderItem({ provider, displayName, actionUrl }: { provider: str
 }
 
 /**
- * Renders OAuth login providers as circular icon buttons with labels,
- * styled like the "其他登录方式" section in the reference design.
+ * Renders OAuth login providers as prominent buttons,
+ * styled as the primary login method.
  */
 export function LoginButton({ returnTo }: LoginButtonProps) {
   const { data, isLoading } = useAuthMethods(returnTo)
@@ -42,13 +42,13 @@ export function LoginButton({ returnTo }: LoginButtonProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-4">
-        <div className="w-12 h-12 rounded-full border border-border flex items-center justify-center animate-shimmer" />
+        <div className="w-full h-14 rounded-xl border border-border animate-shimmer" />
       </div>
     )
   }
 
   return (
-    <div className="flex items-center justify-center gap-8">
+    <div className="flex flex-col gap-3">
       {providers.map((provider) => (
         <OAuthProviderItem
           key={provider.id}

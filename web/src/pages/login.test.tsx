@@ -18,8 +18,7 @@ vi.mock('react-i18next', async () => {
 })
 
 vi.mock('lucide-react', () => ({
-  Eye: () => null,
-  EyeOff: () => null,
+  ChevronDown: () => null,
 }))
 
 vi.mock('@/api/client', () => ({
@@ -54,13 +53,6 @@ vi.mock('@/shared/ui/input', () => ({
   Input: () => null,
 }))
 
-vi.mock('@/shared/ui/tabs', () => ({
-  Tabs: ({ children }: { children: unknown }) => children,
-  TabsContent: ({ children }: { children: unknown }) => children,
-  TabsList: ({ children }: { children: unknown }) => children,
-  TabsTrigger: ({ children }: { children: unknown }) => children,
-}))
-
 import { renderToStaticMarkup } from 'react-dom/server'
 import { LoginPage } from './login.tsx'
 
@@ -69,11 +61,11 @@ describe('LoginPage', () => {
     expect(typeof LoginPage).toBe('function')
   })
 
-  it('renders the login title and form elements', () => {
+  it('renders the login title and admin login toggle', () => {
     const html = renderToStaticMarkup(<LoginPage />)
 
     expect(html).toContain('login.title')
     expect(html).toContain('login.subtitle')
-    expect(html).toContain('login.submit')
+    expect(html).toContain('login.adminLoginToggle')
   })
 })

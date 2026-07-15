@@ -1,7 +1,7 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Eye, EyeOff } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { getDirectAuthRuntimeConfig } from '@/api/client.ts'
 import { LoginButton } from '@/features/auth/login-button.tsx'
 import { SessionBootstrapEntry } from '@/features/auth/session-bootstrap-entry.tsx'
@@ -9,7 +9,6 @@ import { useAuthMethods } from '@/features/auth/use-auth-methods.ts'
 import { usePasswordLogin } from '@/features/auth/use-password-login.ts'
 import { Button } from '@/shared/ui/button.tsx'
 import { Input } from '@/shared/ui/input.tsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs.tsx'
 
 /**
  * Authentication entry page.
@@ -25,7 +24,7 @@ export function LoginPage() {
   const directAuthConfig = getDirectAuthRuntimeConfig()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<{ username?: string, password?: string }>({})
   const isChinese = i18n.resolvedLanguage?.split('-')[0] === 'zh'
   const { data: authMethods } = useAuthMethods(search.returnTo)
@@ -88,16 +87,41 @@ export function LoginPage() {
               onAuthenticated={() => navigate({ to: returnTo })}
             />
 
-            <Tabs defaultValue="password" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="password">{t('login.tabPassword')}</TabsTrigger>
-                <TabsTrigger value="oauth">{t('login.tabOAuth')}</TabsTrigger>
-              </TabsList>
+            {/* Primary: Feishu OAuth Login */}
+            <div className="space-y-4">
+              <LoginButton returnTo={returnTo} />
+            </div>
 
-              <TabsContent value="password">
-                <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">
+                  {t('login.adminLoginDivider')}
+                </span>
+              </div>
+            </div>
+
+            {/* Secondary: Admin Password Login (collapsed by default) */}
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowAdminLogin(!showAdminLogin)}
+                className="flex w-full items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>{t('login.adminLoginToggle')}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${showAdminLogin ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAdminLogin && (
+                <form className="space-y-4 rounded-lg border border-border/50 bg-muted/30 p-4" onSubmit={handleSubmit}>
+                  <p className="text-xs text-muted-foreground text-center">
+                    {t('login.adminLoginHint')}
+                  </p>
                   {directAuthConfig.enabled ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {t('login.passwordCompatHint', {
                         name: directMethod?.displayName ?? directAuthConfig.provider,
                       })}
@@ -127,7 +151,7 @@ export function LoginPage() {
                     <div className="relative">
                       <Input
                         id="password"
-                        type={showPassword ? 'text' : 'password'}
+                        type="password"
                         autoComplete="current-password"
                         value={password}
                         onChange={(event) => {
@@ -137,18 +161,8 @@ export function LoginPage() {
                           }
                         }}
                         placeholder={t('login.passwordPlaceholder')}
-                        className="pr-12"
                         aria-invalid={fieldErrors.password ? 'true' : 'false'}
                       />
-                      <button
-                        type="button"
-                        aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
-                        aria-pressed={showPassword}
-                        onClick={() => setShowPassword((current) => !current)}
-                        className="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
                     </div>
                     {fieldErrors.password ? (
                       <p className="text-sm text-red-600">{fieldErrors.password}</p>
@@ -157,25 +171,17 @@ export function LoginPage() {
                   {loginMutation.error ? (
                     <p className="text-sm text-red-600">{loginMutation.error.message}</p>
                   ) : null}
-                  <Button className="w-full" disabled={loginMutation.isPending} type="submit">
+                  <Button className="w-full" variant="secondary" disabled={loginMutation.isPending} type="submit">
                     {loginMutation.isPending ? t('login.submitting') : t('login.submit')}
                   </Button>
-                  <p className="text-center text-sm">
-                    <Link to="/reset-password" className="font-medium text-primary hover:underline">
+                  <p className="text-center text-xs">
+                    <Link to="/reset-password" className="font-medium text-muted-foreground hover:text-foreground hover:underline">
                       {t('login.forgotPassword')}
                     </Link>
                   </p>
-
                 </form>
-              </TabsContent>
-
-              <TabsContent value="oauth" className="space-y-4">
-                <p className="text-center text-sm text-muted-foreground">
-                  {t('login.otherLoginMethods')}
-                </p>
-                <LoginButton returnTo={returnTo} />
-              </TabsContent>
-            </Tabs>
+              )}
+            </div>
           </div>
         </div>
 
