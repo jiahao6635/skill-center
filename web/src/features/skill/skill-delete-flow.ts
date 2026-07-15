@@ -26,4 +26,8 @@ export function clearDeletedSkillQueries(queryClient: QueryClient, namespace: st
 
   void queryClient.invalidateQueries({ queryKey: ['skills', 'my'] })
   void queryClient.invalidateQueries({ queryKey: ['skills'] })
+
+  // The broad invalidation above may re-trigger the deleted skill's detail query before the
+  // component has a chance to disable it. Remove it again to prevent a 404 refetch.
+  queryClient.removeQueries({ queryKey: baseKey })
 }
