@@ -72,7 +72,7 @@ public class SkillPackageValidator {
 
             String contentMismatch = SkillPackagePolicy.validateContentMatchesExtension(normalizedPath, entry.content());
             if (contentMismatch != null) {
-                warnings.add(contentMismatch);
+                errors.add(contentMismatch);
             }
 
             if (SkillPackagePolicy.SKILL_MD_PATH.equals(normalizedPath) && skillMd == null) {

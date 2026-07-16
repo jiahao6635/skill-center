@@ -55,6 +55,7 @@ public class BuiltinSkillInitializer {
     private final BuiltinSkillProperties properties;
     private final BuiltinSkillManifestLoader manifestLoader;
     private final BuiltinSkillRemotePackageDownloader downloader;
+    private final BuiltinSkillClasspathPackageLoader classpathPackageLoader;
     private final BuiltinSkillPackageExtractor extractor;
     private final SkillMetadataParser metadataParser;
     private final NamespaceRepository namespaceRepository;
@@ -69,6 +70,7 @@ public class BuiltinSkillInitializer {
             BuiltinSkillProperties properties,
             BuiltinSkillManifestLoader manifestLoader,
             BuiltinSkillRemotePackageDownloader downloader,
+            BuiltinSkillClasspathPackageLoader classpathPackageLoader,
             BuiltinSkillPackageExtractor extractor,
             SkillMetadataParser metadataParser,
             NamespaceRepository namespaceRepository,
@@ -81,6 +83,7 @@ public class BuiltinSkillInitializer {
         this.properties = properties;
         this.manifestLoader = manifestLoader;
         this.downloader = downloader;
+        this.classpathPackageLoader = classpathPackageLoader;
         this.extractor = extractor;
         this.metadataParser = metadataParser;
         this.namespaceRepository = namespaceRepository;
@@ -192,25 +195,28 @@ public class BuiltinSkillInitializer {
     }
 
     private SyncOutcome syncItem(Namespace namespace, ManifestItem item) throws Exception {
-        Optional<SyncOutcome> skipBeforeDownload = shouldSkipBeforeDownload(namespace.getId(), item);
-        if (skipBeforeDownload.isPresent()) {
-            return skipBeforeDownload.get();
+        if (item.classpathSource() == null) {
+            Optional<SyncOutcome> skipBeforeDownload = shouldSkipBeforeDownload(namespace.getId(), item);
+            if (skipBeforeDownload.isPresent()) {
+                return skipBeforeDownload.get();
+            }
         }
 
-        Optional<URI> packageUri = parsePackageUri(item);
-        if (packageUri.isEmpty()) {
-            return SyncOutcome.FAILED;
+        List<PackageEntry> entries;
+        if (item.classpathSource() != null) {
+            entries = classpathPackageLoader.load(item.classpathSource());
+        } else {
+            Optional<URI> packageUri = parsePackageUri(item);
+            if (packageUri.isEmpty()) return SyncOutcome.FAILED;
+            Optional<byte[]> packageBytes = downloader.download(packageUri.get());
+            if (packageBytes.isEmpty()) {
+                log.warn("Skipping built-in skill slug={} version={} because package download failed",
+                        item.slug(), item.version());
+                return SyncOutcome.FAILED;
+            }
+            SkillPackageArchiveExtractor.ExtractionResult extractionResult = extractor.extract(packageBytes.get());
+            entries = extractionResult.entries();
         }
-
-        Optional<byte[]> packageBytes = downloader.download(packageUri.get());
-        if (packageBytes.isEmpty()) {
-            log.warn("Skipping built-in skill slug={} version={} because package download failed",
-                    item.slug(), item.version());
-            return SyncOutcome.FAILED;
-        }
-
-        SkillPackageArchiveExtractor.ExtractionResult extractionResult = extractor.extract(packageBytes.get());
-        List<PackageEntry> entries = extractionResult.entries();
         SkillMetadata metadata = parseSkillMetadata(entries);
         String packageSlug = SlugValidator.slugify(metadata.name());
         if (!item.slug().equals(packageSlug)) {

@@ -13,23 +13,24 @@ class RouteSecurityPolicyRegistryTest {
     private final RouteSecurityPolicyRegistry registry = new RouteSecurityPolicyRegistry();
 
     @Test
-    void authorizeApiToken_requiresPublishScopeForPublishEndpoints() {
+    void authorizeApiToken_rejectsAllBrowserWebEndpoints() {
         var denied = registry.authorizeApiToken("POST", "/api/web/skills/global/publish", Set.of("skill:read"));
         var allowed = registry.authorizeApiToken("POST", "/api/web/skills/global/publish", Set.of("skill:publish"));
 
         assertFalse(denied.allowed());
-        assertEquals("skill:publish", denied.requiredScope());
-        assertTrue(allowed.allowed());
+        assertEquals(null, denied.requiredScope());
+        assertFalse(allowed.allowed());
+        assertFalse(registry.authorizeApiToken("GET", "/api/web/skills/global/demo", Set.of()).allowed());
     }
 
     @Test
-    void authorizeApiToken_requiresDeleteScopeForHardDeleteEndpoint() {
+    void authorizeApiToken_rejectsHardDeleteForEveryTokenScope() {
         var denied = registry.authorizeApiToken("DELETE", "/api/v1/skills/global/demo-skill", Set.of("skill:publish"));
         var allowed = registry.authorizeApiToken("DELETE", "/api/v1/skills/global/demo-skill", Set.of("skill:delete"));
 
         assertFalse(denied.allowed());
-        assertEquals("skill:delete", denied.requiredScope());
-        assertTrue(allowed.allowed());
+        assertEquals(null, denied.requiredScope());
+        assertFalse(allowed.allowed());
     }
 
     @Test
@@ -99,17 +100,17 @@ class RouteSecurityPolicyRegistryTest {
         assertTrue(registry.authorizeApiToken("POST", "/api/cli/v1/skills/global/publish", Set.of("skill:publish")).allowed());
         assertFalse(registry.authorizeApiToken("POST", "/api/cli/v1/skills/global/publish/validate", Set.of()).allowed());
         assertTrue(registry.authorizeApiToken("POST", "/api/cli/v1/skills/global/publish/validate", Set.of("skill:publish")).allowed());
-        assertTrue(registry.authorizeApiToken("DELETE", "/api/cli/v1/skills/global/demo", Set.of("skill:delete")).allowed());
+        assertFalse(registry.authorizeApiToken("DELETE", "/api/cli/v1/skills/global/demo", Set.of("skill:delete")).allowed());
     }
 
     @Test
-    void routeAuthorizationProtectsNativeCliRemoteDeleteByAuthenticationNotSuperAdminRole() {
+    void routeAuthorizationDoesNotExposeNativeCliRemoteDelete() {
         boolean matched = registry.authorizationPolicies().stream()
                 .anyMatch(policy -> policy.method() == HttpMethod.DELETE
                         && "/api/cli/v1/skills/*/*".equals(policy.pattern())
                         && policy.accessLevel() == RouteSecurityPolicyRegistry.AccessLevel.AUTHENTICATED);
 
-        assertTrue(matched);
+        assertFalse(matched);
     }
 
     @Test

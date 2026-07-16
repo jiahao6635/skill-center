@@ -39,6 +39,21 @@ public class AuditLog {
     @Column(name = "user_agent", length = 512)
     private String userAgent;
 
+    @Column(name = "auth_source", length = 32)
+    private String authSource;
+
+    @Column(name = "token_id")
+    private Long tokenId;
+
+    @Column(name = "token_prefix", length = 16)
+    private String tokenPrefix;
+
+    @Column(name = "client_name", length = 128)
+    private String clientName;
+
+    @Column(name = "authorized_namespace_id")
+    private Long authorizedNamespaceId;
+
     @Column(name = "detail_json")
     @JdbcTypeCode(SqlTypes.JSON)
     private String detailJson;
@@ -57,6 +72,24 @@ public class AuditLog {
                     String userAgent,
                     String detailJson,
                     Instant createdAt) {
+        this(actorUserId, action, targetType, targetId, requestId, clientIp, userAgent,
+                detailJson, createdAt, null, null, null, null, null);
+    }
+
+    public AuditLog(String actorUserId,
+                    String action,
+                    String targetType,
+                    Long targetId,
+                    String requestId,
+                    String clientIp,
+                    String userAgent,
+                    String detailJson,
+                    Instant createdAt,
+                    String authSource,
+                    Long tokenId,
+                    String tokenPrefix,
+                    String clientName,
+                    Long authorizedNamespaceId) {
         this.actorUserId = actorUserId;
         this.action = action;
         this.targetType = targetType;
@@ -66,6 +99,11 @@ public class AuditLog {
         this.userAgent = userAgent;
         this.detailJson = detailJson;
         this.createdAt = createdAt;
+        this.authSource = authSource;
+        this.tokenId = tokenId;
+        this.tokenPrefix = tokenPrefix;
+        this.clientName = clientName;
+        this.authorizedNamespaceId = authorizedNamespaceId;
     }
 
     public Long getId() { return id; }
@@ -78,4 +116,9 @@ public class AuditLog {
     public String getUserAgent() { return userAgent; }
     public String getDetailJson() { return detailJson; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getAuthSource() { return authSource; }
+    public Long getTokenId() { return tokenId; }
+    public String getTokenPrefix() { return tokenPrefix; }
+    public String getClientName() { return clientName; }
+    public Long getAuthorizedNamespaceId() { return authorizedNamespaceId; }
 }

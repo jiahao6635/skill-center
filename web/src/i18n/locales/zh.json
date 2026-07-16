@@ -197,7 +197,10 @@
     "enterKeyword": "请输入搜索关键词",
     "results": "找到 {{count}} 个技能",
     "resultCount": "找到 <1>{{count}}</1> 个结果",
-    "loadingMore": "正在更新搜索结果..."
+    "loadingMore": "正在更新搜索结果...",
+    "sourceLocal": "本中心",
+    "sourceSkillHubCn": "SkillHub 公共库",
+    "externalDisabled": "当前部署未启用 SkillHub 公共库"
   },
   "searchBar": {
     "placeholder": "搜索技能...",
@@ -299,7 +302,14 @@
     "defaultError": "授权失败，请检查用户码是否正确",
     "submitting": "授权中...",
     "submit": "授权设备",
-    "notice": "授权后,设备将可以访问你的账户"
+    "notice": "授权仅限于所选命名空间和页面展示的权限",
+    "client": "客户端",
+    "permissions": "权限",
+    "expires": "有效期",
+    "days": "天",
+    "namespace": "授权命名空间",
+    "deny": "拒绝",
+    "denied": "已拒绝设备授权"
   },
   "cliAuth": {
     "validating": "验证中...",

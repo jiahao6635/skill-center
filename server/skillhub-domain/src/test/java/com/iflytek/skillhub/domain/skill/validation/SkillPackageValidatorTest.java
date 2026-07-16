@@ -41,6 +41,28 @@ class SkillPackageValidatorTest {
     }
 
     @Test
+    void acceptsUtf8MdxAndRejectsBinaryMdx() {
+        String skillMdContent = """
+            ---
+            name: test-skill
+            description: A test skill
+            version: 1.0.0
+            ---
+            Body
+            """;
+        ValidationResult valid = validator.validate(List.of(
+                new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown"),
+                new PackageEntry("references/example.mdx", "# Hello".getBytes(), 7, "text/markdown")));
+        ValidationResult invalid = validator.validate(List.of(
+                new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown"),
+                new PackageEntry("references/example.mdx", new byte[]{0, 1, 2}, 3, "text/markdown")));
+
+        assertTrue(valid.passed());
+        assertFalse(invalid.passed());
+        assertTrue(invalid.errors().stream().anyMatch(error -> error.contains("example.mdx")));
+    }
+
+    @Test
     void normalizesSkillMdFilenameCase() {
         assertEquals("SKILL.md", SkillPackagePolicy.normalizeEntryPath("skill.md"));
         assertEquals("SKILL.md", SkillPackagePolicy.normalizeEntryPath("Skill.MD"));
@@ -270,8 +292,8 @@ class SkillPackageValidatorTest {
 
         ValidationResult result = validator.validate(entries);
 
-        assertTrue(result.passed());
-        assertTrue(result.warnings().stream().anyMatch(e -> e.contains("File content does not match extension")));
+        assertFalse(result.passed());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("File content does not match extension")));
     }
 
     @Test
@@ -292,8 +314,8 @@ class SkillPackageValidatorTest {
 
         ValidationResult result = validator.validate(entries);
 
-        assertTrue(result.passed());
-        assertTrue(result.warnings().stream().anyMatch(e -> e.contains("File content does not match extension")));
+        assertFalse(result.passed());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("File content does not match extension")));
     }
 
     @Test
@@ -303,8 +325,8 @@ class SkillPackageValidatorTest {
                 new PackageEntry("photo.jpeg", new byte[]{0x00, 0x00}, 2, "image/jpeg")
         );
         ValidationResult result = validator.validate(entries);
-        assertTrue(result.passed());
-        assertTrue(result.warnings().stream().anyMatch(e -> e.contains("photo.jpeg")));
+        assertFalse(result.passed());
+        assertTrue(result.errors().stream().anyMatch(e -> e.contains("photo.jpeg")));
     }
 
     @Test

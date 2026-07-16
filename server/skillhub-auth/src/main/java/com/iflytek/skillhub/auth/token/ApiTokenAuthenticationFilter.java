@@ -4,6 +4,8 @@ import com.iflytek.skillhub.auth.entity.ApiToken;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.rbac.PlatformRoleDefaults;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
+import com.iflytek.skillhub.auth.repository.ApiTokenNamespaceGrantRepository;
+import com.iflytek.skillhub.auth.entity.ApiTokenNamespaceGrant;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import jakarta.servlet.FilterChain;
@@ -41,18 +43,21 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
     private final UserRoleBindingRepository roleBindingRepo;
     private final ApiTokenScopeService apiTokenScopeService;
     private final AuthenticationEntryPoint authenticationEntryPoint;
+    private final ApiTokenNamespaceGrantRepository grantRepository;
 
     @Autowired
     public ApiTokenAuthenticationFilter(ApiTokenService apiTokenService,
                                         UserAccountRepository userRepo,
                                         UserRoleBindingRepository roleBindingRepo,
                                         ApiTokenScopeService apiTokenScopeService,
-                                        AuthenticationEntryPoint authenticationEntryPoint) {
+                                        AuthenticationEntryPoint authenticationEntryPoint,
+                                        ApiTokenNamespaceGrantRepository grantRepository) {
         this.apiTokenService = apiTokenService;
         this.userRepo = userRepo;
         this.roleBindingRepo = roleBindingRepo;
         this.apiTokenScopeService = apiTokenScopeService;
         this.authenticationEntryPoint = authenticationEntryPoint;
+        this.grantRepository = grantRepository;
     }
 
     ApiTokenAuthenticationFilter(ApiTokenService apiTokenService,
@@ -61,7 +66,7 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
                                  ApiTokenScopeService apiTokenScopeService) {
         this(apiTokenService, userRepo, roleBindingRepo, apiTokenScopeService,
             (request, response, authException) ->
-                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage()));
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage()), null);
     }
 
     @Override
@@ -106,6 +111,10 @@ public class ApiTokenAuthenticationFilter extends OncePerRequestFilter {
                 .map(scope -> new SimpleGrantedAuthority("SCOPE_" + scope))
                 .toList());
             var auth = new UsernamePasswordAuthenticationToken(principal, null, authorities);
+            Set<Long> namespaceIds = grantRepository == null ? Set.of() : grantRepository.findByTokenId(apiToken.getId()).stream()
+                    .map(ApiTokenNamespaceGrant::getNamespaceId).collect(Collectors.toSet());
+            auth.setDetails(new ApiTokenGrantContext(apiToken.getId(), apiToken.getTokenPrefix(),
+                    apiToken.getClientName(), apiToken.getTokenKind(), scopes, namespaceIds, apiToken.getExpiresAt()));
             SecurityContextHolder.getContext().setAuthentication(auth);
             apiTokenService.touchLastUsed(apiToken);
         }

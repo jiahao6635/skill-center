@@ -7,5 +7,13 @@ public record CliDryRunResponse(
         List<String> errors,
         List<String> warnings,
         String resolvedSlug,
-        String resolvedVersion
-) {}
+        String resolvedVersion,
+        String packageFingerprint,
+        String warningDigest,
+        boolean requiresConfirmation
+) {
+    public CliDryRunResponse(boolean valid, List<String> errors, List<String> warnings,
+                             String resolvedSlug, String resolvedVersion) {
+        this(valid, errors, warnings, resolvedSlug, resolvedVersion, null, null, !warnings.isEmpty());
+    }
+}

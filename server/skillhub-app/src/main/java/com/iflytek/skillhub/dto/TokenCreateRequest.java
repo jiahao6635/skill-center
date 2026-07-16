@@ -10,5 +10,13 @@ public record TokenCreateRequest(
         @Size(max = 64, message = "{validation.token.name.size}")
         String name,
         List<String> scopes,
-        String expiresAt
-) {}
+        String expiresAt,
+        String tokenKind,
+        String namespaceSlug,
+        String clientId,
+        String clientName
+) {
+    public TokenCreateRequest(String name, List<String> scopes, String expiresAt) {
+        this(name, scopes, expiresAt, null, null, null, null);
+    }
+}

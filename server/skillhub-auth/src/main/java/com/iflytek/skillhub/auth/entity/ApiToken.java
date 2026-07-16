@@ -35,6 +35,15 @@ public class ApiToken {
     @Column(name = "scope_json", nullable = false, columnDefinition = "jsonb")
     private String scopeJson;
 
+    @Column(name = "token_kind", nullable = false, length = 32)
+    private String tokenKind = "PERSONAL";
+
+    @Column(name = "client_id", length = 128)
+    private String clientId;
+
+    @Column(name = "client_name", length = 128)
+    private String clientName;
+
     @Column(name = "expires_at")
     private Instant expiresAt;
 
@@ -72,6 +81,12 @@ public class ApiToken {
     public String getTokenPrefix() { return tokenPrefix; }
     public String getTokenHash() { return tokenHash; }
     public String getScopeJson() { return scopeJson; }
+    public String getTokenKind() { return tokenKind; }
+    public void setTokenKind(String tokenKind) { this.tokenKind = tokenKind; }
+    public String getClientId() { return clientId; }
+    public void setClientId(String clientId) { this.clientId = clientId; }
+    public String getClientName() { return clientName; }
+    public void setClientName(String clientName) { this.clientName = clientName; }
     public Instant getExpiresAt() { return expiresAt; }
     public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
     public Instant getLastUsedAt() { return lastUsedAt; }

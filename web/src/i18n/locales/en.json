@@ -197,7 +197,10 @@
     "enterKeyword": "Please enter a search keyword",
     "results": "{{count}} skills found",
     "resultCount": "Found <1>{{count}}</1> results",
-    "loadingMore": "Updating search results..."
+    "loadingMore": "Updating search results...",
+    "sourceLocal": "This registry",
+    "sourceSkillHubCn": "SkillHub public catalog",
+    "externalDisabled": "The public catalog is not enabled by this deployment"
   },
   "searchBar": {
     "placeholder": "Search skills...",
@@ -299,7 +302,14 @@
     "defaultError": "Authorization failed, please check the user code",
     "submitting": "Authorizing...",
     "submit": "Authorize Device",
-    "notice": "After authorization, the device will have access to your account"
+    "notice": "Authorization is limited to the selected namespace and displayed permissions",
+    "client": "Client",
+    "permissions": "Permissions",
+    "expires": "Expires in",
+    "days": "days",
+    "namespace": "Authorized namespace",
+    "deny": "Deny",
+    "denied": "Device authorization denied"
   },
   "cliAuth": {
     "validating": "Validating...",

@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import org.slf4j.MDC;
 
 /**
  * Records audit log entries for administrative and security-relevant actions.
@@ -39,7 +40,21 @@ public class AuditLogService {
             clientIp,
             userAgent,
             detailJson,
-            createdAt
+            createdAt,
+            MDC.get("authSource"),
+            parseLong(MDC.get("tokenId")),
+            MDC.get("tokenPrefix"),
+            MDC.get("clientName"),
+            parseLong(MDC.get("authorizedNamespaceId"))
         ));
+    }
+
+    private Long parseLong(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }

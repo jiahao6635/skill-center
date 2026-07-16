@@ -66,6 +66,7 @@ class BuiltinSkillInitializerTest {
 
     @Mock private BuiltinSkillManifestLoader manifestLoader;
     @Mock private BuiltinSkillRemotePackageDownloader downloader;
+    @Mock private BuiltinSkillClasspathPackageLoader classpathPackageLoader;
     @Mock private BuiltinSkillPackageExtractor extractor;
     @Mock private NamespaceRepository namespaceRepository;
     @Mock private NamespaceMemberRepository namespaceMemberRepository;
@@ -86,6 +87,7 @@ class BuiltinSkillInitializerTest {
                 properties,
                 manifestLoader,
                 downloader,
+                classpathPackageLoader,
                 extractor,
                 new SkillMetadataParser(),
                 namespaceRepository,

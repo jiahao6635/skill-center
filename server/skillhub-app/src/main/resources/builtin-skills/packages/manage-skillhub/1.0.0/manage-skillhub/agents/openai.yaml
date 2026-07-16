@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage SkillHub"
+  short_description: "Operate SkillHub safely through the official CLI"
+  default_prompt: "Use $manage-skillhub to manage a SkillHub skill safely."

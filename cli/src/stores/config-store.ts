@@ -1,11 +1,13 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { joinPath, userStateDir, ensureDir, pathExists } from '../platform/paths'
+import { randomUUID } from 'node:crypto'
 
 export interface CliConfig {
   registry?: string
   defaultAgent?: string
   lastUpdateCheckAt?: string
+  clientInstanceId?: string
 }
 
 export class ConfigStore {
@@ -27,5 +29,13 @@ export class ConfigStore {
 
   async setRegistry(registry: string): Promise<void> {
     await this.write({ ...(await this.read()), registry })
+  }
+
+  async getOrCreateClientInstanceId(): Promise<string> {
+    const config = await this.read()
+    if (config.clientInstanceId) return config.clientInstanceId
+    const clientInstanceId = randomUUID()
+    await this.write({ ...config, clientInstanceId })
+    return clientInstanceId
   }
 }

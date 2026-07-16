@@ -103,7 +103,7 @@ class ApiTokenScopeFilterTest {
     }
 
     @Test
-    void shouldDenyApiWebRequestsWithoutRequiredScope() throws Exception {
+    void shouldDenyApiWebRequestsBecauseBearerTokensAreUnsupported() throws Exception {
         AccessDeniedHandler handler = (request, response, accessDeniedException) -> {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, accessDeniedException.getMessage());
         };
@@ -131,7 +131,7 @@ class ApiTokenScopeFilterTest {
         filter.doFilter(request, response, chain);
 
         assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
-        assertTrue(response.getErrorMessage().contains("Missing API token scope: skill:publish"));
+        assertTrue(response.getErrorMessage().contains("API token cannot access endpoint"));
         verify(chain, never()).doFilter(request, response);
     }
 

@@ -15,6 +15,9 @@ import { useMyStars } from '@/shared/hooks/use-user-queries.ts'
 import { formatNamespaceSearchInput, normalizeSearchQuery, parseNamespaceSearchInput } from '@/shared/lib/search-query.ts'
 import { Button } from '@/shared/ui/button.tsx'
 import { APP_SHELL_PAGE_CLASS_NAME } from '@/app/page-shell-style.ts'
+import { useExternalSkillCategories, useExternalSkillProviders, useExternalSkillSearch } from '@/features/external-skill/use-external-skills.ts'
+import { ExternalSkillCard } from '@/features/external-skill/external-skill-card.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select.tsx'
 
 const PAGE_SIZE = 12
 
@@ -96,6 +99,9 @@ export function SearchPage() {
   const sort = searchParams.sort || 'newest'
   const page = searchParams.page ?? 0
   const starredOnly = searchParams.starredOnly ?? false
+  const source = searchParams.source === 'skillhub-cn' ? 'skillhub-cn' : 'local'
+  const category = searchParams.category || ''
+  const isExternal = source === 'skillhub-cn'
   const [queryInput, setQueryInput] = useState(formatNamespaceSearchInput(namespace, q))
   const previousPageRef = useRef(page)
 
@@ -126,6 +132,10 @@ export function SearchPage() {
     size: PAGE_SIZE,
     starredOnly,
   })
+  const { data: providers } = useExternalSkillProviders()
+  const externalEnabled = providers?.some((provider) => provider.id === 'skillhub-cn' && provider.enabled) ?? false
+  const externalQuery = useExternalSkillSearch({ q, category: category || undefined, sort, page, size: PAGE_SIZE }, isExternal && externalEnabled)
+  const { data: externalCategories } = useExternalSkillCategories(isExternal && externalEnabled)
   const { data: labels } = useVisibleLabels()
   const {
     data: starredSkills,
@@ -142,44 +152,44 @@ export function SearchPage() {
 
     if (!parsedInput.query && !parsedInput.namespace) {
       startTransition(() => {
-        navigate({ to: '/search', search: { q: '', namespace: '', label: selectedLabel, sort, page: 0, starredOnly }, replace: page === 0 })
+        navigate({ to: '/search', search: { q: '', namespace: '', label: selectedLabel, sort, page: 0, starredOnly, source, category }, replace: page === 0 })
       })
       return
     }
 
     const timeoutId = window.setTimeout(() => {
       startTransition(() => {
-        navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+        navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly, source, category }, replace: true })
       })
     }, 250)
 
     return () => window.clearTimeout(timeoutId)
-  }, [navigate, namespace, page, q, queryInput, selectedLabel, sort, starredOnly])
+  }, [navigate, namespace, page, q, queryInput, selectedLabel, sort, starredOnly, source, category])
 
   const handleSearch = (query: string) => {
     const parsedInput = parseNamespaceSearchInput(query)
     setQueryInput(query)
     startTransition(() => {
-      navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+      navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly, source, category }, replace: true })
     })
   }
 
   const handleSortChange = (newSort: string) => {
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort: newSort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort: newSort, page: 0, starredOnly, source, category } })
   }
 
   const handlePageChange = (newPage: number) => {
     blurActiveElement()
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: newPage, starredOnly } })
+    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: newPage, starredOnly, source, category } })
   }
 
   const handleLabelToggle = (label: string) => {
     const nextLabel = selectedLabel === label ? '' : label
-    navigate({ to: '/search', search: { q, namespace, label: nextLabel, sort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: { q, namespace, label: nextLabel, sort, page: 0, starredOnly, source, category } })
   }
 
   const handleNamespaceClear = () => {
-    navigate({ to: '/search', search: { q, namespace: '', label: selectedLabel, sort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: { q, namespace: '', label: selectedLabel, sort, page: 0, starredOnly, source, category } })
   }
 
   const handleStarredToggle = () => {
@@ -193,7 +203,7 @@ export function SearchPage() {
       return
     }
 
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: 0, starredOnly: !starredOnly } })
+    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: 0, starredOnly: !starredOnly, source, category } })
   }
 
   const handleSkillClick = (namespace: string, slug: string) => {
@@ -215,6 +225,11 @@ export function SearchPage() {
   const isPageLoading = starredOnly ? isLoadingStarred : isLoading
   const isUpdatingResults = starredOnly ? isFetchingStarred && !isLoadingStarred : isFetching && !isLoading
   const resultCount = starredOnly ? filteredStarredSkills.length : (data?.total ?? 0)
+  const externalItems = externalQuery.data?.items ?? []
+  const activeResultCount = isExternal ? (externalQuery.data?.total ?? 0) : resultCount
+  const activeTotalPages = isExternal ? Math.ceil((externalQuery.data?.total ?? 0) / PAGE_SIZE) : totalPages
+  const activeLoading = isExternal ? externalQuery.isLoading : isPageLoading
+  const activeUpdating = isExternal ? externalQuery.isFetching && !externalQuery.isLoading : isUpdatingResults
 
   return (
     <div className={APP_SHELL_PAGE_CLASS_NAME}>
@@ -222,10 +237,21 @@ export function SearchPage() {
       <div className="max-w-3xl mx-auto">
         <SearchBar
           value={queryInput}
-          isSearching={isUpdatingResults}
+          isSearching={activeUpdating}
           onChange={setQueryInput}
           onSearch={handleSearch}
         />
+      </div>
+
+      <div className="flex gap-2">
+        <Button variant={!isExternal ? 'default' : 'outline'} onClick={() => navigate({ to: '/search', search: { q, sort: 'newest', page: 0, starredOnly: false, source: 'local' } })}>
+          {t('search.sourceLocal')}
+        </Button>
+        {externalEnabled ? (
+          <Button variant={isExternal ? 'default' : 'outline'} onClick={() => navigate({ to: '/search', search: { q, sort: 'relevance', page: 0, starredOnly: false, source: 'skillhub-cn' } })}>
+            {t('search.sourceSkillHubCn')}
+          </Button>
+        ) : null}
       </div>
 
       {/* Sort And Filters */}
@@ -258,21 +284,21 @@ export function SearchPage() {
             </div>
           </div>
 
-          {resultCount > 0 && (
+          {activeResultCount > 0 && (
             <div className="text-sm text-muted-foreground">
-              {t('search.results', { count: resultCount })}
+              {t('search.results', { count: activeResultCount })}
             </div>
           )}
         </div>
 
-        {isUpdatingResults ? (
+        {activeUpdating ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>{t('search.loadingMore')}</span>
           </div>
         ) : null}
 
-        <div className="flex items-center gap-3">
+        {!isExternal ? <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-muted-foreground">{t('search.filters.label')}</span>
           <Button
             variant={starredOnly ? 'default' : 'outline'}
@@ -300,12 +326,39 @@ export function SearchPage() {
               {t('search.namespaceFilter', { namespace })}
             </Button>
           ) : null}
-        </div>
+        </div> : (
+          <div className="flex max-w-sm items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground">Category</span>
+            <Select value={category || '__all__'} onValueChange={(value) => navigate({
+              to: '/search',
+              search: { q, sort, page: 0, starredOnly: false, source, category: value === '__all__' ? '' : value },
+            })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All</SelectItem>
+                {(externalCategories ?? []).map((item) => (
+                  <SelectItem key={item.key} value={item.key}>{item.name || item.nameEn || item.key}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {/* Results */}
-      {isPageLoading ? (
+      {isExternal && !externalEnabled ? (
+        <EmptyState title={t('search.externalDisabled')} />
+      ) : activeLoading ? (
         <SkeletonList count={PAGE_SIZE} />
+      ) : isExternal && externalItems.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {externalItems.map((skill) => (
+              <ExternalSkillCard key={skill.slug} skill={skill} onClick={() => navigate({ to: `/external/skillhub-cn/${encodeURIComponent(skill.slug)}` })} />
+            ))}
+          </div>
+          {activeTotalPages > 1 ? <Pagination page={page} totalPages={activeTotalPages} onPageChange={handlePageChange} /> : null}
+        </>
       ) : displayItems.length > 0 ? (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -319,10 +372,10 @@ export function SearchPage() {
               </div>
             ))}
           </div>
-          {totalPages > 1 && (
+          {activeTotalPages > 1 && (
             <Pagination
               page={page}
-              totalPages={totalPages}
+              totalPages={activeTotalPages}
               onPageChange={handlePageChange}
             />
           )}

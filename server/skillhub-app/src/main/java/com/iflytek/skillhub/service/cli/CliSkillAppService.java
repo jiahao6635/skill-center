@@ -7,12 +7,10 @@ import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import com.iflytek.skillhub.dto.SkillSummaryResponse;
-import com.iflytek.skillhub.dto.cli.CliDeleteResponse;
 import com.iflytek.skillhub.dto.cli.CliDryRunResponse;
 import com.iflytek.skillhub.dto.cli.CliPublishResponse;
 import com.iflytek.skillhub.dto.cli.CliResolveResponse;
 import com.iflytek.skillhub.service.AuditRequestContext;
-import com.iflytek.skillhub.service.SkillDeleteAppService;
 import com.iflytek.skillhub.service.SkillSearchAppService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.InputStreamResource;
@@ -31,19 +29,16 @@ public class CliSkillAppService {
     private final SkillSearchAppService skillSearchAppService;
     private final SkillQueryService skillQueryService;
     private final SkillDownloadService skillDownloadService;
-    private final SkillDeleteAppService skillDeleteAppService;
     private final SkillPublishService skillPublishService;
 
     public CliSkillAppService(
             SkillSearchAppService skillSearchAppService,
             SkillQueryService skillQueryService,
             SkillDownloadService skillDownloadService,
-            SkillDeleteAppService skillDeleteAppService,
             SkillPublishService skillPublishService) {
         this.skillSearchAppService = skillSearchAppService;
         this.skillQueryService = skillQueryService;
         this.skillDownloadService = skillDownloadService;
-        this.skillDeleteAppService = skillDeleteAppService;
         this.skillPublishService = skillPublishService;
     }
 
@@ -106,43 +101,71 @@ public class CliSkillAppService {
         return buildDownloadResponse(result);
     }
 
-    public CliDeleteResponse deleteRemote(String namespace, String slug, String actorUserId, AuditRequestContext auditContext) {
-        SkillDeleteAppService.DeleteResult result = skillDeleteAppService.deleteSkill(
-                namespace, slug, null, actorUserId, auditContext
-        );
-
-        return new CliDeleteResponse(
-                result.deleted(),
-                "remote",
-                "delete",
-                result.namespace(),
-                result.slug()
-        );
-    }
-
     public CliDryRunResponse validatePublish(String namespace, List<PackageEntry> entries, String publisherId, SkillVisibility visibility, Set<String> platformRoles) {
         SkillPublishService.DryRunResult result = skillPublishService.validateOnly(
                 namespace, entries, publisherId, visibility, platformRoles);
+        String fingerprint = packageFingerprint(entries);
+        String warningDigest = sha256(fingerprint + "\n" + String.join("\n", result.warnings().stream().sorted().toList()));
         return new CliDryRunResponse(
                 result.valid(),
                 result.errors(),
                 result.warnings(),
                 result.resolvedSlug(),
-                result.resolvedVersion()
+                result.resolvedVersion(),
+                fingerprint,
+                warningDigest,
+                !result.warnings().isEmpty()
         );
     }
 
     public CliPublishResponse publish(String namespace, List<PackageEntry> entries, String publisherId, SkillVisibility visibility, Set<String> platformRoles) {
+        return publish(namespace, entries, publisherId, visibility, platformRoles, false);
+    }
+
+    public CliPublishResponse publish(String namespace, List<PackageEntry> entries, String publisherId,
+                                      SkillVisibility visibility, Set<String> platformRoles,
+                                      boolean confirmWarnings) {
         SkillPublishService.PublishResult result = skillPublishService.publishFromEntries(
-                namespace, entries, publisherId, visibility, platformRoles, false
+                namespace, entries, publisherId, visibility, platformRoles, confirmWarnings
         );
 
+        String status = result.version().getStatus().name();
+        String nextAction = switch (status) {
+            case "SCANNING" -> "WAIT_FOR_SCAN";
+            case "PENDING_REVIEW" -> "WAIT_FOR_REVIEW";
+            case "UPLOADED" -> "NONE";
+            default -> "VIEW_SKILL";
+        };
         return new CliPublishResponse(
                 namespace,
                 result.slug(),
                 result.version().getVersion(),
-                visibility.name()
+                visibility.name(),
+                result.version().getId(),
+                status,
+                nextAction
         );
+    }
+
+    private String packageFingerprint(List<PackageEntry> entries) {
+        String material = entries.stream()
+                .sorted(java.util.Comparator.comparing(PackageEntry::path))
+                .map(entry -> entry.path() + "\u0000" + sha256(entry.content()))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        return sha256(material);
+    }
+
+    private String sha256(String value) {
+        return sha256(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String sha256(byte[] value) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(value));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private ResponseEntity<InputStreamResource> buildDownloadResponse(SkillDownloadService.DownloadResult result) {

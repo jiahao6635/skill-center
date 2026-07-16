@@ -7,6 +7,7 @@ import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.domain.namespace.NamespaceMember;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
+import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.domain.user.UserStatus;
@@ -41,6 +42,7 @@ class AuthContextFilterTest {
 
     private final NamespaceMemberRepository namespaceMemberRepository = mock(NamespaceMemberRepository.class);
     private final UserAccountRepository userAccountRepository = mock(UserAccountRepository.class);
+    private final NamespaceRepository namespaceRepository = mock(NamespaceRepository.class);
     private final AuthContextFilter filter;
 
     AuthContextFilterTest() {
@@ -54,7 +56,8 @@ class AuthContextFilterTest {
                 apiResponseFactory,
                 new ObjectMapper().registerModule(new JavaTimeModule()),
                 true,
-                new RouteSecurityPolicyRegistry()
+                new RouteSecurityPolicyRegistry(),
+                namespaceRepository
         );
     }
 

@@ -72,8 +72,11 @@ public class BuiltinSkillManifestLoader {
             String slug = text(itemNode, "slug");
             String version = text(itemNode, "version");
             String url = text(itemNode, "url");
-            if (!StringUtils.hasText(slug) || !StringUtils.hasText(version) || !StringUtils.hasText(url)) {
-                log.warn("Skipping built-in skill manifest item {} because slug, version, and url are required", index);
+            JsonNode sourceNode = itemNode.path("source");
+            ClasspathSource source = parseClasspathSource(sourceNode);
+            if (!StringUtils.hasText(slug) || !StringUtils.hasText(version)
+                    || (StringUtils.hasText(url) == (source != null))) {
+                log.warn("Skipping built-in skill manifest item {} because exactly one package source is required", index);
                 continue;
             }
             try {
@@ -90,7 +93,7 @@ public class BuiltinSkillManifestLoader {
                 continue;
             }
 
-            items.add(new ManifestItem(slug, version, url));
+            items.add(new ManifestItem(slug, version, url, source));
         }
         return List.copyOf(items);
     }
@@ -103,6 +106,37 @@ public class BuiltinSkillManifestLoader {
         return value.asText().trim();
     }
 
-    public record ManifestItem(String slug, String version, String url) {
+    private ClasspathSource parseClasspathSource(JsonNode node) {
+        if (!node.isObject() || !"classpath-files".equals(text(node, "type"))) return null;
+        String basePath = text(node, "basePath");
+        if (!basePath.startsWith("builtin-skills/packages/")) return null;
+        try {
+            if (!basePath.equals(com.iflytek.skillhub.domain.skill.validation.SkillPackagePolicy
+                    .normalizeEntryPath(basePath))) return null;
+        } catch (RuntimeException exception) {
+            return null;
+        }
+        JsonNode filesNode = node.path("files");
+        if (!filesNode.isArray() || filesNode.isEmpty()) return null;
+        List<String> files = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (JsonNode file : filesNode) {
+            if (!file.isTextual()) return null;
+            String path = file.asText().trim();
+            try {
+                path = com.iflytek.skillhub.domain.skill.validation.SkillPackagePolicy.normalizeEntryPath(path);
+            } catch (RuntimeException exception) {
+                return null;
+            }
+            if (!seen.add(path)) return null;
+            files.add(path);
+        }
+        return new ClasspathSource(basePath, List.copyOf(files));
     }
+
+    public record ManifestItem(String slug, String version, String url, ClasspathSource classpathSource) {
+        public ManifestItem(String slug, String version, String url) { this(slug, version, url, null); }
+    }
+
+    public record ClasspathSource(String basePath, List<String> files) {}
 }

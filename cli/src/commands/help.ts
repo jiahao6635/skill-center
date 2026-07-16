@@ -40,16 +40,24 @@ export const commands = {
       'skillhub install pdf-parser --scope project --agent codex'
     ]
   },
+  download: {
+    summary: 'Download a skill package without installing it',
+    usage: 'skillhub download <@namespace/slug> --output <path> [--version <v>] [--overwrite] [--json]',
+    examples: ['skillhub download @global/pdf-parser --output pdf-parser.zip --json']
+  },
   list: {
     summary: 'List local installs',
     usage: 'skillhub list [--agent <profile>] [--dir <path>] [--registry <url>] [--json]',
     examples: ['skillhub list', 'skillhub list --agent codex']
   },
   remove: {
-    summary: 'Remove local or remote skill',
-    usage: 'skillhub remove <slug> [--agent <profile>] [--all] [--remote] [--hard] [--namespace <slug>] [--json]',
-    examples: ['skillhub remove pdf-parser', 'skillhub remove pdf-parser --remote --hard']
+    summary: 'Remove a local skill installation',
+    usage: 'skillhub remove <slug> [--agent <profile>] [--all] [--json]',
+    examples: ['skillhub remove pdf-parser']
   },
+  skill: { summary: 'Inspect or manage a remote skill', usage: 'skillhub skill <action> <@namespace/slug> [flags]', examples: ['skillhub skill show @global/pdf-parser --json'] },
+  review: { summary: 'Inspect or decide one review', usage: 'skillhub review <action> [id] [flags]', examples: ['skillhub review list --namespace global --json'] },
+  external: { summary: 'Search, inspect, or import an external skill', usage: 'skillhub external <action> [value] [flags]', examples: ['skillhub external search pdf --json'] },
   doctor: {
     summary: 'Scan project and merge into local inventory (preserves entries outside scan scope)',
     usage: 'skillhub doctor [--json]',
@@ -76,8 +84,8 @@ export async function helpCommand(args: string[]): Promise<string> {
   const topic = args.find(arg => !arg.startsWith('--'))
   if (json) {
     if (topic) {
-      // TODO: unknown topic returns undefined and crashes on detail.usage; see help-command.test.ts
       const detail = commands[topic as keyof typeof commands]
+      if (!detail) return printResult({ ok: false, code: 'COMMAND_NOT_FOUND', command: topic }, true)
       return printResult({ ok: true, command: topic, ...detail }, true)
     }
     return printResult({
@@ -87,6 +95,7 @@ export async function helpCommand(args: string[]): Promise<string> {
   }
   if (topic) {
     const detail = commands[topic as keyof typeof commands]
+    if (!detail) return `Unknown command: ${topic}`
     return [
       `${topic} - ${detail.summary}`,
       `Usage: ${detail.usage}`,

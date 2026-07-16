@@ -10,4 +10,7 @@ export const EXIT = {
   filesystem: 4,
   usage: 5,
   validation: 6
+  ,confirmation: 7
+  ,conflict: 8
+  ,notFound: 9
 } as const

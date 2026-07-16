@@ -67,6 +67,7 @@ const LoginPage = createLazyRouteComponent(() => import('@/pages/login.tsx'), 'L
 const ResetPasswordPage = createLazyRouteComponent(() => import('@/pages/reset-password.tsx'), 'ResetPasswordPage')
 const PrivacyPolicyPage = createLazyRouteComponent(() => import('@/pages/privacy.tsx'), 'PrivacyPolicyPage')
 const SearchPage = createLazyRouteComponent(() => import('@/pages/search.tsx'), 'SearchPage')
+const ExternalSkillDetailPage = createLazyRouteComponent(() => import('@/pages/external-skill-detail.tsx'), 'ExternalSkillDetailPage')
 const TermsOfServicePage = createLazyRouteComponent(() => import('@/pages/terms.tsx'), 'TermsOfServicePage')
 const NamespacePage = createLazyRouteComponent(() => import('@/pages/namespace.tsx'), 'NamespacePage')
 const SkillDetailPage = createLazyRouteComponent(() => import('@/pages/skill-detail.tsx'), 'SkillDetailPage')
@@ -108,6 +109,7 @@ const MySubscriptionsPage = createLazyRouteComponent(() => import('@/pages/dashb
 const NotificationsPage = createLazyRouteComponent(() => import('@/pages/notifications.tsx'), 'NotificationsPage')
 const TokensPage = createLazyRouteComponent(() => import('@/pages/dashboard/tokens.tsx'), 'TokensPage')
 const CliAuthPage = createLazyRouteComponent(() => import('@/pages/cli-auth.tsx'), 'CliAuthPage')
+const DeviceAuthPage = createLazyRouteComponent(() => import('@/pages/device.tsx'), 'DeviceAuthPage')
 const SecuritySettingsPage = createLazyRouteComponent(
   () => import('@/pages/settings/security.tsx'),
   'SecuritySettingsPage',
@@ -201,7 +203,7 @@ const searchRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'search',
   component: SearchPage,
-  validateSearch: (search: Record<string, unknown>): { q: string; namespace?: string; label?: string; sort: string; page: number; starredOnly: boolean } => {
+  validateSearch: (search: Record<string, unknown>): { q: string; namespace?: string; label?: string; sort: string; page: number; starredOnly: boolean; source?: string; category?: string } => {
     return {
       q: normalizeSearchQuery(typeof search.q === 'string' ? search.q : ''),
       namespace: typeof search.namespace === 'string' && search.namespace ? search.namespace.replace(/^@/, '') : undefined,
@@ -209,6 +211,8 @@ const searchRoute = createRoute({
       sort: (search.sort as string) || 'newest',
       page: Number(search.page) || 0,
       starredOnly: search.starredOnly === true || search.starredOnly === 'true',
+      source: search.source === 'skillhub-cn' ? 'skillhub-cn' : 'local',
+      category: typeof search.category === 'string' && search.category ? search.category : undefined,
     }
   },
 })
@@ -217,6 +221,12 @@ const termsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'terms',
   component: TermsOfServicePage,
+})
+
+const externalSkillDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/external/$provider/$slug',
+  component: ExternalSkillDetailPage,
 })
 
 const namespaceRoute = createRoute({
@@ -385,6 +395,13 @@ const cliAuthRoute = createRoute({
   },
 })
 
+const deviceAuthRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'device',
+  beforeLoad: requireAuth,
+  component: DeviceAuthPage,
+})
+
 const settingsSecurityRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'settings/security',
@@ -444,6 +461,7 @@ const routeTree = rootRoute.addChildren([
   resetPasswordRoute,
   privacyRoute,
   searchRoute,
+  externalSkillDetailRoute,
   termsRoute,
   namespaceRoute,
   skillDetailRoute,
@@ -465,6 +483,7 @@ const routeTree = rootRoute.addChildren([
   dashboardNotificationsRoute,
   dashboardTokensRoute,
   cliAuthRoute,
+  deviceAuthRoute,
   settingsSecurityRoute,
   settingsProfileRoute,
   settingsNotificationsRoute,

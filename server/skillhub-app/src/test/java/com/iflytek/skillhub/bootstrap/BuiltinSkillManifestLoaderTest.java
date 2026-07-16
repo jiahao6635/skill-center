@@ -31,6 +31,40 @@ class BuiltinSkillManifestLoaderTest {
     }
 
     @Test
+    void loadsExplicitClasspathFileSourceAndRejectsTraversal() {
+        BuiltinSkillManifestLoader loader = loaderWith("""
+                {
+                  "skills": [
+                    {
+                      "slug": "manage-skillhub",
+                      "version": "1.0.0",
+                      "source": {
+                        "type": "classpath-files",
+                        "basePath": "builtin-skills/packages/manage-skillhub/1.0.0/manage-skillhub",
+                        "files": ["SKILL.md", "agents/openai.yaml"]
+                      }
+                    },
+                    {
+                      "slug": "bad-source",
+                      "version": "1.0.0",
+                      "source": {
+                        "type": "classpath-files",
+                        "basePath": "builtin-skills/packages/../../secrets",
+                        "files": ["SKILL.md"]
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        List<BuiltinSkillManifestLoader.ManifestItem> items = loader.load();
+
+        assertThat(items).hasSize(1);
+        assertThat(items.getFirst().classpathSource().files())
+                .containsExactly("SKILL.md", "agents/openai.yaml");
+    }
+
+    @Test
     void returnsEmptyListWhenManifestIsMissing() {
         BuiltinSkillManifestLoader loader = new BuiltinSkillManifestLoader(
                 new ObjectMapper(),

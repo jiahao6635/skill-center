@@ -24,19 +24,27 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import com.iflytek.skillhub.security.RequestAuthorizationContext;
+import com.iflytek.skillhub.security.TokenGrantGuard;
+import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 
 @RestController
 @RequestMapping("/api/cli/v1/skills")
 public class CliSkillController extends BaseApiController {
     private final CliSkillAppService cliSkillAppService;
     private final SkillPackageArchiveExtractor archiveExtractor;
+    private final TokenGrantGuard tokenGrantGuard;
+    private final NamespaceRepository namespaceRepository;
 
     public CliSkillController(CliSkillAppService cliSkillAppService,
                               SkillPackageArchiveExtractor archiveExtractor,
-                              ApiResponseFactory responseFactory) {
+                              ApiResponseFactory responseFactory, TokenGrantGuard tokenGrantGuard,
+                              NamespaceRepository namespaceRepository) {
         super(responseFactory);
         this.cliSkillAppService = cliSkillAppService;
         this.archiveExtractor = archiveExtractor;
+        this.tokenGrantGuard = tokenGrantGuard;
+        this.namespaceRepository = namespaceRepository;
     }
 
     @GetMapping("/search")
@@ -85,23 +93,15 @@ public class CliSkillController extends BaseApiController {
         return cliSkillAppService.downloadVersion(namespace, slug, version, request);
     }
 
-    @DeleteMapping("/{namespace}/{slug}")
-    public ApiResponse<CliDeleteResponse> deleteRemote(
-            @PathVariable String namespace,
-            @PathVariable String slug,
-            @AuthenticationPrincipal PlatformPrincipal principal,
-            HttpServletRequest request) {
-        return ok("response.success.deleted", cliSkillAppService.deleteRemote(
-                namespace, slug, principal.userId(), AuditRequestContext.from(request)));
-    }
-
     @PostMapping(value = "/{namespace}/publish/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @RateLimit(category = "publish", authenticated = 10, anonymous = 0)
     public ApiResponse<CliDryRunResponse> validatePublish(
             @PathVariable String namespace,
             @RequestPart("file") MultipartFile file,
             @RequestPart(value = "visibility", required = false) String visibility,
-            @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            @RequestAttribute(value = "authorizationContext", required = false) RequestAuthorizationContext authorizationContext) throws IOException {
+        guardPublish(namespace, authorizationContext);
         List<PackageEntry> entries;
         try {
             entries = archiveExtractor.extract(file);
@@ -125,17 +125,44 @@ public class CliSkillController extends BaseApiController {
             @PathVariable String namespace,
             @RequestPart("file") MultipartFile file,
             @RequestPart(value = "visibility", required = false) String visibility,
-            @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
+            @RequestPart(value = "warningDigest", required = false) String warningDigest,
+            @AuthenticationPrincipal PlatformPrincipal principal,
+            @RequestAttribute(value = "authorizationContext", required = false) RequestAuthorizationContext authorizationContext) throws IOException {
+        guardPublish(namespace, authorizationContext);
         List<PackageEntry> entries;
         try {
             entries = archiveExtractor.extract(file);
         } catch (IllegalArgumentException e) {
             throw new DomainBadRequestException("error.skill.publish.package.invalid", e.getMessage());
         }
+        SkillVisibility resolvedVisibility;
+        try {
+            resolvedVisibility = SkillVisibility.valueOf(
+                    (visibility != null ? visibility : "PUBLIC").toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new DomainBadRequestException("error.skill.publish.visibility.invalid", visibility);
+        }
+        var validation = cliSkillAppService.validatePublish(
+                namespace, entries, principal.userId(), resolvedVisibility, principal.platformRoles());
+        if (!validation.valid()) {
+            throw new DomainBadRequestException(
+                    "error.skill.publish.package.invalid", String.join(", ", validation.errors()));
+        }
+        if (validation.requiresConfirmation()
+                && (warningDigest == null || !warningDigest.equals(validation.warningDigest()))) {
+            throw new DomainBadRequestException(
+                    "error.skill.publish.warningConfirmationRequired", validation.warningDigest());
+        }
         var result = cliSkillAppService.publish(
                 namespace, entries, principal.userId(),
-                SkillVisibility.valueOf((visibility != null ? visibility : "PUBLIC").toUpperCase()),
-                principal.platformRoles());
+                resolvedVisibility, principal.platformRoles(), validation.requiresConfirmation());
         return ok("response.success.published", result);
+    }
+
+    private void guardPublish(String namespace, RequestAuthorizationContext context) {
+        String clean = namespace.startsWith("@") ? namespace.substring(1) : namespace;
+        Long namespaceId = namespaceRepository.findBySlug(clean)
+                .orElseThrow(() -> new DomainBadRequestException("error.namespace.slug.notFound", clean)).getId();
+        tokenGrantGuard.require(context, "skill:publish", namespaceId);
     }
 }

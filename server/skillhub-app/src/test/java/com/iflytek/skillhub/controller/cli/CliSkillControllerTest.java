@@ -10,6 +10,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.ratelimit.RateLimit;
+import com.iflytek.skillhub.security.RequestAuthorizationContext;
 import com.iflytek.skillhub.service.cli.CliSkillAppService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.ByteArrayInputStream;
@@ -69,7 +70,8 @@ class CliSkillControllerTest {
     @Test
     void publishConsumesMultipartFormData() throws Exception {
         Method publish = CliSkillController.class.getMethod(
-                "publish", String.class, MultipartFile.class, String.class, PlatformPrincipal.class);
+                "publish", String.class, MultipartFile.class, String.class, String.class,
+                PlatformPrincipal.class, RequestAuthorizationContext.class);
 
         PostMapping mapping = publish.getAnnotation(PostMapping.class);
         assertNotNull(mapping);
@@ -192,36 +194,10 @@ class CliSkillControllerTest {
     }
 
     @Test
-    void deleteRequiresAuthentication() throws Exception {
+    void wholeSkillDeleteIsNotExposed() throws Exception {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .delete("/api/cli/v1/skills/global/demo"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void deleteReturnsCliDeleteResponse() throws Exception {
-        ApiToken token = new ApiToken("user-1", "cli", "sk_test", "hash", "[\"skill:delete\"]");
-        UserAccount user = new UserAccount("user-1", "tester", "t@example.com", "");
-
-        given(apiTokenService.validateToken("test-token")).willReturn(Optional.of(token));
-        given(userAccountRepository.findById("user-1")).willReturn(Optional.of(user));
-        given(userRoleBindingRepository.findByUserId("user-1")).willReturn(List.of());
-        given(cliSkillAppService.deleteRemote(
-                org.mockito.ArgumentMatchers.eq("global"),
-                org.mockito.ArgumentMatchers.eq("demo"),
-                org.mockito.ArgumentMatchers.eq("user-1"),
-                org.mockito.ArgumentMatchers.any()
-        )).willReturn(new com.iflytek.skillhub.dto.cli.CliDeleteResponse(
-                true, "remote", "delete", "global", "demo"
-        ));
-
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .delete("/api/cli/v1/skills/global/demo")
-                        .header("Authorization", "Bearer test-token"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.ok").value(true))
-                .andExpect(jsonPath("$.data.namespace").value("global"))
-                .andExpect(jsonPath("$.data.slug").value("demo"));
     }
 
     private static void assertDownloadRateLimit(RateLimit rateLimit) {

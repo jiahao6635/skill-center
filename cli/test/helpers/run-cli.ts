@@ -41,7 +41,7 @@ export async function runCli(
   const proc = Bun.spawn({
     cmd: [bunPath, entry, ...args],
     cwd: options.cwd ?? cliRoot,
-    env: { ...sanitizeProcessEnv(), ...env },
+    env: { ...sanitizeProcessEnv(), SKILLHUB_CREDENTIAL_STORE: 'file', ...env },
     stdout: 'pipe',
     stderr: 'pipe'
   })

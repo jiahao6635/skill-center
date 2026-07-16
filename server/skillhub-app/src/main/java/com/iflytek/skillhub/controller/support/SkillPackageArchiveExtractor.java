@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,10 +39,21 @@ public class SkillPackageArchiveExtractor {
             );
         }
 
+        return extract(file.getInputStream());
+    }
+
+    public List<PackageEntry> extract(byte[] archive) throws IOException {
+        if (archive.length > maxTotalPackageSize) {
+            throw new IllegalArgumentException("Package too large: " + archive.length);
+        }
+        return extract(new ByteArrayInputStream(archive));
+    }
+
+    private List<PackageEntry> extract(java.io.InputStream inputStream) throws IOException {
         List<PackageEntry> entries = new ArrayList<>();
         long totalSize = 0;
 
-        try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
+        try (ZipInputStream zis = new ZipInputStream(inputStream)) {
             ZipEntry zipEntry;
             while ((zipEntry = zis.getNextEntry()) != null) {
                 if (zipEntry.isDirectory()) {
@@ -195,7 +207,7 @@ public class SkillPackageArchiveExtractor {
         if (lower.endsWith(".json")) return "application/json";
         if (lower.endsWith(".yaml") || lower.endsWith(".yml")) return "application/x-yaml";
         if (lower.endsWith(".txt")) return "text/plain";
-        if (lower.endsWith(".md")) return "text/markdown";
+        if (lower.endsWith(".md") || lower.endsWith(".mdx")) return "text/markdown";
         if (lower.endsWith(".html")) return "text/html";
         if (lower.endsWith(".css")) return "text/css";
         if (lower.endsWith(".csv")) return "text/csv";

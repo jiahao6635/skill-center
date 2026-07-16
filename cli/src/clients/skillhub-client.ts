@@ -1,10 +1,19 @@
 import { CliError } from '../shared/errors'
 import { EXIT } from '../shared/constants'
+import { createHash } from 'node:crypto'
 
 export interface WhoAmIResponse {
   handle: string
   displayName: string
   email?: string
+  tokenKind?: string
+  tokenId?: number
+  tokenPrefix?: string
+  clientName?: string
+  scopes?: string[]
+  namespaceIds?: number[]
+  namespaces?: string[]
+  expiresAt?: string
 }
 
 export interface SearchItem {
@@ -42,6 +51,9 @@ export interface PublishResponse {
   slug: string
   version: string
   visibility: string
+  versionId?: number
+  status?: string
+  nextAction?: string
 }
 
 export interface DryRunResponse {
@@ -50,6 +62,9 @@ export interface DryRunResponse {
   warnings: string[]
   resolvedSlug: string | null
   resolvedVersion: string | null
+  packageFingerprint: string
+  warningDigest: string
+  requiresConfirmation: boolean
 }
 
 export class SkillHubClient {
@@ -104,15 +119,53 @@ export class SkillHubClient {
     return this.deleteJson(`/skills/${namespace}/${slug}`)
   }
 
-  async publish(namespace: string, file: Blob, visibility: string, fileName = 'skill.zip'): Promise<PublishResponse> {
+  async requestJson<T>(path: string, init: RequestInit = {}): Promise<T> {
+    let response: Response
+    try {
+      const headers = { ...this.headers(), ...(init.headers ?? {}) } as Record<string, string>
+      if (typeof init.body === 'string' && headers['Idempotency-Key'] && !headers['Idempotency-Request-Digest']) {
+        headers['Idempotency-Request-Digest'] = createHash('sha256').update(init.body).digest('hex')
+      }
+      response = await this.fetchImpl(`${this.registry}/api/cli/v1${path}`, {
+        ...init,
+        headers,
+      })
+    } catch {
+      throw new CliError('registry unreachable', EXIT.network, { registry: this.registry })
+    }
+    return this.handleJsonResponse<T>(response)
+  }
+
+  async requestBinary(path: string): Promise<Response> {
+    let response: Response
+    try {
+      response = await this.fetchImpl(`${this.registry}/api/cli/v1${path}`, { headers: this.headers() })
+    } catch {
+      throw new CliError('registry unreachable', EXIT.network, { registry: this.registry })
+    }
+    if (response.status === 401 || response.status === 403) {
+      throw new CliError('authentication failed', EXIT.auth, { registry: this.registry })
+    }
+    if (response.status === 404) throw new CliError('resource not found', EXIT.notFound)
+    if (!response.ok) throw new CliError(`download failed with status ${response.status}`, EXIT.generic)
+    return response
+  }
+
+  async publish(namespace: string, file: Blob, visibility: string, fileName = 'skill.zip',
+                warningDigest?: string, idempotencyKey?: string, packageFingerprint?: string): Promise<PublishResponse> {
     const formData = new FormData()
     formData.append('file', file, fileName)
     formData.append('visibility', visibility)
+    if (warningDigest) formData.append('warningDigest', warningDigest)
     let response: Response
     try {
       response = await this.fetchImpl(`${this.registry}/api/cli/v1/skills/${namespace}/publish`, {
         method: 'POST',
-        headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
+        headers: {
+          ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+          ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+          ...(packageFingerprint ? { 'Idempotency-Request-Digest': packageFingerprint } : {}),
+        },
         body: formData
       })
     } catch {
@@ -158,7 +211,20 @@ export class SkillHubClient {
       throw new CliError('access denied — token may lack required scope', EXIT.auth, { registry: this.registry, next: 'regenerate token with required scopes or run `skillhub login`' })
     }
     if (response.status === 404) {
-      throw new CliError('resource not found', EXIT.generic, { registry: this.registry })
+      throw new CliError('resource not found', EXIT.notFound, { registry: this.registry })
+    }
+    if (response.status === 409) {
+      const detail = await response.text().catch(() => '')
+      throw new CliError('request conflicts with current server state', EXIT.conflict, {
+        registry: this.registry, code: 'STATE_CONFLICT', detail,
+      })
+    }
+    if (response.status === 429) {
+      throw new CliError('registry rate limit exceeded', EXIT.network, {
+        registry: this.registry,
+        code: 'RATE_LIMITED',
+        retryAfterSeconds: Number(response.headers.get('retry-after') ?? 0) || undefined,
+      })
     }
     // 502/503 indicate network-level failures (connection refused, service unavailable)
     if (response.status === 502 || response.status === 503) {

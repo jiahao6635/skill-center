@@ -7,6 +7,7 @@ import { resolveRegistry, resolveToken } from '../services/registry-service'
 import { CliError } from '../shared/errors'
 import { EXIT } from '../shared/constants'
 import { createZip, isZipFile } from '../platform/archive'
+import { randomUUID } from 'node:crypto'
 
 export interface PublishCommandOptions {
   namespace?: string
@@ -15,6 +16,8 @@ export interface PublishCommandOptions {
   token?: string
   json?: boolean
   dryRun?: boolean
+  confirmWarnings?: string
+  idempotencyKey?: string
 }
 
 export async function publishCommand(path: string, options: PublishCommandOptions): Promise<string> {
@@ -56,60 +59,78 @@ export async function publishCommand(path: string, options: PublishCommandOption
   }
 
   const client = new SkillHubClient(registry, token)
+  const requestId = options.idempotencyKey ?? randomUUID()
+  const validation = await client.validatePublish(namespace, archiveBlob, toServerVisibility(visibility), archiveName)
 
   if (options.dryRun) {
-    const result = await client.validatePublish(namespace, archiveBlob, toServerVisibility(visibility), archiveName)
-
+    if (!validation.valid) {
+      throw new CliError('validation failed', EXIT.validation, {
+        code: 'PACKAGE_VALIDATION_FAILED', requestId, ...validation,
+      })
+    }
     if (options.json) {
-      if (!result.valid) {
-        process.stdout.write(JSON.stringify(result) + '\n')
-        throw new CliError('validation failed', EXIT.validation)
-      }
-      return JSON.stringify(result)
+      return JSON.stringify({ ok: validation.valid, schemaVersion: 1, contractVersion: 1,
+        command: 'publish.validate', requestId, ...validation })
     }
 
     const lines: string[] = []
-    if (result.valid) {
+    if (validation.valid) {
       lines.push('Validation passed')
     } else {
       lines.push('Validation failed')
     }
-    if (result.resolvedSlug) {
-      lines.push(`  Slug: ${result.resolvedSlug}`)
+    if (validation.resolvedSlug) {
+      lines.push(`  Slug: ${validation.resolvedSlug}`)
     }
-    if (result.resolvedVersion) {
-      lines.push(`  Version: ${result.resolvedVersion}`)
+    if (validation.resolvedVersion) {
+      lines.push(`  Version: ${validation.resolvedVersion}`)
     }
-    if (result.errors.length > 0) {
+    if (validation.errors.length > 0) {
       lines.push('Errors:')
-      for (const error of result.errors) {
+      for (const error of validation.errors) {
         lines.push(`  - ${error}`)
       }
     }
-    if (result.warnings.length > 0) {
+    if (validation.warnings.length > 0) {
       lines.push('Warnings:')
-      for (const warning of result.warnings) {
+      for (const warning of validation.warnings) {
         lines.push(`  - ${warning}`)
       }
-    }
-    if (!result.valid) {
-      process.stdout.write(lines.join('\n') + '\n')
-      throw new CliError('validation failed', EXIT.validation)
     }
     return lines.join('\n')
   }
 
-  const result = await client.publish(namespace, archiveBlob, toServerVisibility(visibility), archiveName)
+  if (!validation.valid) {
+    throw new CliError('validation failed', EXIT.validation, {
+      code: 'PACKAGE_VALIDATION_FAILED', requestId, errors: validation.errors,
+    })
+  }
+  if (validation.requiresConfirmation && options.confirmWarnings !== validation.warningDigest) {
+    throw new CliError('publish warnings require explicit digest confirmation', EXIT.confirmation, {
+      code: 'CONFIRMATION_REQUIRED', requestId, warningDigest: validation.warningDigest,
+      warnings: validation.warnings, packageFingerprint: validation.packageFingerprint,
+    })
+  }
+
+  const result = await client.publish(namespace, archiveBlob, toServerVisibility(visibility), archiveName,
+    validation.requiresConfirmation ? validation.warningDigest : undefined, requestId, validation.packageFingerprint)
 
   const detailUrl = `${registry}/space/${result.namespace}/${encodeURIComponent(result.slug)}`
 
   if (options.json) {
     return JSON.stringify({
       ok: true,
+      schemaVersion: 1,
+      contractVersion: 1,
+      command: 'publish',
+      requestId,
       namespace: result.namespace,
       slug: result.slug,
       version: result.version,
       visibility: result.visibility.toLowerCase(),
+      versionId: result.versionId,
+      status: result.status,
+      nextAction: result.nextAction,
       detailUrl
     })
   }

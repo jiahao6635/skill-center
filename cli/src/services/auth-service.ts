@@ -10,14 +10,14 @@ export class AuthService {
     private readonly credentialsStore: CredentialsStore
   ) {}
 
-  async login(registry: string, token?: string): Promise<{ handle: string }> {
+  async login(registry: string, token?: string): Promise<{ handle: string; credentialStore: 'system' | 'file' }> {
     if (!token) {
       throw new CliError('token is required', EXIT.usage, { next: 'pass --token, set SKILLHUB_TOKEN, or use interactive login' })
     }
     const user = await new SkillHubClient(registry, token).whoami()
     await this.configStore.setRegistry(registry)
-    await this.credentialsStore.setToken(registry, token)
-    return { handle: user.handle }
+    const credentialStore = await this.credentialsStore.setToken(registry, token)
+    return { handle: user.handle, credentialStore }
   }
 
   async logout(registry: string): Promise<void> {

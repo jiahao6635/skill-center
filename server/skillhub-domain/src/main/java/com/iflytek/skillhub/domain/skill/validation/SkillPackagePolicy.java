@@ -21,7 +21,7 @@ public final class SkillPackagePolicy {
     public static final String SKILL_MD_PATH = "SKILL.md";
     public static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             // Documentation
-            ".md", ".txt", ".json", ".yaml", ".yml", ".html", ".css", ".csv", ".pdf",
+            ".md", ".mdx", ".txt", ".json", ".yaml", ".yml", ".html", ".css", ".csv", ".pdf",
             // Configuration and schemas
             ".toml", ".xml", ".xsd", ".xsl", ".dtd", ".ini", ".cfg", ".env",
             // Scripts and source code
@@ -136,7 +136,7 @@ public final class SkillPackagePolicy {
     }
 
     private static boolean isTextExtension(String path) {
-        return path.endsWith(".md") || path.endsWith(".txt")
+        return path.endsWith(".md") || path.endsWith(".mdx") || path.endsWith(".txt")
                 || path.endsWith(".json") || path.endsWith(".yaml") || path.endsWith(".yml")
                 || path.endsWith(".js") || path.endsWith(".cjs") || path.endsWith(".mjs")
                 || path.endsWith(".ts") || path.endsWith(".py") || path.endsWith(".sh")
@@ -153,7 +153,9 @@ public final class SkillPackagePolicy {
 
     private static boolean isUtf8Text(byte[] content) {
         for (byte value : content) {
-            if (value == 0) {
+            int unsigned = value & 0xff;
+            if (unsigned == 0 || (unsigned < 0x20 && unsigned != '\n'
+                    && unsigned != '\r' && unsigned != '\t' && unsigned != '\f')) {
                 return false;
             }
         }

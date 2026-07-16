@@ -18,11 +18,8 @@ import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import com.iflytek.skillhub.dto.SkillLifecycleVersionResponse;
 import com.iflytek.skillhub.dto.SkillSummaryResponse;
-import com.iflytek.skillhub.dto.cli.CliDeleteResponse;
 import com.iflytek.skillhub.dto.cli.CliPublishResponse;
 import com.iflytek.skillhub.dto.cli.CliResolveResponse;
-import com.iflytek.skillhub.service.AuditRequestContext;
-import com.iflytek.skillhub.service.SkillDeleteAppService;
 import com.iflytek.skillhub.service.SkillSearchAppService;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
@@ -49,7 +46,6 @@ class CliSkillAppServiceTest {
     @Mock SkillSearchAppService skillSearchAppService;
     @Mock SkillQueryService skillQueryService;
     @Mock SkillDownloadService skillDownloadService;
-    @Mock SkillDeleteAppService skillDeleteAppService;
     @Mock SkillPublishService skillPublishService;
     @Mock SkillRepository skillRepository;
     @Mock NamespaceRepository namespaceRepository;
@@ -63,7 +59,7 @@ class CliSkillAppServiceTest {
     void setUp() {
         service = new CliSkillAppService(
                 skillSearchAppService, skillQueryService,
-                skillDownloadService, skillDeleteAppService, skillPublishService);
+                skillDownloadService, skillPublishService);
     }
 
     @Test
@@ -165,7 +161,6 @@ class CliSkillAppServiceTest {
                 realSearchAppService,
                 skillQueryService,
                 skillDownloadService,
-                skillDeleteAppService,
                 skillPublishService
         );
 
@@ -220,21 +215,6 @@ class CliSkillAppServiceTest {
         assertEquals("2.0.0", response.version());
         assertEquals(42L, response.versionId());
         assertEquals("abc123", response.fingerprint());
-    }
-
-    @Test
-    void deleteRemote_delegatesToDeleteAppService() {
-        var auditContext = new AuditRequestContext("127.0.0.1", "CLI/1.0");
-        given(skillDeleteAppService.deleteSkill("global", "demo", null, "user-1", auditContext))
-                .willReturn(new SkillDeleteAppService.DeleteResult(10L, "global", "demo", true));
-
-        CliDeleteResponse response = service.deleteRemote("global", "demo", "user-1", auditContext);
-
-        assertTrue(response.ok());
-        assertEquals("remote", response.scope());
-        assertEquals("delete", response.action());
-        assertEquals("global", response.namespace());
-        assertEquals("demo", response.slug());
     }
 
     @Test

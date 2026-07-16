@@ -70,6 +70,23 @@ public class SkillPublishService {
             SkillVersion version
     ) {}
 
+    /** Trusted coordinates supplied by application-layer import/bootstrap workflows. */
+    public record PublishOptions(
+            String slugOverride,
+            String versionOverride,
+            Long existingSkillId,
+            boolean forceAutoPublish,
+            boolean bypassMembershipCheck
+    ) {
+        public static PublishOptions standard() {
+            return new PublishOptions(null, null, null, false, false);
+        }
+
+        public static PublishOptions trustedImport(String slug, String version, Long existingSkillId) {
+            return new PublishOptions(slug, version, existingSkillId, false, false);
+        }
+    }
+
     private final NamespaceRepository namespaceRepository;
     private final NamespaceMemberRepository namespaceMemberRepository;
     private final SkillRepository skillRepository;
@@ -130,10 +147,9 @@ public class SkillPublishService {
     /**
      * Validates a package without persisting anything. Used by the --dry-run CLI flow.
      *
-     * <p>Warnings make the result invalid because the CLI publish flow uses
-     * {@code confirmWarnings=false}, which causes real publish to reject any
-     * package with warnings. Treating warnings as making the dry-run invalid
-     * keeps the two flows in lockstep.
+     * <p>A dry run is valid when it has no errors. Warnings are returned
+     * separately and require an explicit digest-bound confirmation before
+     * the real publish.
      */
     @Transactional(readOnly = true)
     public DryRunResult validateOnly(
@@ -247,9 +263,7 @@ public class SkillPublishService {
             }
         }
 
-        // Warnings make valid=false: real publish rejects them when confirmWarnings=false,
-        // which is the only mode the CLI uses today.
-        boolean valid = errors.isEmpty() && warnings.isEmpty();
+        boolean valid = errors.isEmpty();
         return new DryRunResult(valid, errors, warnings, resolvedSlug, resolvedVersion);
     }
 
@@ -277,7 +291,19 @@ public class SkillPublishService {
             SkillVisibility visibility,
             java.util.Set<String> platformRoles,
             boolean confirmWarnings) {
-        return publishFromEntriesInternal(namespaceSlug, entries, publisherId, visibility, platformRoles, confirmWarnings, false, false);
+        return publishFromEntriesInternal(namespaceSlug, entries, publisherId, visibility, platformRoles, confirmWarnings, PublishOptions.standard());
+    }
+
+    @Transactional
+    public PublishResult publishFromEntries(
+            String namespaceSlug,
+            List<PackageEntry> entries,
+            String publisherId,
+            SkillVisibility visibility,
+            Set<String> platformRoles,
+            boolean confirmWarnings,
+            PublishOptions options) {
+        return publishFromEntriesInternal(namespaceSlug, entries, publisherId, visibility, platformRoles, confirmWarnings, options);
     }
 
     /**
@@ -316,9 +342,8 @@ public class SkillPublishService {
                 publisherId,
                 skill.getVisibility(),
                 Set.of(),
-                confirmWarnings,  // confirmWarnings: honour caller's choice for rerelease
-                false,  // forceAutoPublish=false: respect visibility rules
-                true
+                confirmWarnings,
+                new PublishOptions(null, null, skillId, false, true)
         );
     }
 
@@ -329,8 +354,8 @@ public class SkillPublishService {
             SkillVisibility visibility,
             Set<String> platformRoles,
             boolean confirmWarnings,
-            boolean forceAutoPublish,
-            boolean bypassMembershipCheck) {
+            PublishOptions options) {
+        PublishOptions resolvedOptions = options != null ? options : PublishOptions.standard();
 
         // 1. Find namespace by slug
         Namespace namespace = namespaceRepository.findBySlug(namespaceSlug)
@@ -340,7 +365,7 @@ public class SkillPublishService {
         boolean isSuperAdmin = platformRoles.contains("SUPER_ADMIN");
 
         // 2. Check publisher is member unless SUPER_ADMIN short-circuits permission checks
-        if (!isSuperAdmin && !bypassMembershipCheck) {
+        if (!isSuperAdmin && !resolvedOptions.bypassMembershipCheck()) {
             namespaceMemberRepository.findByNamespaceIdAndUserId(namespace.getId(), publisherId)
                     .orElseThrow(() -> new DomainBadRequestException("error.skill.publish.publisher.notMember", namespaceSlug));
         }
@@ -361,11 +386,19 @@ public class SkillPublishService {
 
         String skillMdContent = new String(skillMd.content());
         SkillMetadata metadata = skillMetadataParser.parse(skillMdContent);
-        if (metadata.version() == null || metadata.version().isBlank()) {
+        if (resolvedOptions.versionOverride() != null) {
+            metadata = new SkillMetadata(metadata.name(), metadata.description(), resolvedOptions.versionOverride(), metadata.body(), metadata.frontmatter());
+        } else if (metadata.version() == null || metadata.version().isBlank()) {
             String autoVersion = AUTO_VERSION_FORMATTER.format(currentTime());
             metadata = new SkillMetadata(metadata.name(), metadata.description(), autoVersion, metadata.body(), metadata.frontmatter());
         }
-        String skillSlug = SlugValidator.slugify(metadata.name());
+        String skillSlug;
+        if (resolvedOptions.slugOverride() != null) {
+            SlugValidator.validate(resolvedOptions.slugOverride());
+            skillSlug = resolvedOptions.slugOverride();
+        } else {
+            skillSlug = SlugValidator.slugify(metadata.name());
+        }
 
         // 5. Run PrePublishValidator
         PrePublishValidator.SkillPackageContext context = new PrePublishValidator.SkillPackageContext(
@@ -409,8 +442,12 @@ public class SkillPublishService {
         }
 
         // Find or create skill for current user
-        Skill skill = skillRepository.findByNamespaceIdAndSlugAndOwnerId(namespace.getId(), skillSlug, publisherId)
-                .orElseGet(() -> {
+        Skill skill = resolvedOptions.existingSkillId() != null
+                ? skillRepository.findById(resolvedOptions.existingSkillId())
+                    .filter(existing -> existing.getNamespaceId().equals(namespace.getId()) && existing.getSlug().equals(skillSlug))
+                    .orElseThrow(() -> new DomainBadRequestException("error.skill.import.lineageConflict", skillSlug))
+                : skillRepository.findByNamespaceIdAndSlugAndOwnerId(namespace.getId(), skillSlug, publisherId)
+                    .orElseGet(() -> {
                     Skill newSkill = new Skill(namespace.getId(), skillSlug, publisherId, visibility);
                     newSkill.setCreatedBy(publisherId);
                     return skillRepository.save(newSkill);
@@ -444,7 +481,7 @@ public class SkillPublishService {
         // 8. Create SkillVersion
         SkillVersion version = new SkillVersion(skill.getId(), metadata.version(), publisherId);
         version.setRequestedVisibility(visibility);
-        boolean autoPublish = forceAutoPublish || isSuperAdmin;
+        boolean autoPublish = resolvedOptions.forceAutoPublish() || isSuperAdmin;
         if (autoPublish) {
             version.setStatus(SkillVersionStatus.PUBLISHED);
             version.setPublishedAt(currentTime());

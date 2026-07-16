@@ -24,6 +24,24 @@ public class IdempotencyRecord {
     @Column(name = "response_status_code")
     private Integer responseStatusCode;
 
+    @Column(name = "actor_user_id", length = 128)
+    private String actorUserId;
+
+    @Column(name = "token_id")
+    private Long tokenId;
+
+    @Column(name = "http_method", length = 16)
+    private String httpMethod;
+
+    @Column(name = "request_path")
+    private String requestPath;
+
+    @Column(name = "request_digest", length = 64)
+    private String requestDigest;
+
+    @Column(name = "response_body")
+    private String responseBody;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -80,4 +98,17 @@ public class IdempotencyRecord {
     public Instant getExpiresAt() {
         return expiresAt;
     }
+
+    public String getActorUserId() { return actorUserId; }
+    public void setActorUserId(String actorUserId) { this.actorUserId = actorUserId; }
+    public Long getTokenId() { return tokenId; }
+    public void setTokenId(Long tokenId) { this.tokenId = tokenId; }
+    public String getHttpMethod() { return httpMethod; }
+    public void setHttpMethod(String httpMethod) { this.httpMethod = httpMethod; }
+    public String getRequestPath() { return requestPath; }
+    public void setRequestPath(String requestPath) { this.requestPath = requestPath; }
+    public String getRequestDigest() { return requestDigest; }
+    public void setRequestDigest(String requestDigest) { this.requestDigest = requestDigest; }
+    public String getResponseBody() { return responseBody; }
+    public void setResponseBody(String responseBody) { this.responseBody = responseBody; }
 }

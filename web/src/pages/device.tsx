@@ -7,13 +7,24 @@ import { Label } from '@/shared/ui/label.tsx'
 import { fetchJson, getCsrfHeaders } from '@/api/client.ts'
 import { truncateErrorMessage } from '@/shared/lib/error-display.ts'
 
-async function authorizeDevice(userCode: string): Promise<void> {
+interface DeviceRequestInfo {
+  clientName: string
+  scopes: string[]
+  requestedNamespaceSlug?: string
+  expiresInDays: number
+}
+
+async function getDeviceRequest(userCode: string): Promise<DeviceRequestInfo> {
+  return fetchJson<DeviceRequestInfo>(`/api/v1/device/request?userCode=${encodeURIComponent(userCode)}`)
+}
+
+async function authorizeDevice(userCode: string, namespaceSlug: string, decision: 'APPROVE' | 'DENY'): Promise<void> {
   await fetchJson<void>('/api/v1/device/authorize', {
     method: 'POST',
     headers: getCsrfHeaders({
       'Content-Type': 'application/json',
     }),
-    body: JSON.stringify({ userCode }),
+    body: JSON.stringify({ userCode, namespaceSlug, decision }),
   })
 }
 
@@ -22,6 +33,8 @@ export function DeviceAuthPage() {
   const [part1, setPart1] = useState('')
   const [part2, setPart2] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [namespaceSlug, setNamespaceSlug] = useState('')
+  const [requestInfo, setRequestInfo] = useState<DeviceRequestInfo | null>(null)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const input1Ref = useRef<HTMLInputElement>(null)
@@ -73,7 +86,7 @@ export function DeviceAuthPage() {
     setMessage(null)
 
     try {
-      await authorizeDevice(userCode)
+      await authorizeDevice(userCode, namespaceSlug, 'APPROVE')
       setMessage({ type: 'success', text: t('device.success') })
       setPart1('')
       setPart2('')
@@ -88,6 +101,34 @@ export function DeviceAuthPage() {
     }
   }
 
+  useEffect(() => {
+    if (part1.length !== 4 || part2.length !== 4) {
+      setRequestInfo(null)
+      return
+    }
+    const userCode = `${part1}-${part2}`
+    const timeout = window.setTimeout(() => {
+      void getDeviceRequest(userCode).then((info) => {
+        setRequestInfo(info)
+        setNamespaceSlug(info.requestedNamespaceSlug ?? '')
+      }).catch(() => setRequestInfo(null))
+    }, 250)
+    return () => window.clearTimeout(timeout)
+  }, [part1, part2])
+
+  const handleDeny = async () => {
+    if (part1.length !== 4 || part2.length !== 4) return
+    setIsSubmitting(true)
+    try {
+      await authorizeDevice(`${part1}-${part2}`, namespaceSlug, 'DENY')
+      setMessage({ type: 'success', text: t('device.denied') })
+    } catch (error) {
+      setMessage({ type: 'error', text: error instanceof Error ? error.message : t('device.defaultError') })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-4 animate-fade-up">
       <Card className="w-full max-w-md p-8 space-y-8">
@@ -97,6 +138,18 @@ export function DeviceAuthPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
           </div>
+
+          {requestInfo ? (
+            <div className="space-y-3 rounded-xl border border-border p-4 text-sm">
+              <p><span className="font-medium">{t('device.client')}:</span> {requestInfo.clientName}</p>
+              <p><span className="font-medium">{t('device.permissions')}:</span> {requestInfo.scopes.join(', ')}</p>
+              <p><span className="font-medium">{t('device.expires')}:</span> {requestInfo.expiresInDays} {t('device.days')}</p>
+              <div className="space-y-2">
+                <Label htmlFor="device-namespace">{t('device.namespace')}</Label>
+                <Input id="device-namespace" value={namespaceSlug} onChange={(event) => setNamespaceSlug(event.target.value.replace(/^@/, ''))} placeholder="global" />
+              </div>
+            </div>
+          ) : null}
           <h1 className="text-3xl font-bold font-heading">{t('device.title')}</h1>
           <p className="text-muted-foreground">
             {t('device.subtitle')}
@@ -149,9 +202,12 @@ export function DeviceAuthPage() {
           <Button
             type="submit"
             className="w-full"
-            disabled={isSubmitting || part1.length !== 4 || part2.length !== 4}
+            disabled={isSubmitting || part1.length !== 4 || part2.length !== 4 || !namespaceSlug}
           >
             {isSubmitting ? t('device.submitting') : t('device.submit')}
+          </Button>
+          <Button type="button" variant="outline" className="w-full" disabled={isSubmitting || !requestInfo} onClick={handleDeny}>
+            {t('device.deny')}
           </Button>
         </form>
 

@@ -46,6 +46,16 @@ vi.mock('@/features/skill/skill-card', () => ({
   SkillCard: () => <div>skill-card</div>,
 }))
 
+vi.mock('@/features/external-skill/use-external-skills', () => ({
+  useExternalSkillProviders: () => ({ data: [{ id: 'skillhub-cn', enabled: false }] }),
+  useExternalSkillSearch: () => ({ data: undefined, isLoading: false, isFetching: false }),
+  useExternalSkillCategories: () => ({ data: [] }),
+}))
+
+vi.mock('@/features/external-skill/external-skill-card', () => ({
+  ExternalSkillCard: () => <div>external-skill-card</div>,
+}))
+
 vi.mock('@/shared/components/skeleton-loader', () => ({
   SkeletonList: () => <div>skeleton</div>,
 }))
@@ -172,6 +182,8 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        source: 'local',
+        category: '',
       },
     })
   })
@@ -190,6 +202,8 @@ describe('SearchPage', () => {
         sort: 'newest',
         page: 0,
         starredOnly: false,
+        source: 'local',
+        category: '',
       },
     })
   })
@@ -209,6 +223,8 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 2,
         starredOnly: false,
+        source: 'local',
+        category: '',
       },
     })
     expect(navigateMock).toHaveBeenNthCalledWith(2, {
@@ -220,6 +236,8 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: true,
+        source: 'local',
+        category: '',
       },
     })
   })
@@ -251,6 +269,8 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        source: 'local',
+        category: '',
       },
       replace: true,
     })

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import com.iflytek.skillhub.notification.sse.SseEmitterManager;
+import com.iflytek.skillhub.filter.IdempotencyInterceptor;
 import com.iflytek.skillhub.ratelimit.RateLimitInterceptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
@@ -12,7 +13,9 @@ class WebMvcRateLimitConfigTest {
 
     @Test
     void configureAsyncSupport_shouldSetTimeoutToMatchSseTimeout() {
-        WebMvcRateLimitConfig config = new WebMvcRateLimitConfig(mock(RateLimitInterceptor.class));
+        WebMvcRateLimitConfig config = new WebMvcRateLimitConfig(
+                mock(RateLimitInterceptor.class),
+                mock(IdempotencyInterceptor.class));
         TestAsyncSupportConfigurer asyncSupportConfigurer = new TestAsyncSupportConfigurer();
 
         config.configureAsyncSupport(asyncSupportConfigurer);

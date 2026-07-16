@@ -2,6 +2,7 @@ package com.iflytek.skillhub.config;
 
 import com.iflytek.skillhub.notification.sse.SseEmitterManager;
 import com.iflytek.skillhub.ratelimit.RateLimitInterceptor;
+import com.iflytek.skillhub.filter.IdempotencyInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -14,14 +15,18 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcRateLimitConfig implements WebMvcConfigurer {
 
     private final RateLimitInterceptor rateLimitInterceptor;
+    private final IdempotencyInterceptor idempotencyInterceptor;
 
-    public WebMvcRateLimitConfig(RateLimitInterceptor rateLimitInterceptor) {
+    public WebMvcRateLimitConfig(RateLimitInterceptor rateLimitInterceptor, IdempotencyInterceptor idempotencyInterceptor) {
         this.rateLimitInterceptor = rateLimitInterceptor;
+        this.idempotencyInterceptor = idempotencyInterceptor;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
+                .addPathPatterns("/api/**");
+        registry.addInterceptor(idempotencyInterceptor)
                 .addPathPatterns("/api/**");
     }
 

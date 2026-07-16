@@ -9,6 +9,8 @@ public record DeviceTokenResponse(
         return new DeviceTokenResponse(null, null, "authorization_pending");
     }
 
+    public static DeviceTokenResponse error(String error) { return new DeviceTokenResponse(null, null, error); }
+
     public static DeviceTokenResponse success(String token) {
         return new DeviceTokenResponse(token, "Bearer", null);
     }

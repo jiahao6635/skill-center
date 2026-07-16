@@ -18,6 +18,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
+import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
+import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
+import com.iflytek.skillhub.auth.token.ApiTokenScopeService;
+import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 
 /**
  * Self-service API token management endpoints for authenticated users.
@@ -28,11 +33,22 @@ public class TokenController extends BaseApiController {
 
     private final ApiTokenService apiTokenService;
     private final ObjectMapper objectMapper;
+    private final NamespaceRepository namespaceRepository;
+    private final ApiTokenScopeService scopeService;
+    private final NamespaceMemberRepository namespaceMemberRepository;
+    private static final Set<String> AGENT_SCOPES = Set.of(
+            "skill:read", "skill:publish", "skill:lifecycle", "review:read", "review:decide");
+    private static final Set<String> PERSONAL_SCOPES = Set.of("skill:read", "skill:publish", "token:manage");
 
-    public TokenController(ApiTokenService apiTokenService, ApiResponseFactory responseFactory, ObjectMapper objectMapper) {
+    public TokenController(ApiTokenService apiTokenService, ApiResponseFactory responseFactory, ObjectMapper objectMapper,
+                           NamespaceRepository namespaceRepository, ApiTokenScopeService scopeService,
+                           NamespaceMemberRepository namespaceMemberRepository) {
         super(responseFactory);
         this.apiTokenService = apiTokenService;
         this.objectMapper = objectMapper;
+        this.namespaceRepository = namespaceRepository;
+        this.scopeService = scopeService;
+        this.namespaceMemberRepository = namespaceMemberRepository;
     }
 
     @PostMapping
@@ -50,14 +66,39 @@ public class TokenController extends BaseApiController {
             }
         }
 
-        var result = apiTokenService.rotateToken(principal.userId(), request.name(), scopeJson, request.expiresAt());
+        List<String> requestedScopes = request.scopes() == null || request.scopes().isEmpty()
+                ? List.of("skill:read", "skill:publish") : request.scopes();
+        boolean agent = "AGENT".equalsIgnoreCase(request.tokenKind());
+        if (agent && !AGENT_SCOPES.containsAll(requestedScopes))
+            throw new DomainBadRequestException("validation.token.scope.invalid");
+        if (!agent && !PERSONAL_SCOPES.containsAll(requestedScopes))
+            throw new DomainBadRequestException("validation.token.scope.invalid");
+        Long namespaceId = null;
+        String namespaceSlug = "";
+        if (agent) {
+            namespaceSlug = request.namespaceSlug() == null ? "" : request.namespaceSlug().replaceFirst("^@", "");
+            var namespace = namespaceRepository.findBySlug(namespaceSlug)
+                    .orElseThrow(() -> new DomainBadRequestException("error.namespace.slug.notFound", request.namespaceSlug()));
+            namespaceId = namespace.getId();
+            boolean superAdmin = principal.platformRoles() != null && principal.platformRoles().contains("SUPER_ADMIN");
+            if (!superAdmin && namespaceMemberRepository
+                    .findByNamespaceIdAndUserId(namespaceId, principal.userId()).isEmpty()) {
+                throw new com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException(
+                        "error.namespace.permission.denied");
+            }
+        }
+        var result = agent
+                ? apiTokenService.createAgentToken(principal.userId(), request.name(), scopeJson, request.expiresAt(),
+                    request.clientId(), request.clientName(), namespaceId)
+                : apiTokenService.rotateToken(principal.userId(), request.name(), scopeJson, request.expiresAt());
         return ok("response.success.created", new TokenCreateResponse(
                 result.rawToken(),
                 result.entity().getId(),
                 result.entity().getName(),
                 result.entity().getTokenPrefix(),
                 formatInstant(result.entity().getCreatedAt()),
-                formatInstant(result.entity().getExpiresAt())
+                formatInstant(result.entity().getExpiresAt()), result.entity().getTokenKind(), requestedScopes,
+                namespaceSlug, result.entity().getClientName()
         ));
     }
 
@@ -73,7 +114,9 @@ public class TokenController extends BaseApiController {
             t.getTokenPrefix(),
             formatInstant(t.getCreatedAt()),
             formatInstant(t.getExpiresAt()),
-            formatInstant(t.getLastUsedAt())
+            formatInstant(t.getLastUsedAt()), t.getTokenKind(),
+            scopeService.parseScopes(t.getScopeJson()).stream().sorted().toList(),
+            resolveNamespaceSlug(t.getId()), t.getClientName()
         ));
         return ok("response.success.read", PageResponse.from(result));
     }
@@ -98,11 +141,18 @@ public class TokenController extends BaseApiController {
                 token.getTokenPrefix(),
                 formatInstant(token.getCreatedAt()),
                 formatInstant(token.getExpiresAt()),
-                formatInstant(token.getLastUsedAt())
+                formatInstant(token.getLastUsedAt()), token.getTokenKind(),
+                scopeService.parseScopes(token.getScopeJson()).stream().sorted().toList(),
+                resolveNamespaceSlug(token.getId()), token.getClientName()
         ));
     }
 
     private String formatInstant(Instant value) {
         return value == null ? "" : value.toString();
+    }
+
+    private String resolveNamespaceSlug(Long tokenId) {
+        return apiTokenService.namespaceGrants(tokenId).stream().findFirst()
+                .flatMap(namespaceRepository::findById).map(namespace -> namespace.getSlug()).orElse("");
     }
 }

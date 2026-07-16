@@ -30,12 +30,20 @@ export type ApiToken = Omit<components['schemas']['TokenSummaryResponse'], 'id' 
   createdAt: string
   expiresAt?: string
   lastUsedAt?: string
+  tokenKind?: string
+  scopes?: string[]
+  namespace?: string
+  clientName?: string
 }
 
 export type CreateTokenRequest = Omit<components['schemas']['TokenCreateRequest'], 'name'> & {
   name: string
   scopes?: string[]
   expiresAt?: string
+  tokenKind?: string
+  namespaceSlug?: string
+  clientId?: string
+  clientName?: string
 }
 
 export type CreateTokenResponse = Omit<components['schemas']['TokenCreateResponse'], 'token' | 'id' | 'name' | 'tokenPrefix' | 'createdAt'> & {
@@ -45,6 +53,31 @@ export type CreateTokenResponse = Omit<components['schemas']['TokenCreateRespons
   tokenPrefix: string
   createdAt: string
   expiresAt?: string
+  tokenKind?: string
+  scopes?: string[]
+  namespace?: string
+  clientName?: string
+}
+
+export interface ExternalSkillProvider { id: string; displayName: string; enabled: boolean }
+export interface ExternalSkillCategory { key: string; name: string; nameEn?: string }
+export interface ExternalSkillSummary {
+  provider: string; slug: string; displayName: string; summary: string; summaryZh?: string
+  owner: string; version: string; category: string; iconUrl?: string; sourceUrl?: string
+  downloads: number; installs: number; stars: number; verified: boolean
+}
+export interface ExternalSkillVersion { version: string; changelog?: string; createdAt?: number; securityReports?: unknown }
+export interface ExternalSkillDetail { skill: ExternalSkillSummary; latestVersion: ExternalSkillVersion; securityReports?: unknown }
+export interface ExternalSkillFile { path: string; size: number; sha256: string }
+export interface ExternalSkillSearchResponse { items: ExternalSkillSummary[]; total: number; page: number; size: number }
+export interface ExternalSkillImportValidation {
+  valid: boolean; packageSha256: string; targetSlug: string; targetVersion: string
+  errors: string[]; warnings: string[]; warningDigest: string; licenseStatus: string
+  licenseExpression?: string; lineageStatus: string; metadataNameDiffers: boolean; metadataVersionDiffers: boolean
+}
+export interface ExternalSkillImportResult {
+  outcome: string; namespace: string; slug: string; version: string; skillId: number; versionId: number
+  status: string; nextAction: string
 }
 
 export interface LocalLoginRequest {

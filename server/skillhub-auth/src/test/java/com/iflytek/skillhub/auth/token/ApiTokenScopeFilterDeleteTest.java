@@ -63,7 +63,7 @@ class ApiTokenScopeFilterDeleteTest {
         filter.doFilter(request, response, chain);
 
         assertEquals(HttpServletResponse.SC_FORBIDDEN, response.getStatus());
-        assertTrue(response.getErrorMessage().contains("Missing API token scope: skill:delete"));
+        assertTrue(response.getErrorMessage().contains("API token cannot access endpoint"));
         verify(chain, never()).doFilter(request, response);
     }
 }

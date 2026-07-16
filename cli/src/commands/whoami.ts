@@ -21,6 +21,6 @@ export async function whoamiCommand(options: WhoamiCommandOptions): Promise<stri
   }
   const user = await new SkillHubClient(registry, token).whoami()
   return options.json
-    ? JSON.stringify({ ok: true, registry, handle: user.handle, displayName: user.displayName })
+    ? JSON.stringify({ ok: true, schemaVersion: 1, contractVersion: 1, registry, ...user })
     : `Registry: ${registry}\nHandle: ${user.handle}\nName: ${user.displayName}`
 }

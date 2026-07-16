@@ -69,6 +69,9 @@ public class RouteSecurityPolicyRegistry {
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/web/skills/*/*/tags/*/files"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/web/skills/*/*/tags/*/file"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/web/labels"),
+            RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/web/external-skill-providers"),
+            RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/web/external-skills/**"),
+            RouteAuthorizationPolicy.authenticated(HttpMethod.POST, "/api/web/external-skills/**"),
             RouteAuthorizationPolicy.roles(HttpMethod.DELETE, "/api/v1/skills/id/*", "SUPER_ADMIN"),
             RouteAuthorizationPolicy.roles(HttpMethod.DELETE, "/api/v1/skills/*/*", "SUPER_ADMIN"),
             RouteAuthorizationPolicy.authenticated(HttpMethod.DELETE, "/api/web/skills/id/*"),
@@ -83,9 +86,11 @@ public class RouteSecurityPolicyRegistry {
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/cli/v1/skills/*/*/resolve"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/cli/v1/skills/*/*/download"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/cli/v1/skills/*/*/versions/*/download"),
-            RouteAuthorizationPolicy.authenticated(HttpMethod.DELETE, "/api/cli/v1/skills/*/*"),
             RouteAuthorizationPolicy.authenticated(HttpMethod.POST, "/api/cli/v1/skills/*/publish"),
             RouteAuthorizationPolicy.authenticated(HttpMethod.POST, "/api/cli/v1/skills/*/publish/validate")
+            ,RouteAuthorizationPolicy.authenticated(null, "/api/cli/v1/manage/**")
+            ,RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/cli/v1/external/**")
+            ,RouteAuthorizationPolicy.authenticated(HttpMethod.POST, "/api/cli/v1/external/**")
     );
 
     private static final List<ApiTokenPolicy> API_TOKEN_POLICIES = List.of(
@@ -98,12 +103,6 @@ public class RouteSecurityPolicyRegistry {
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/search"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/skills"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/skills/**"),
-            ApiTokenPolicy.allow(HttpMethod.GET, "/api/web/skills"),
-            ApiTokenPolicy.allow(HttpMethod.GET, "/api/web/skills/**"),
-            ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/namespaces"),
-            ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/namespaces/*"),
-            ApiTokenPolicy.allow(HttpMethod.GET, "/api/web/namespaces"),
-            ApiTokenPolicy.allow(HttpMethod.GET, "/api/web/namespaces/*"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/resolve/**"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/download"),
             ApiTokenPolicy.allow(null, "/.well-known/**"),
@@ -112,20 +111,24 @@ public class RouteSecurityPolicyRegistry {
             ApiTokenPolicy.allow(null, "/swagger-ui/**"),
             ApiTokenPolicy.require(null, "/api/v1/tokens", "token:manage"),
             ApiTokenPolicy.require(null, "/api/v1/tokens/**", "token:manage"),
-            ApiTokenPolicy.require(HttpMethod.DELETE, "/api/v1/skills/id/*", "skill:delete"),
-            ApiTokenPolicy.require(HttpMethod.DELETE, "/api/v1/skills/*/*", "skill:delete"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/skills", "skill:publish"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/skills/*/publish", "skill:publish"),
-            ApiTokenPolicy.require(HttpMethod.POST, "/api/web/skills/*/publish", "skill:publish"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/publish", "skill:publish"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/auth/whoami"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/search"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/*/*/resolve"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/*/*/download"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/*/*/versions/*/download"),
-            ApiTokenPolicy.require(HttpMethod.DELETE, "/api/cli/v1/skills/*/*", "skill:delete"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/skills/*/publish", "skill:publish"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/skills/*/publish/validate", "skill:publish")
+            ,ApiTokenPolicy.require(HttpMethod.GET, "/api/cli/v1/manage/reviews/**", "review:read")
+            ,ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/manage/reviews/*/approve", "review:decide")
+            ,ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/manage/reviews/*/reject", "review:decide")
+            ,ApiTokenPolicy.require(HttpMethod.GET, "/api/cli/v1/manage/skills/**", "skill:read")
+            ,ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/manage/skills/*/*/versions/*/rerelease", "skill:publish")
+            ,ApiTokenPolicy.require(null, "/api/cli/v1/manage/skills/**", "skill:lifecycle")
+            ,ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/external/**")
+            ,ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/external/**", "skill:publish")
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();

@@ -113,23 +113,19 @@ class SkillDeleteFlowIntegrationTest {
     }
 
     @Test
-    void adminDeleteById_removesPersistedSkillGraphForSuperAdmin() throws Exception {
+    void bearerTokenCannotHardDeleteWholeSkillEvenForSuperAdmin() throws Exception {
         PersistedSkillGraph graph = createSkillGraph("owner-1");
 
         mockMvc.perform(delete("/api/v1/skills/id/" + graph.skill().getId())
                         .with(authentication(apiAuth("super-1", "SUPER_ADMIN")))
                         .with(csrf()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.skillId").value(graph.skill().getId()))
-                .andExpect(jsonPath("$.data.namespace").value(graph.namespace().getSlug()))
-                .andExpect(jsonPath("$.data.slug").value(graph.skill().getSlug()))
-                .andExpect(jsonPath("$.data.deleted").value(true));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
 
-        assertThat(skillRepository.findById(graph.skill().getId())).isEmpty();
-        assertThat(skillVersionRepository.findBySkillId(graph.skill().getId())).isEmpty();
-        assertThat(skillFileRepository.findByVersionId(graph.version().getId())).isEmpty();
-        verify(searchIndexService).remove(graph.skill().getId());
+        assertThat(skillRepository.findById(graph.skill().getId())).isPresent();
+        assertThat(skillVersionRepository.findBySkillId(graph.skill().getId())).hasSize(1);
+        assertThat(skillFileRepository.findByVersionId(graph.version().getId())).hasSize(1);
+        verify(searchIndexService, never()).remove(graph.skill().getId());
     }
 
     private PersistedSkillGraph createSkillGraph(String ownerId) {

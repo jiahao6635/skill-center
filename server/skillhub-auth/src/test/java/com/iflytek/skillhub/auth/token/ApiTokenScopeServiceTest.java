@@ -54,7 +54,7 @@ class ApiTokenScopeServiceTest {
     }
 
     @Test
-    void authorizeShouldRequireDeleteScopeForHardDeleteEndpoint() {
+    void authorizeShouldRejectHardDeleteEndpointForEveryTokenScope() {
         ApiTokenScopeService.AuthorizationDecision denied = scopeService.authorize(
                 "DELETE",
                 "/api/v1/skills/team-a/demo-skill",
@@ -62,7 +62,7 @@ class ApiTokenScopeServiceTest {
         );
 
         assertFalse(denied.allowed());
-        assertEquals("skill:delete", denied.requiredScope());
+        assertEquals(null, denied.requiredScope());
 
         ApiTokenScopeService.AuthorizationDecision allowed = scopeService.authorize(
                 "DELETE",
@@ -70,7 +70,7 @@ class ApiTokenScopeServiceTest {
                 Set.of("skill:delete")
         );
 
-        assertTrue(allowed.allowed());
+        assertFalse(allowed.allowed());
     }
 
     @Test
@@ -98,14 +98,15 @@ class ApiTokenScopeServiceTest {
     }
 
     @Test
-    void authorizeShouldAllowPublicNamespaceReadWithoutScope() {
+    void authorizeShouldDenyNamespaceMetadataForBearerTokens() {
         ApiTokenScopeService.AuthorizationDecision decision = scopeService.authorize(
                 "GET",
                 "/api/v1/namespaces/team-a",
                 Set.of()
         );
 
-        assertTrue(decision.allowed());
+        assertFalse(decision.allowed());
+        assertEquals("API token cannot access endpoint: /api/v1/namespaces/team-a", decision.message());
     }
 
     @Test

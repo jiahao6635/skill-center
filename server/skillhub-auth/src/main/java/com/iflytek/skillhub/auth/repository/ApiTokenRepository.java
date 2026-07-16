@@ -19,4 +19,6 @@ public interface ApiTokenRepository extends JpaRepository<ApiToken, Long> {
     Page<ApiToken> findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(String userId, Pageable pageable);
     boolean existsByUserIdAndRevokedAtIsNullAndNameIgnoreCase(String userId, String name);
     Optional<ApiToken> findByUserIdAndNameIgnoreCaseAndRevokedAtIsNull(String userId, String name);
+    Optional<ApiToken> findByUserIdAndClientIdAndTokenKindAndRevokedAtIsNull(
+            String userId, String clientId, String tokenKind);
 }

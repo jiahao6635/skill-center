@@ -27,6 +27,8 @@ public interface ReviewTaskJpaRepository extends JpaRepository<ReviewTask, Long>
     Page<ReviewTask> findByNamespaceIdAndStatus(Long namespaceId, ReviewTaskStatus status, Pageable pageable);
 
     Page<ReviewTask> findBySubmittedByAndStatus(String submittedBy, ReviewTaskStatus status, Pageable pageable);
+    Page<ReviewTask> findBySubmittedByAndNamespaceIdAndStatus(
+            String submittedBy, Long namespaceId, ReviewTaskStatus status, Pageable pageable);
 
     boolean existsByNamespaceId(Long namespaceId);
 

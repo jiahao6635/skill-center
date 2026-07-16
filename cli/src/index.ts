@@ -12,8 +12,12 @@ import { searchCommand } from './commands/search'
 import { updateCommand } from './commands/update'
 import { versionCommand } from './commands/version'
 import { whoamiCommand } from './commands/whoami'
+import { reviewCommand, skillManageCommand, type ManageOptions } from './commands/manage'
+import { externalCommand, type ExternalOptions } from './commands/external'
+import { downloadCommand, type DownloadCommandOptions } from './commands/download'
 import { CliError } from './shared/errors'
 import { renderError } from './shared/output'
+import { randomUUID } from 'node:crypto'
 
 const cli = cac('skillhub')
 
@@ -27,13 +31,40 @@ async function runCommand(action: () => Promise<string>, json = false): Promise<
   try {
     const output = await action()
     if (output) {
-      process.stdout.write(`${output}\n`)
+      process.stdout.write(`${json ? normalizeJsonOutput(output) : output}\n`)
     }
   } catch (error) {
     const exitCode = error instanceof CliError ? error.exitCode : 1
     process.stderr.write(`${renderError(error, json)}\n`)
     process.exit(exitCode)
   }
+}
+
+function normalizeJsonOutput(output: string): string {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(output)
+  } catch {
+    parsed = { ok: true, message: output }
+  }
+  const value = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed as Record<string, unknown>
+    : { ok: true, data: parsed }
+  return JSON.stringify({
+    ok: value.ok ?? true,
+    schemaVersion: value.schemaVersion ?? 1,
+    command: value.command ?? commandName(),
+    requestId: value.requestId ?? randomUUID(),
+    ...value,
+  })
+}
+
+function commandName(): string {
+  const args = process.argv.slice(2).filter(arg => !arg.startsWith('-'))
+  const root = args[0] ?? 'unknown'
+  if (['skill', 'review', 'external'].includes(root) && args[1]) return `${root}.${args[1]}`
+  if (root === 'publish' && process.argv.includes('--dry-run')) return 'publish.validate'
+  return root
 }
 
 const KNOWN_COMMANDS = Object.keys(commands)
@@ -175,8 +206,10 @@ cli
   .command('help [command]', 'Show help')
   .option('--json', 'Output JSON')
   .action((command: string | undefined, options: { json?: boolean }) => {
-    // TODO: --json is not forwarded to helpCommand; see help-command.test.ts
-    return runCommand(() => helpCommand(command ? [command] : []), Boolean(options.json))
+    return runCommand(
+      () => helpCommand([...(command ? [command] : []), ...(options.json ? ['--json'] : [])]),
+      Boolean(options.json),
+    )
   })
 
 cli
@@ -198,8 +231,14 @@ cli
   .command('login', 'Save registry and token')
   .option('--registry <url>', 'Registry URL')
   .option('--token <token>', 'API token')
+  .option('--token-stdin', 'Read API token from stdin')
+  .option('--namespace <slug>', 'Authorized namespace')
+  .option('--client-name <name>', 'Agent client name')
+  .option('--client-id <id>', 'Stable Agent client id')
+  .option('--expires-in <days>', 'Agent token lifetime (1d-90d)', { default: '90d' })
+  .option('--resume <flow-id>', 'Resume a device authorization flow')
   .option('--json', 'Output JSON')
-  .action((options: { registry?: string; token?: string; json?: boolean }) => {
+  .action((options: import('./commands/login').LoginCommandOptions) => {
     return runCommand(() => loginCommand(options), Boolean(options.json))
   })
 
@@ -246,6 +285,18 @@ cli
   })
 
 cli
+  .command('download <coordinate>', 'Download a skill package without installing it')
+  .option('--version <v>', 'Version')
+  .option('--output <path>', 'Destination ZIP path')
+  .option('--overwrite', 'Overwrite an existing destination')
+  .option('--registry <url>', 'Registry URL')
+  .option('--token <token>', 'API token')
+  .option('--json', 'Output JSON')
+  .action((coordinate: string, options: DownloadCommandOptions) => {
+    return runCommand(() => downloadCommand(coordinate, options), Boolean(options.json))
+  })
+
+cli
   .command('list', 'List local installs')
   .option('--agent <profile>', 'Filter by agent (repeatable)')
   .option('--dir <path>', 'Filter by directory')
@@ -270,6 +321,55 @@ cli
   })
 
 cli
+  .command('skill <action> <coordinate>', 'Inspect or manage a remote skill')
+  .option('--version <v>', 'Target version')
+  .option('--visibility <v>', 'Target visibility')
+  .option('--target-version <v>', 'Rerelease target version')
+  .option('--reason <text>', 'Reason')
+  .option('--confirm <coordinate>', 'Exact target confirmation')
+  .option('--idempotency-key <uuid>', 'Reuse a mutation idempotency key')
+  .option('--page <n>', 'Page number')
+  .option('--limit <n>', 'Page size')
+  .option('--registry <url>', 'Registry URL')
+  .option('--token <token>', 'API token')
+  .option('--json', 'Output JSON')
+  .action((action: string, coordinate: string, options: ManageOptions) => runCommand(() => skillManageCommand(action, coordinate, options), Boolean(options.json)))
+
+cli
+  .command('review <action> [id]', 'Inspect or decide one review')
+  .option('--namespace <slug>', 'Authorized namespace')
+  .option('--status <status>', 'Review status')
+  .option('--page <n>', 'Page number')
+  .option('--limit <n>', 'Page size')
+  .option('--comment <text>', 'Review comment')
+  .option('--confirm <coordinate>', 'Exact target confirmation')
+  .option('--idempotency-key <uuid>', 'Reuse a mutation idempotency key')
+  .option('--output <path>', 'Destination ZIP path')
+  .option('--overwrite', 'Overwrite an existing destination')
+  .option('--registry <url>', 'Registry URL')
+  .option('--token <token>', 'API token')
+  .option('--json', 'Output JSON')
+  .action((action: string, id: string | undefined, options: ManageOptions) => runCommand(() => reviewCommand(action, id, options), Boolean(options.json)))
+
+cli
+  .command('external <action> [value]', 'Search, inspect, or import an external skill')
+  .option('--version <v>', 'Source version')
+  .option('--namespace <slug>', 'Target namespace')
+  .option('--visibility <v>', 'Target visibility')
+  .option('--package-sha256 <sha>', 'Validated package hash')
+  .option('--warning-digest <digest>', 'Validated warning digest')
+  .option('--confirm-warnings', 'Confirm validation warnings')
+  .option('--confirm-missing-license', 'Super-admin license override')
+  .option('--page <n>', 'Page number')
+  .option('--limit <n>', 'Page size')
+  .option('--sort <sort>', 'Sort order')
+  .option('--idempotency-key <uuid>', 'Reuse an import idempotency key')
+  .option('--registry <url>', 'Registry URL')
+  .option('--token <token>', 'API token')
+  .option('--json', 'Output JSON')
+  .action((action: string, value: string | undefined, options: ExternalOptions) => runCommand(() => externalCommand(action, value ?? '', options), Boolean(options.json)))
+
+cli
   .command('doctor', 'Scan project and merge into local inventory')
   .option('--json', 'Output JSON')
   .action((options: { json?: boolean }) => {
@@ -281,6 +381,8 @@ cli
   .option('--namespace <slug>', 'Namespace')
   .option('--visibility <v>', 'Visibility (public|namespace-only|private)')
   .option('--dry-run', 'Validate without publishing')
+  .option('--confirm-warnings <digest>', 'Confirm the exact warning digest returned by dry-run')
+  .option('--idempotency-key <uuid>', 'Reuse a mutation idempotency key')
   .option('--registry <url>', 'Registry URL')
   .option('--token <token>', 'API token')
   .option('--json', 'Output JSON')

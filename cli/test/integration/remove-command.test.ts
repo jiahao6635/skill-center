@@ -93,7 +93,7 @@ describe('remove command — flag validation (P0)', () => {
     expect(result.stderr).toContain('--remote cannot be used with --agent or --all')
   })
 
-  test('--remote without --hard in non-interactive mode fails with usage error', async () => {
+  test('--remote is rejected because whole-skill deletion is unsupported', async () => {
     const env = await createTempHome()
     // Bun.spawn with piped stdin is never a TTY — this exercises the non-interactive guard.
     const result = await runCli(
@@ -102,10 +102,10 @@ describe('remove command — flag validation (P0)', () => {
     )
 
     expect(result.exitCode).toBe(5) // EXIT.usage
-    expect(result.stderr).toContain('non-interactive remote delete requires --hard')
+    expect(result.stderr).toContain('remote whole-skill deletion is not supported')
   })
 
-  test('--remote --hard calls deleteRemote and exits 0', async () => {
+  test('--remote --hard is also rejected without calling the registry', async () => {
     const env = await createTempHome()
     registry = await startFakeRegistry({
       token: 'sk_ok',
@@ -124,14 +124,9 @@ describe('remove command — flag validation (P0)', () => {
       { HOME: env.home, USERPROFILE: env.home }
     )
 
-    expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain('global/my-skill')
-    expect(result.stdout).toContain('remote-hard-delete')
-    expect(registry.received.delete).toEqual({
-      namespace: 'global',
-      slug: 'my-skill',
-      token: expect.any(String)
-    })
+    expect(result.exitCode).toBe(5)
+    expect(result.stderr).toContain('remote whole-skill deletion is not supported')
+    expect(registry.received.delete).toBeUndefined()
   })
 })
 
@@ -169,7 +164,7 @@ describe('remove command — local remove (P1)', () => {
     expect(Array.isArray(parsed.removed)).toBe(true)
   })
 
-  test('--json shape for --remote --hard', async () => {
+  test('--json shape for unsupported --remote --hard', async () => {
     const env = await createTempHome()
     registry = await startFakeRegistry({
       token: 'sk_ok',
@@ -187,20 +182,14 @@ describe('remove command — local remove (P1)', () => {
       { HOME: env.home, USERPROFILE: env.home }
     )
 
-    expect(result.exitCode).toBe(0)
-    const parsed = JSON.parse(result.stdout)
-    expect(parsed).toMatchObject({
-      ok: true,
-      scope: 'remote',
-      action: 'hard-delete',
-      namespace: 'global',
-      slug: 'my-skill'
+    expect(result.exitCode).toBe(5)
+    expect(result.stdout).toBe('')
+    expect(JSON.parse(result.stderr)).toMatchObject({
+      ok: false,
+      message: 'remote whole-skill deletion is not supported',
+      exitCode: 5
     })
-    expect(registry.received.delete).toEqual({
-      namespace: 'global',
-      slug: 'my-skill',
-      token: expect.any(String)
-    })
+    expect(registry.received.delete).toBeUndefined()
   })
 
   test('stale record branch (existed: false) shows distinct human copy', async () => {

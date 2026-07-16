@@ -203,6 +203,17 @@ public class ReviewPortalAppService {
         ));
     }
 
+    public PageResponse<ReviewTaskResponse> listMySubmissions(
+            int page, int size, String userId, Long namespaceId) {
+        Page<ReviewTask> tasks = reviewTaskRepository.findBySubmittedByAndNamespaceIdAndStatus(
+                userId, namespaceId, ReviewTaskStatus.PENDING, PageRequest.of(page, size));
+        return PageResponse.from(new PageImpl<>(
+                governanceQueryRepository.getReviewTaskResponses(tasks.getContent()),
+                tasks.getPageable(),
+                tasks.getTotalElements()
+        ));
+    }
+
     public ReviewTaskResponse getReviewDetail(Long reviewTaskId,
                                               String userId,
                                               Map<Long, NamespaceRole> userNsRoles) {

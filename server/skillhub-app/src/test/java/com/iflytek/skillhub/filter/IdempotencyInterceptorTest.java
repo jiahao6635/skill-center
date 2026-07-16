@@ -59,7 +59,7 @@ class IdempotencyInterceptorTest {
     @Test
     void testNewRequestPassesThrough() throws Exception {
         when(request.getMethod()).thenReturn("POST");
-        when(request.getHeader("X-Request-Id")).thenReturn("req-123");
+        when(request.getHeader("Idempotency-Key")).thenReturn("req-123");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get("idempotency:req-123")).thenReturn(null);
         when(idempotencyRecordRepository.findByRequestId("req-123")).thenReturn(Optional.empty());
@@ -73,7 +73,7 @@ class IdempotencyInterceptorTest {
     @Test
     void testDuplicateRequestReturnsCachedResponse() throws Exception {
         when(request.getMethod()).thenReturn("POST");
-        when(request.getHeader("X-Request-Id")).thenReturn("req-456");
+        when(request.getHeader("Idempotency-Key")).thenReturn("req-456");
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get("idempotency:req-456")).thenReturn("COMPLETED");
 
@@ -86,12 +86,13 @@ class IdempotencyInterceptorTest {
         assertFalse(result);
         writer.flush();
         String output = stringWriter.toString();
-        assertTrue(output.contains("error.request.duplicate"));
+        assertTrue(output.contains("IDEMPOTENCY_REQUEST_IN_PROGRESS"));
     }
 
     @Test
     void testNoRequestIdHeaderPassesThrough() throws Exception {
         when(request.getMethod()).thenReturn("POST");
+        when(request.getHeader("Idempotency-Key")).thenReturn(null);
         when(request.getHeader("X-Request-Id")).thenReturn(null);
 
         boolean result = interceptor.preHandle(request, response, new Object());
@@ -113,7 +114,8 @@ class IdempotencyInterceptorTest {
     @Test
     void testAfterCompletionUpdatesRecord() throws Exception {
         when(request.getMethod()).thenReturn("POST");
-        when(request.getHeader("X-Request-Id")).thenReturn("req-789");
+        when(request.getHeader("Idempotency-Key")).thenReturn("req-789");
+        when(request.getAttribute(IdempotencyInterceptor.class.getName() + ".owner")).thenReturn(Boolean.TRUE);
         when(response.getStatus()).thenReturn(200);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
@@ -127,5 +129,58 @@ class IdempotencyInterceptorTest {
 
         verify(idempotencyRecordRepository).save(any(IdempotencyRecord.class));
         verify(valueOperations).set(eq("idempotency:req-789"), eq("COMPLETED"), anyLong(), any(TimeUnit.class));
+    }
+
+    @Test
+    void legacyRequestIdHeaderRemainsSupported() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getHeader("Idempotency-Key")).thenReturn(null);
+        when(request.getHeader("X-Request-Id")).thenReturn("legacy-123");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("idempotency:legacy-123")).thenReturn(null);
+        when(idempotencyRecordRepository.findByRequestId("legacy-123")).thenReturn(Optional.empty());
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+
+        verify(idempotencyRecordRepository).save(argThat(record ->
+                "legacy-123".equals(record.getRequestId())));
+    }
+
+    @Test
+    void completedRequestReplaysOriginalResponseBody() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getHeader("Idempotency-Key")).thenReturn("replay-1");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        IdempotencyRecord record = new IdempotencyRecord(
+                "replay-1", null, null, IdempotencyStatus.COMPLETED, 201,
+                Instant.now(clock), Instant.now(clock).plusSeconds(86400));
+        record.setResponseBody("{\"code\":0,\"data\":{\"id\":7}}");
+        when(idempotencyRecordRepository.findByRequestId("replay-1")).thenReturn(Optional.of(record));
+        StringWriter output = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(output));
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+
+        verify(response).setStatus(201);
+        assertTrue(output.toString().contains("\"id\":7"));
+    }
+
+    @Test
+    void sameKeyWithDifferentPathIsRejected() throws Exception {
+        when(request.getMethod()).thenReturn("POST");
+        when(request.getRequestURI()).thenReturn("/api/cli/v1/manage/reviews/2/approve");
+        when(request.getHeader("Idempotency-Key")).thenReturn("reused-1");
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        IdempotencyRecord record = new IdempotencyRecord(
+                "reused-1", null, null, IdempotencyStatus.COMPLETED, 200,
+                Instant.now(clock), Instant.now(clock).plusSeconds(86400));
+        record.setRequestPath("/api/cli/v1/manage/reviews/1/approve");
+        when(idempotencyRecordRepository.findByRequestId("reused-1")).thenReturn(Optional.of(record));
+        StringWriter output = new StringWriter();
+        when(response.getWriter()).thenReturn(new PrintWriter(output));
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+
+        assertTrue(output.toString().contains("IDEMPOTENCY_KEY_REUSED"));
     }
 }

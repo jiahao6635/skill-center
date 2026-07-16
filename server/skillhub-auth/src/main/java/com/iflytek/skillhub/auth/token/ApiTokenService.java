@@ -2,12 +2,15 @@ package com.iflytek.skillhub.auth.token;
 
 import com.iflytek.skillhub.auth.entity.ApiToken;
 import com.iflytek.skillhub.auth.repository.ApiTokenRepository;
+import com.iflytek.skillhub.auth.repository.ApiTokenNamespaceGrantRepository;
+import com.iflytek.skillhub.auth.entity.ApiTokenNamespaceGrant;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -24,6 +27,7 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.util.StringUtils;
 
 /**
  * Issues, rotates, validates, and revokes API tokens for non-browser clients.
@@ -37,10 +41,17 @@ public class ApiTokenService {
     private final SecureRandom secureRandom = new SecureRandom();
     private final ApiTokenRepository tokenRepo;
     private final Clock clock;
+    private final ApiTokenNamespaceGrantRepository grantRepository;
 
     public ApiTokenService(ApiTokenRepository tokenRepo, Clock clock) {
+        this(tokenRepo, clock, null);
+    }
+
+    @Autowired
+    public ApiTokenService(ApiTokenRepository tokenRepo, Clock clock, ApiTokenNamespaceGrantRepository grantRepository) {
         this.tokenRepo = tokenRepo;
         this.clock = clock;
+        this.grantRepository = grantRepository;
     }
 
     public record TokenCreateResult(String rawToken, ApiToken entity) {}
@@ -77,6 +88,37 @@ public class ApiTokenService {
             throw new DomainBadRequestException("error.token.name.duplicate");
         }
         return new TokenCreateResult(rawToken, token);
+    }
+
+    @Transactional
+    public TokenCreateResult createAgentToken(String userId, String name, String scopeJson, String expiresAt,
+                                              String clientId, String clientName, Long namespaceId) {
+        if (namespaceId == null) throw new DomainBadRequestException("validation.token.namespace.required");
+        if (!StringUtils.hasText(clientId)) throw new DomainBadRequestException("validation.token.clientId.required");
+        if (!StringUtils.hasText(clientName)) throw new DomainBadRequestException("validation.token.clientName.required");
+        if (clientId.trim().length() > 128 || clientName.trim().length() > 128)
+            throw new DomainBadRequestException("validation.token.client.size");
+        Instant parsedExpiration = parseExpiresAt(expiresAt);
+        if (parsedExpiration == null) parsedExpiration = currentTime().plusSeconds(90L * 24 * 60 * 60);
+        if (parsedExpiration.isAfter(currentTime().plusSeconds(90L * 24 * 60 * 60)))
+            throw new DomainBadRequestException("validation.token.agent.expiresAt.max");
+        TokenCreateResult result = createToken(userId, name, scopeJson, parsedExpiration.toString());
+        result.entity().setTokenKind("AGENT");
+        result.entity().setClientId(clientId.trim());
+        result.entity().setClientName(clientName.trim());
+        tokenRepo.save(result.entity());
+        if (grantRepository != null) grantRepository.save(new ApiTokenNamespaceGrant(result.entity().getId(), namespaceId));
+        return result;
+    }
+
+    @Transactional
+    public TokenCreateResult rotateAgentToken(String userId, String name, String scopeJson, String expiresAt,
+                                              String clientId, String clientName, Long namespaceId) {
+        tokenRepo.findByUserIdAndClientIdAndTokenKindAndRevokedAtIsNull(userId, clientId, "AGENT").ifPresent(existing -> {
+            existing.setRevokedAt(currentTime());
+            tokenRepo.save(existing);
+        });
+        return createAgentToken(userId, normalizeName(name), scopeJson, expiresAt, clientId, clientName, namespaceId);
     }
 
     /**
@@ -133,12 +175,22 @@ public class ApiTokenService {
         ApiToken token = tokenRepo.findById(tokenId)
                 .filter(existing -> existing.getUserId().equals(userId) && existing.getRevokedAt() == null)
                 .orElseThrow(() -> new DomainNotFoundException("error.token.notFound", tokenId));
-        token.setExpiresAt(parseExpiresAt(expiresAt));
+        Instant parsed = parseExpiresAt(expiresAt);
+        if ("AGENT".equals(token.getTokenKind())
+                && (parsed == null || parsed.isAfter(currentTime().plusSeconds(90L * 24 * 60 * 60)))) {
+            throw new DomainBadRequestException("validation.token.agent.expiresAt.max");
+        }
+        token.setExpiresAt(parsed);
         return tokenRepo.save(token);
     }
 
     public List<ApiToken> listActiveTokens(String userId) {
         return tokenRepo.findByUserIdAndRevokedAtIsNullOrderByCreatedAtDesc(userId);
+    }
+
+    public List<Long> namespaceGrants(Long tokenId) {
+        if (grantRepository == null) return List.of();
+        return grantRepository.findByTokenId(tokenId).stream().map(ApiTokenNamespaceGrant::getNamespaceId).toList();
     }
 
     public Page<ApiToken> listActiveTokens(String userId, int page, int size) {

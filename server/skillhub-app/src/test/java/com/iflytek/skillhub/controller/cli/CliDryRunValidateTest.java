@@ -3,6 +3,8 @@ package com.iflytek.skillhub.controller.cli;
 import com.iflytek.skillhub.auth.entity.ApiToken;
 import com.iflytek.skillhub.auth.repository.UserRoleBindingRepository;
 import com.iflytek.skillhub.auth.token.ApiTokenService;
+import com.iflytek.skillhub.domain.namespace.Namespace;
+import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
@@ -37,6 +39,7 @@ class CliDryRunValidateTest {
     @MockBean ApiTokenService apiTokenService;
     @MockBean UserAccountRepository userAccountRepository;
     @MockBean UserRoleBindingRepository userRoleBindingRepository;
+    @MockBean NamespaceRepository namespaceRepository;
 
     private void givenValidPublishToken() {
         ApiToken token = new ApiToken("user-1", "cli", "sk_test", "hash", "[\"skill:publish\"]");
@@ -45,6 +48,9 @@ class CliDryRunValidateTest {
         given(apiTokenService.validateToken("test-token")).willReturn(Optional.of(token));
         given(userAccountRepository.findById("user-1")).willReturn(Optional.of(user));
         given(userRoleBindingRepository.findByUserId("user-1")).willReturn(List.of());
+        Namespace namespace = new Namespace("global", "Global", "system");
+        org.springframework.test.util.ReflectionTestUtils.setField(namespace, "id", 1L);
+        given(namespaceRepository.findBySlug("global")).willReturn(Optional.of(namespace));
     }
 
     @Test

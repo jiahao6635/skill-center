@@ -93,6 +93,11 @@ public class GovernanceWorkflowAppService {
         return reviewPortalAppService.listMySubmissions(page, size, userId);
     }
 
+    public PageResponse<ReviewTaskResponse> listMyReviewSubmissions(
+            int page, int size, String userId, Long namespaceId) {
+        return reviewPortalAppService.listMySubmissions(page, size, userId, namespaceId);
+    }
+
     public ReviewTaskResponse getReviewDetail(Long reviewTaskId,
                                               String userId,
                                               Map<Long, NamespaceRole> userNsRoles) {

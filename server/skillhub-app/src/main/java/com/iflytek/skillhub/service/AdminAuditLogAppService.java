@@ -91,7 +91,12 @@ public class AdminAuditLogAppService {
                        al.target_id,
                        al.request_id,
                        al.client_ip,
-                       al.created_at
+                       al.created_at,
+                       al.auth_source,
+                       al.token_id,
+                       al.token_prefix,
+                       al.client_name,
+                       al.authorized_namespace_id
                 FROM audit_log al
                 LEFT JOIN user_account ua ON ua.id = al.actor_user_id
                 """ + whereClause + """
@@ -112,7 +117,12 @@ public class AdminAuditLogAppService {
                         rs.getString("request_id"),
                         rs.getString("target_type"),
                         toResourceId(rs.getObject("target_id")),
-                        readInstant(rs, "created_at"))
+                        readInstant(rs, "created_at"),
+                        rs.getString("auth_source"),
+                        rs.getObject("token_id", Long.class),
+                        rs.getString("token_prefix"),
+                        rs.getString("client_name"),
+                        rs.getObject("authorized_namespace_id", Long.class))
         );
 
         return new PageResponse<>(items, total == null ? 0 : total, page, size);

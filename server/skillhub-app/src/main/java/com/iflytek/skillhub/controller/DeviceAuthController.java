@@ -25,8 +25,10 @@ public class DeviceAuthController extends BaseApiController {
     }
 
     @PostMapping("/code")
-    public ApiResponse<DeviceCodeResponse> requestDeviceCode() {
-        return ok("response.success.created", deviceAuthService.generateDeviceCode());
+    public ApiResponse<DeviceCodeResponse> requestDeviceCode(@RequestBody(required = false) CodeRequest request) {
+        return ok("response.success.created", request == null ? deviceAuthService.generateDeviceCode()
+                : deviceAuthService.generateDeviceCode(request.clientId(), request.clientName(), request.scopes(),
+                        request.namespaceSlug(), request.expiresInDays()));
     }
 
     @PostMapping("/token")
@@ -35,4 +37,6 @@ public class DeviceAuthController extends BaseApiController {
     }
 
     public record TokenRequest(String deviceCode) {}
+    public record CodeRequest(String clientId, String clientName, java.util.List<String> scopes,
+                              String namespaceSlug, Integer expiresInDays) {}
 }

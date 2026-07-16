@@ -153,7 +153,7 @@ skillhub:
       anonymous-cookie-max-age: ${SKILLHUB_DOWNLOAD_ANON_COOKIE_MAX_AGE:P30D}
       anonymous-cookie-secret: ${SKILLHUB_DOWNLOAD_ANON_COOKIE_SECRET:}
   publish:
-    max-file-count: 100
+    max-file-count: 500
     max-single-file-size: 10485760 # 10MB
     max-package-size: 104857600 # 100MB
     # allowed-file-extensions: uses SkillPackagePolicy.ALLOWED_EXTENSIONS by default
@@ -170,7 +170,14 @@ skillhub:
         editable: false
         requires-review: false
   device-auth:
-    verification-uri: ${DEVICE_AUTH_VERIFICATION_URI:${skillhub.public.base-url:}/cli/auth}
+    verification-uri: ${DEVICE_AUTH_VERIFICATION_URI:${skillhub.public.base-url:}/device}
+  external-skills:
+    skillhub-cn:
+      enabled: ${SKILLHUB_CN_ENABLED:false}
+      api-base-url: ${SKILLHUB_CN_API_BASE_URL:https://api.skillhub.cn}
+      allowed-download-hosts: ${SKILLHUB_CN_ALLOWED_DOWNLOAD_HOSTS:skillhub-1388575217.cos.accelerate.myqcloud.com}
+      connect-timeout: ${SKILLHUB_CN_CONNECT_TIMEOUT:PT5S}
+      request-timeout: ${SKILLHUB_CN_REQUEST_TIMEOUT:PT30S}
   security:
     scanner:
       enabled: ${SKILLHUB_SECURITY_SCANNER_ENABLED:true}
