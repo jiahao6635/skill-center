@@ -27,17 +27,38 @@ metadata:
 
 ### 第 3 步：通过浏览器登录（未认证时）
 
-执行：`npx clawhub login --registry https://skill-center.sigmob.com --browser`
+使用 Device Authorization Flow 完成登录，按顺序执行：
 
-告诉用户：**“正在打开浏览器进行登录授权，请在浏览器中完成登录操作...”**
+**3.1 请求设备码：**
+```bash
+curl -s -X POST https://skill-center.sigmob.com/api/v1/auth/device/code
+```
+响应示例：`{"code":0,"data":{"deviceCode":"xxx","userCode":"ABCD-1234","verificationUri":"/cli/auth","expiresIn":900,"interval":5}}`
 
-该命令会：
-- 自动打开用户浏览器进行登录
-- 显示验证码供用户确认
-- 等待用户在浏览器中完成授权
-- 授权成功后自动保存凭证
+**3.2 打开浏览器授权：**
 
-等待命令完成后再继续。成功后告诉用户：**“登录成功！现在可以帮您安装和管理技能了。”**
+告诉用户：**“正在打开浏览器进行登录授权，请在浏览器中完成登录...”**
+
+根据操作系统打开对应 URL（将 userCode 替换为实际值）：
+- macOS: `open "https://skill-center.sigmob.com/cli/auth?user_code=<userCode>"`
+- Linux: `xdg-open "https://skill-center.sigmob.com/cli/auth?user_code=<userCode>"`
+- Windows: `start "https://skill-center.sigmob.com/cli/auth?user_code=<userCode>"`
+
+**3.3 轮询等待授权完成：**
+
+每隔 5 秒执行一次，直到返回 accessToken：
+```bash
+curl -s -X POST https://skill-center.sigmob.com/api/v1/auth/device/token -H "Content-Type: application/json" -d '{"deviceCode":"<deviceCode>"}'
+```
+- 返回 `{"data":{"error":"authorization_pending"}}` → 继续等待
+- 返回 `{"data":{"accessToken":"sk_xxx"}}` → 授权成功
+
+**3.4 保存凭证：**
+```bash
+npx clawhub login --registry https://skill-center.sigmob.com --token <accessToken>
+```
+
+成功后告诉用户：**“登录成功！现在可以帮您安装和管理技能了。”**
 
 ## 可用操作
 

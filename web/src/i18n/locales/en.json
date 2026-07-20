@@ -316,7 +316,19 @@
     "windowsUrlBug": "Known Windows issue: the browser opened an incomplete URL. Please copy the full URL from the CLI output (the line starting with 'Opening browser:') and paste it into your browser address bar.",
     "tokenCreationFailed": "Token creation failed",
     "loginRequired": "Please log in first to authorize CLI access",
-    "goToLogin": "Go to Login"
+    "goToLogin": "Go to Login",
+    "deviceLoginRequired": "Login Required",
+    "deviceLoginRequiredDesc": "Log in to authorize the command-line tool to access your account",
+    "deviceConfirmTitle": "Authorize CLI Tool",
+    "deviceConfirmDesc": "Confirm the verification code matches the one shown in your terminal",
+    "deviceCodeLabel": "Verification Code",
+    "deviceConfirmHint": "Make sure this code matches your terminal, then click authorize",
+    "deviceAuthorize": "Authorize",
+    "deviceAuthorizing": "Authorizing...",
+    "deviceSuccess": "Authorized",
+    "deviceSuccessDesc": "The CLI tool is now logged in. You can close this page.",
+    "deviceRetry": "Retry",
+    "deviceAuthorizeFailed": "Authorization failed, please retry"
   },
   "dashboard": {
     "title": "Dashboard",

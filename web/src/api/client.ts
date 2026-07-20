@@ -420,6 +420,19 @@ export const authApi = {
   },
 }
 
+export const deviceApi = {
+  /** Authorize a pending device code (Device Authorization Flow, browser side). */
+  async authorize(userCode: string): Promise<void> {
+    await fetchJson<void>('/api/v1/device/authorize', {
+      method: 'POST',
+      headers: await ensureCsrfHeaders({
+        'Content-Type': 'application/json',
+      }),
+      body: JSON.stringify({ userCode }),
+    })
+  },
+}
+
 export const accountApi = {
   async initiateMerge(request: MergeInitiateRequest): Promise<MergeInitiateResponse> {
     return fetchJson<MergeInitiateResponse>('/api/v1/account/merge/initiate', {

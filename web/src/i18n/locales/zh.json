@@ -316,7 +316,19 @@
     "windowsUrlBug": "检测到 Windows 系统的已知问题：浏览器打开的 URL 不完整。请从 CLI 输出中复制完整的 URL（以 'Opening browser:' 开头的那一行），然后粘贴到浏览器地址栏中。",
     "tokenCreationFailed": "令牌创建失败",
     "loginRequired": "请先登录以授权 CLI 访问",
-    "goToLogin": "前往登录"
+    "goToLogin": "前往登录",
+    "deviceLoginRequired": "请先登录",
+    "deviceLoginRequiredDesc": "登录后即可授权命令行工具访问你的账户",
+    "deviceConfirmTitle": "授权命令行工具",
+    "deviceConfirmDesc": "确认以下验证码与命令行工具中显示的一致",
+    "deviceCodeLabel": "验证码",
+    "deviceConfirmHint": "请确认此验证码与终端中显示的一致，然后点击授权",
+    "deviceAuthorize": "确认授权",
+    "deviceAuthorizing": "授权中...",
+    "deviceSuccess": "授权成功",
+    "deviceSuccessDesc": "命令行工具已完成登录，你可以关闭此页面",
+    "deviceRetry": "重试",
+    "deviceAuthorizeFailed": "授权失败，请重试"
   },
   "dashboard": {
     "title": "Dashboard",

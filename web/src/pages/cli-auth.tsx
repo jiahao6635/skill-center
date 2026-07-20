@@ -3,12 +3,15 @@ import { useNavigate } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Card } from '@/shared/ui/card.tsx'
 import { Button } from '@/shared/ui/button.tsx'
-import { getCurrentUser, tokenApi } from '@/api/client.ts'
+import { getCurrentUser, tokenApi, deviceApi } from '@/api/client.ts'
 import type { User } from '@/api/types.ts'
 import { ORIGINAL_URL_SEARCH } from '@/app/router.tsx'
 
 // Parse the original URL params captured before TanStack Router rewrites
 const ORIGINAL_PARAMS = new URLSearchParams(ORIGINAL_URL_SEARCH)
+
+/** Device Authorization Flow mode: /cli/auth?user_code=XXXX-YYYY */
+const DEVICE_USER_CODE = ORIGINAL_PARAMS.get('user_code')?.trim() || undefined
 
 function isValidRedirectUri(uri: string): boolean {
   try {
@@ -43,19 +46,15 @@ export function CliAuthPage() {
   const [errorMessage, setErrorMessage] = useState<string>('')
   const [token, setToken] = useState<string>('')
 
+  // Device flow state
+  const [deviceStatus, setDeviceStatus] = useState<'confirm' | 'authorizing' | 'done' | 'error'>('confirm')
+
   // Use the captured original params from module load time
   const redirectUri = ORIGINAL_PARAMS.get('redirect_uri')?.trim() || undefined
   const state = ORIGINAL_PARAMS.get('state')?.trim() || undefined
   const labelB64 = ORIGINAL_PARAMS.get('label_b64')?.trim() || undefined
   const labelPlain = ORIGINAL_PARAMS.get('label')?.trim() || undefined
   const label = decodeLabel(labelB64, labelPlain)
-
-  // Debug: log search params and raw URL
-  console.log('CLI Auth - Original search (from router.tsx):', ORIGINAL_URL_SEARCH)
-  console.log('CLI Auth - Current URL:', typeof window !== 'undefined' ? window.location.href : 'SSR')
-  console.log('CLI Auth - redirectUri:', redirectUri)
-  console.log('CLI Auth - state:', state)
-  console.log('CLI Auth - label:', label)
 
   useEffect(() => {
     // Check authentication status
@@ -69,6 +68,20 @@ export function CliAuthPage() {
   }, [])
 
   useEffect(() => {
+    // Device flow mode: wait for auth check, then show confirmation UI
+    if (!DEVICE_USER_CODE) return
+    if (user === undefined) return
+    if (user === null) {
+      // Not logged in — show login prompt (handled in render)
+      return
+    }
+    // Logged in — show confirmation UI
+    setDeviceStatus('confirm')
+  }, [user])
+
+  useEffect(() => {
+    // Redirect flow mode only
+    if (DEVICE_USER_CODE) return
     // Once we know the user status, proceed with token creation
     if (user === undefined) {
       // Still loading
@@ -129,6 +142,142 @@ export function CliAuthPage() {
         setErrorMessage(error instanceof Error ? error.message : t('cliAuth.tokenCreationFailed'))
       })
   }, [user, redirectUri, state, label, t])
+
+  /* ─── Device Authorization Flow UI ─── */
+  if (DEVICE_USER_CODE) {
+    // Still checking auth
+    if (user === undefined) {
+      return (
+        <div className="min-h-[70vh] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md p-8 space-y-6 text-center">
+            <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent items-center justify-center shadow-glow mb-2 mx-auto">
+              <svg className="w-8 h-8 text-primary-foreground animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold font-heading">{t('cliAuth.validating')}</h1>
+            <p className="text-muted-foreground">{t('cliAuth.pleaseWait')}</p>
+          </Card>
+        </div>
+      )
+    }
+
+    // Not logged in — prompt to login first
+    if (user === null) {
+      return (
+        <div className="min-h-[70vh] flex items-center justify-center p-4 animate-fade-up">
+          <Card className="w-full max-w-md p-8 space-y-6">
+            <div className="text-center space-y-3">
+              <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent items-center justify-center shadow-glow mb-2 mx-auto">
+                <svg className="w-8 h-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold font-heading">{t('cliAuth.deviceLoginRequired')}</h1>
+              <p className="text-muted-foreground">{t('cliAuth.deviceLoginRequiredDesc')}</p>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => {
+                const returnTo = `/cli/auth?${ORIGINAL_PARAMS.toString()}`
+                navigate({ to: '/login', search: { returnTo } })
+              }}
+            >
+              {t('cliAuth.goToLogin')}
+            </Button>
+          </Card>
+        </div>
+      )
+    }
+
+    // Authorization complete
+    if (deviceStatus === 'done') {
+      return (
+        <div className="min-h-[70vh] flex items-center justify-center p-4 animate-fade-up">
+          <Card className="w-full max-w-md p-8 space-y-6 text-center">
+            <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 items-center justify-center shadow-glow mb-2 mx-auto">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold font-heading">{t('cliAuth.deviceSuccess')}</h1>
+            <p className="text-muted-foreground">{t('cliAuth.deviceSuccessDesc')}</p>
+          </Card>
+        </div>
+      )
+    }
+
+    // Error state
+    if (deviceStatus === 'error') {
+      return (
+        <div className="min-h-[70vh] flex items-center justify-center p-4 animate-fade-up">
+          <Card className="w-full max-w-md p-8 space-y-6">
+            <div className="text-center space-y-3">
+              <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 items-center justify-center shadow-glow mb-2 mx-auto">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold font-heading">{t('cliAuth.error')}</h1>
+              <p className="text-muted-foreground">{errorMessage}</p>
+            </div>
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={() => setDeviceStatus('confirm')}
+            >
+              {t('cliAuth.deviceRetry')}
+            </Button>
+          </Card>
+        </div>
+      )
+    }
+
+    // Confirmation UI — show user code and authorize button
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4 animate-fade-up">
+        <Card className="w-full max-w-md p-8 space-y-6">
+          <div className="text-center space-y-3">
+            <div className="inline-flex w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent items-center justify-center shadow-glow mb-2 mx-auto">
+              <svg className="w-8 h-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold font-heading">{t('cliAuth.deviceConfirmTitle')}</h1>
+            <p className="text-muted-foreground">{t('cliAuth.deviceConfirmDesc')}</p>
+          </div>
+
+          <div className="p-4 bg-muted rounded-xl text-center">
+            <p className="text-xs text-muted-foreground mb-1">{t('cliAuth.deviceCodeLabel')}</p>
+            <code className="text-2xl font-mono font-bold tracking-[0.2em]">{DEVICE_USER_CODE}</code>
+          </div>
+
+          <p className="text-xs text-center text-muted-foreground">
+            {t('cliAuth.deviceConfirmHint')}
+          </p>
+
+          <Button
+            className="w-full"
+            disabled={deviceStatus === 'authorizing'}
+            onClick={() => {
+              setDeviceStatus('authorizing')
+              deviceApi
+                .authorize(DEVICE_USER_CODE)
+                .then(() => setDeviceStatus('done'))
+                .catch((error) => {
+                  setDeviceStatus('error')
+                  setErrorMessage(error instanceof Error ? error.message : t('cliAuth.deviceAuthorizeFailed'))
+                })
+            }}
+          >
+            {deviceStatus === 'authorizing' ? t('cliAuth.deviceAuthorizing') : t('cliAuth.deviceAuthorize')}
+          </Button>
+        </Card>
+      </div>
+    )
+  }
+
+  /* ─── Redirect Flow UI (original) ─── */
 
   if (status === 'validating') {
     return (
