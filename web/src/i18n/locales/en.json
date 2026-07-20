@@ -837,6 +837,7 @@
     "loginToRate": "Login to star and rate",
     "install": "Install",
     "installMethodClawhub": "ClawHub CLI",
+    "installMethodQoderwork": "QoderWork",
     "installMethodSkillhub": "Skill Center CLI",
     "download": "Download",
     "labelsSectionTitle": "Labels",

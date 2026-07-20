@@ -837,6 +837,7 @@
     "loginToRate": "登录后可以收藏和评分",
     "install": "安装",
     "installMethodClawhub": "ClawHub CLI",
+    "installMethodQoderwork": "QoderWork",
     "installMethodSkillhub": "Skill Center CLI",
     "download": "下载",
     "labelsSectionTitle": "标签管理",

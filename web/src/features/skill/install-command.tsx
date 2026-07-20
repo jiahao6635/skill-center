@@ -34,6 +34,11 @@ export function buildInstallCommand(namespace: string, slug: string, baseUrl: st
   return `npx clawhub install ${installTarget} --registry ${baseUrl}`
 }
 
+export function buildQoderworkPrompt(namespace: string, slug: string, baseUrl: string): string {
+  const installTarget = buildInstallTarget(namespace, slug)
+  return `请安装技能：npx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
+}
+
 export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
   const namespaceArg = namespace === 'global' ? '' : ` --namespace ${namespace}`
   return `npx @astron-team/skillhub@latest install ${slug}${namespaceArg} --registry ${baseUrl}`
@@ -84,11 +89,15 @@ export function InstallCommand({ namespace, slug }: InstallCommandProps) {
   const { t } = useTranslation()
   const baseUrl = useMemo(() => getBaseUrl(), [])
   const clawhubCommand = useMemo(() => buildInstallCommand(namespace, slug, baseUrl), [baseUrl, namespace, slug])
+  const qoderworkPrompt = useMemo(() => buildQoderworkPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
   const skillhubCommand = useMemo(() => buildSkillhubInstallCommand(namespace, slug, baseUrl), [baseUrl, namespace, slug])
 
   return (
-    <Tabs defaultValue="clawhub" className="space-y-3">
+    <Tabs defaultValue="qoderwork" className="space-y-3">
       <TabsList className="w-full gap-6 border-border/70 bg-transparent p-0 text-xs">
+        <TabsTrigger value="qoderwork" className={installMethodTabTriggerClass}>
+          {t('skillDetail.installMethodQoderwork')}
+        </TabsTrigger>
         <TabsTrigger value="clawhub" className={installMethodTabTriggerClass}>
           {t('skillDetail.installMethodClawhub')}
         </TabsTrigger>
@@ -96,6 +105,9 @@ export function InstallCommand({ namespace, slug }: InstallCommandProps) {
           {t('skillDetail.installMethodSkillhub')}
         </TabsTrigger>
       </TabsList>
+      <TabsContent value="qoderwork">
+        <CommandBlock command={qoderworkPrompt} />
+      </TabsContent>
       <TabsContent value="clawhub">
         <CommandBlock command={clawhubCommand} />
       </TabsContent>
