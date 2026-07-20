@@ -4,13 +4,13 @@ import zh from './locales/zh.json'
 
 describe('landing quick start locales', () => {
   it('uses localized agent setup prompts for chinese and english', () => {
-    expect(zh.landing.quickStart.agent.command).toBe('阅读 https://www.example.com/registry/skill.md，并按照说明完成 Skill Center Skills Registry 的配置')
-    expect(en.landing.quickStart.agent.command).toBe('Read https://www.example.com/registry/skill.md and follow the instructions to setup Skill Center Skills Registry')
+    expect(zh.landing.quickStart.agent.command).toBe('帮我安装 Skill Center：https://skill-center.sigmob.com/registry/skill-center-installer.md')
+    expect(en.landing.quickStart.agent.command).toBe('Install Skill Center for me: https://skill-center.sigmob.com/registry/skill-center-installer.md')
   })
 
   it('provides command templates with url placeholder for dynamic rendering', () => {
-    expect(zh.landing.quickStart.agent.commandTemplate).toBe('阅读 {{url}}，并按照说明完成 Skill Center Skills Registry 的配置')
-    expect(en.landing.quickStart.agent.commandTemplate).toBe('Read {{url}} and follow the instructions to setup Skill Center Skills Registry')
+    expect(zh.landing.quickStart.agent.commandTemplate).toBe('帮我安装 Skill Center：{{url}}')
+    expect(en.landing.quickStart.agent.commandTemplate).toBe('Install Skill Center for me: {{url}}')
   })
 
   it('exposes CLI install command in both locales', () => {

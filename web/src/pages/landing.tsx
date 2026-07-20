@@ -60,11 +60,11 @@ function SearchCard({ onSearch }: { onSearch?: (query: string) => void }) {
 
   const agentPrompt = t('landing.quickStart.agent.commandTemplate', {
     defaultValue: t('landing.quickStart.agent.command'),
-    url: `${baseUrl}/registry/skill.md`,
+    url: `${baseUrl}/registry/skill-center-installer.md`,
   })
   const humanPrompt = t('landing.quickStart.human.command', { defaultValue: 'npx clawhub search <keyword>' })
   const currentPrompt = activeTab === 'agent' ? agentPrompt : humanPrompt
-  const registryUrl = `${baseUrl}/registry/skill.md`
+  const registryUrl = `${baseUrl}/registry/skill-center-installer.md`
 
   return (
     <div
@@ -158,7 +158,7 @@ function SearchCard({ onSearch }: { onSearch?: (query: string) => void }) {
           <p className="flex-1 text-sm leading-relaxed" style={{ color: 'hsl(var(--text-secondary))' }}>
             {activeTab === 'agent' ? (
               <>
-                阅读{' '}
+                复制提示词发送给你的 AI 助手：{' '}
                 <a
                   href={registryUrl}
                   target="_blank"
@@ -167,7 +167,6 @@ function SearchCard({ onSearch }: { onSearch?: (query: string) => void }) {
                 >
                   {registryUrl}
                 </a>
-                ，并按照说明完成 Skill Center Skills Registry 配置
               </>
             ) : (
               <code className="font-mono text-sm" style={{ color: '#0F172A' }}>

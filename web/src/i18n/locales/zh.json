@@ -115,9 +115,9 @@
         "command": "npm i -g @astron-team/skillhub"
       },
       "agent": {
-        "description": "发送提示词给你的 Agent，以设置Skill Center Registry",
-        "command": "阅读 https://www.example.com/registry/skill.md，并按照说明完成 Skill Center Skills Registry 的配置",
-        "commandTemplate": "阅读 {{url}}，并按照说明完成 Skill Center Skills Registry 的配置"
+        "description": "复制下方提示词发送给你的 AI 助手，它会自动完成安装和配置",
+        "command": "帮我安装 Skill Center：https://skill-center.sigmob.com/registry/skill-center-installer.md",
+        "commandTemplate": "帮我安装 Skill Center：{{url}}"
       },
       "human": {
         "description": "使用CLI工具安装Skills",
@@ -837,8 +837,8 @@
     "loginToRate": "登录后可以收藏和评分",
     "install": "安装",
     "installMethodClawhub": "ClawHub CLI",
-    "installAgentHint": "\u5c06\u4e0b\u65b9\u63d0\u793a\u8bcd\u590d\u5236\u7ed9\u4f60\u7684 AI \u52a9\u624b\uff08QoderWork\u3001Claude Code\u3001Codex\u3001Cursor \u7b49\uff09\uff0c\u5b83\u4f1a\u81ea\u52a8\u5b8c\u6210\u5b89\u88c5\u548c\u914d\u7f6e\u3002",
-    "installAgentDone": "\u914d\u7f6e\u5b8c\u6210\u540e\uff0c\u91cd\u542f\u4f60\u7684 AI Agent \u5373\u53ef\u5f00\u59cb\u4f7f\u7528",
+    "installAgentHint": "复制下方提示词发送给 QoderWork，即可一键安装。",
+    "installAgentDone": "已安装 Skill Center 技能后，直接发送“帮我安装技能 xxx”即可完成安装",
     "download": "下载",
     "labelsSectionTitle": "标签管理",
     "labelsSectionDescription": "为这个技能挂载或移除推荐标签，帮助用户筛选和发现。",

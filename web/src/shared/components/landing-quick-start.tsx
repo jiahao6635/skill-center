@@ -74,7 +74,7 @@ export function LandingQuickStartSection({ onSearch }: LandingQuickStartSectionP
 
   const agentPrompt = t('landing.quickStart.agent.commandTemplate', {
     defaultValue: t('landing.quickStart.agent.command'),
-    url: `${baseUrl}/registry/skill.md`,
+    url: `${baseUrl}/registry/skill-center-installer.md`,
   })
 
   const humanPrompt = t('landing.quickStart.human.command', {
@@ -83,7 +83,7 @@ export function LandingQuickStartSection({ onSearch }: LandingQuickStartSectionP
 
   const currentPrompt = activeTab === 'agent' ? agentPrompt : humanPrompt
 
-  const registryUrl = `${baseUrl}/registry/skill.md`
+  const registryUrl = `${baseUrl}/registry/skill-center-installer.md`
 
   return (
     <section className="relative z-10 w-full px-6 py-14 md:py-20">

@@ -115,9 +115,9 @@
         "command": "npm i -g @astron-team/skillhub"
       },
       "agent": {
-        "description": "Send a prompt to your Agent to set up the Skill Center Registry",
-        "command": "Read https://www.example.com/registry/skill.md and follow the instructions to setup Skill Center Skills Registry",
-        "commandTemplate": "Read {{url}} and follow the instructions to setup Skill Center Skills Registry"
+        "description": "Copy the prompt below and send it to your AI assistant. It will handle installation and setup automatically.",
+        "command": "Install Skill Center for me: https://skill-center.sigmob.com/registry/skill-center-installer.md",
+        "commandTemplate": "Install Skill Center for me: {{url}}"
       },
       "human": {
         "description": "Use the CLI tool to install Skills",
@@ -837,8 +837,8 @@
     "loginToRate": "Login to star and rate",
     "install": "Install",
     "installMethodClawhub": "ClawHub CLI",
-    "installAgentHint": "Copy the prompt below to your AI assistant (QoderWork, Claude Code, Codex, Cursor, etc.), and it will automatically complete the installation.",
-    "installAgentDone": "After configuration, restart your AI Agent to start using.",
+    "installAgentHint": "Copy the prompt below and send to QoderWork for one-click install.",
+    "installAgentDone": "Once Skill Center skill is installed, just send \"install skill xxx\" to complete installation.",
     "download": "Download",
     "labelsSectionTitle": "Labels",
     "labelsSectionDescription": "Attach or remove recommended labels that help users filter and discover this skill.",
