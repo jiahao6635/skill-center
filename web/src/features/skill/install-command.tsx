@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, Copy } from 'lucide-react'
 import { Button } from '@/shared/ui/button.tsx'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs.tsx'
 import { useCopyToClipboard } from '@/shared/lib/clipboard.ts'
 
 interface InstallCommandProps {
@@ -48,9 +47,6 @@ interface CommandBlockProps {
   command: string
 }
 
-const installMethodTabTriggerClass =
-  "relative border-b-0 px-1 py-2 text-xs after:absolute after:bottom-[-1px] after:left-1/2 after:h-0.5 after:w-6 after:-translate-x-1/2 after:rounded-full after:bg-transparent after:content-[''] data-[state=active]:after:bg-primary"
-
 function CommandBlock({ command }: CommandBlockProps) {
   const { t } = useTranslation()
   const [copied, copy] = useCopyToClipboard()
@@ -85,35 +81,36 @@ function CommandBlock({ command }: CommandBlockProps) {
   )
 }
 
+export function buildLoginCommand(baseUrl: string): string {
+  return `npx clawhub login --registry ${baseUrl} --token <your_token>`
+}
+
 export function InstallCommand({ namespace, slug }: InstallCommandProps) {
   const { t } = useTranslation()
   const baseUrl = useMemo(() => getBaseUrl(), [])
-  const clawhubCommand = useMemo(() => buildInstallCommand(namespace, slug, baseUrl), [baseUrl, namespace, slug])
+  const loginCommand = useMemo(() => buildLoginCommand(baseUrl), [baseUrl])
   const qoderworkPrompt = useMemo(() => buildQoderworkPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
-  const skillhubCommand = useMemo(() => buildSkillhubInstallCommand(namespace, slug, baseUrl), [baseUrl, namespace, slug])
 
   return (
-    <Tabs defaultValue="qoderwork" className="space-y-3">
-      <TabsList className="w-full gap-6 border-border/70 bg-transparent p-0 text-xs">
-        <TabsTrigger value="qoderwork" className={installMethodTabTriggerClass}>
-          {t('skillDetail.installMethodQoderwork')}
-        </TabsTrigger>
-        <TabsTrigger value="clawhub" className={installMethodTabTriggerClass}>
-          {t('skillDetail.installMethodClawhub')}
-        </TabsTrigger>
-        <TabsTrigger value="skillhub" className={installMethodTabTriggerClass}>
-          {t('skillDetail.installMethodSkillhub')}
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="qoderwork">
+    <div className="space-y-4">
+      {/* Login guidance */}
+      <div className="space-y-2">
+        <p className="text-sm font-semibold text-foreground">
+          {t('skillDetail.installLoginTitle')}
+        </p>
+        <CommandBlock command={loginCommand} />
+        <p className="text-xs text-muted-foreground">
+          {t('skillDetail.installLoginHint')}
+        </p>
+      </div>
+
+      {/* QoderWork install prompt */}
+      <div className="space-y-2">
+        <p className="text-sm font-semibold text-foreground">
+          {t('skillDetail.installPromptTitle')}
+        </p>
         <CommandBlock command={qoderworkPrompt} />
-      </TabsContent>
-      <TabsContent value="clawhub">
-        <CommandBlock command={clawhubCommand} />
-      </TabsContent>
-      <TabsContent value="skillhub">
-        <CommandBlock command={skillhubCommand} />
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   )
 }
