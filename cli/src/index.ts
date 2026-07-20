@@ -198,8 +198,9 @@ cli
   .command('login', 'Save registry and token')
   .option('--registry <url>', 'Registry URL')
   .option('--token <token>', 'API token')
+  .option('--browser', 'Login via browser (OAuth device flow)')
   .option('--json', 'Output JSON')
-  .action((options: { registry?: string; token?: string; json?: boolean }) => {
+  .action((options: { registry?: string; token?: string; browser?: boolean; json?: boolean }) => {
     return runCommand(() => loginCommand(options), Boolean(options.json))
   })
 
