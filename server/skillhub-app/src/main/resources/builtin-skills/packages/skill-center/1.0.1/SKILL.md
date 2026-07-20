@@ -2,7 +2,7 @@
 name: skill-center
 description: 从 Skill Center 技能注册中心搜索、安装和管理技能。自动处理认证和安装流程，对非技术人员友好。
 metadata:
-  version: 1.0.0
+  version: 1.0.1
 ---
 
 # Skill Center - 技能安装助手

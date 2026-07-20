@@ -12,10 +12,10 @@
     },
     {
       "slug": "skill-center",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "source": {
         "type": "classpath-files",
-        "basePath": "builtin-skills/packages/skill-center/1.0.0",
+        "basePath": "builtin-skills/packages/skill-center/1.0.1",
         "files": [
           "SKILL.md"
         ]
