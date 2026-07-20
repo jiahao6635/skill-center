@@ -38,6 +38,11 @@ export function buildQoderworkPrompt(namespace: string, slug: string, baseUrl: s
   return `请帮我安装技能。先执行登录命令（如果 clawhub 未安装请先安装）：\nnpx clawhub login --registry ${baseUrl} --token <your_token>\n然后执行安装命令：\nnpx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
 }
 
+export function buildQoderworkQuickPrompt(namespace: string, slug: string, baseUrl: string): string {
+  const installTarget = buildInstallTarget(namespace, slug)
+  return `请帮我安装技能：\nnpx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
+}
+
 export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
   const namespaceArg = namespace === 'global' ? '' : ` --namespace ${namespace}`
   return `npx @astron-team/skillhub@latest install ${slug}${namespaceArg} --registry ${baseUrl}`
@@ -84,24 +89,31 @@ function CommandBlock({ command }: CommandBlockProps) {
 export function InstallCommand({ namespace, slug }: InstallCommandProps) {
   const { t } = useTranslation()
   const baseUrl = useMemo(() => getBaseUrl(), [])
-  const qoderworkPrompt = useMemo(() => buildQoderworkPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
+  const firstTimePrompt = useMemo(() => buildQoderworkPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
+  const quickPrompt = useMemo(() => buildQoderworkQuickPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
 
   return (
-    <div className="space-y-3">
-      {/* Token hint */}
-      <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-900/50 dark:bg-blue-950/30">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-        <p className="text-xs text-blue-800 dark:text-blue-200">
+    <div className="space-y-4">
+      {/* First time setup */}
+      <div className="space-y-2">
+        <div className="flex items-start gap-2">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+          <p className="text-sm font-semibold text-foreground">
+            {t('skillDetail.installFirstTimeTitle')}
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground pl-6">
           {t('skillDetail.installLoginHint')}
         </p>
+        <CommandBlock command={firstTimePrompt} />
       </div>
 
-      {/* QoderWork install prompt */}
+      {/* Quick install for returning users */}
       <div className="space-y-2">
         <p className="text-sm font-semibold text-foreground">
-          {t('skillDetail.installPromptTitle')}
+          {t('skillDetail.installQuickTitle')}
         </p>
-        <CommandBlock command={qoderworkPrompt} />
+        <CommandBlock command={quickPrompt} />
       </div>
     </div>
   )

@@ -841,6 +841,8 @@
     "installMethodSkillhub": "Skill Center CLI",
     "installLoginTitle": "\u9996\u6b21\u4f7f\u7528\uff1f\u8bf7\u5148\u914d\u7f6e\u8ba4\u8bc1",
     "installLoginHint": "\u8bf7\u524d\u5f80\u300c\u63a7\u5236\u53f0 > \u67e5\u770b API Tokens\u300d\u521b\u5efa token\uff0c\u7136\u540e\u66ff\u6362\u4e0b\u65b9\u547d\u4ee4\u4e2d\u7684 <your_token>",
+    "installFirstTimeTitle": "\u9996\u6b21\u4f7f\u7528\uff1f\u590d\u5236\u4ee5\u4e0b\u5185\u5bb9\u53d1\u9001\u7ed9 QoderWork",
+    "installQuickTitle": "\u5df2\u914d\u7f6e\u8fc7\uff1f\u76f4\u63a5\u590d\u5236\u5b89\u88c5\u547d\u4ee4",
     "installPromptTitle": "\u590d\u5236\u4ee5\u4e0b\u5185\u5bb9\u53d1\u9001\u7ed9 QoderWork",
     "download": "下载",
     "labelsSectionTitle": "标签管理",

@@ -841,6 +841,8 @@
     "installMethodSkillhub": "Skill Center CLI",
     "installLoginTitle": "First time? Configure authentication first",
     "installLoginHint": "Go to Dashboard > View API Tokens to create a token, then replace <your_token> in the command below",
+    "installFirstTimeTitle": "First time? Copy and send to QoderWork",
+    "installQuickTitle": "Already configured? Copy the install command directly",
     "installPromptTitle": "Copy the following and send to QoderWork",
     "download": "Download",
     "labelsSectionTitle": "Labels",
