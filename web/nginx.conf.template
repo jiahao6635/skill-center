@@ -54,6 +54,13 @@ server {
         try_files $uri =404;
     }
 
+    location = /registry/skill-center-installer.md {
+        default_type text/plain;
+        add_header Content-Disposition "inline";
+        add_header X-Content-Type-Options "nosniff";
+        try_files $uri =404;
+    }
+
     location = /runtime-config.js {
         add_header Cache-Control "no-store";
         try_files $uri =404;

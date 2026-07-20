@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Copy, Info } from 'lucide-react'
+import { Check, Copy } from 'lucide-react'
 import { Button } from '@/shared/ui/button.tsx'
 import { useCopyToClipboard } from '@/shared/lib/clipboard.ts'
 
@@ -33,14 +33,9 @@ export function buildInstallCommand(namespace: string, slug: string, baseUrl: st
   return `npx clawhub install ${installTarget} --registry ${baseUrl}`
 }
 
-export function buildQoderworkPrompt(namespace: string, slug: string, baseUrl: string): string {
+export function buildAgentPrompt(namespace: string, slug: string, baseUrl: string): string {
   const installTarget = buildInstallTarget(namespace, slug)
-  return `请帮我安装技能。先执行登录命令（如果 clawhub 未安装请先安装）：\nnpx clawhub login --registry ${baseUrl} --token <your_token>\n然后执行安装命令：\nnpx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
-}
-
-export function buildQoderworkQuickPrompt(namespace: string, slug: string, baseUrl: string): string {
-  const installTarget = buildInstallTarget(namespace, slug)
-  return `请帮我安装技能：\nnpx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
+  return `帮我安装技能：请阅读 ${baseUrl}/registry/skill-center-installer.md 并按照说明完成配置，然后安装技能 ${installTarget}`
 }
 
 export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
@@ -89,32 +84,17 @@ function CommandBlock({ command }: CommandBlockProps) {
 export function InstallCommand({ namespace, slug }: InstallCommandProps) {
   const { t } = useTranslation()
   const baseUrl = useMemo(() => getBaseUrl(), [])
-  const firstTimePrompt = useMemo(() => buildQoderworkPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
-  const quickPrompt = useMemo(() => buildQoderworkQuickPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
+  const agentPrompt = useMemo(() => buildAgentPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
 
   return (
-    <div className="space-y-4">
-      {/* First time setup */}
-      <div className="space-y-2">
-        <div className="flex items-start gap-2">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-          <p className="text-sm font-semibold text-foreground">
-            {t('skillDetail.installFirstTimeTitle')}
-          </p>
-        </div>
-        <p className="text-xs text-muted-foreground pl-6">
-          {t('skillDetail.installLoginHint')}
-        </p>
-        <CommandBlock command={firstTimePrompt} />
-      </div>
-
-      {/* Quick install for returning users */}
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">
-          {t('skillDetail.installQuickTitle')}
-        </p>
-        <CommandBlock command={quickPrompt} />
-      </div>
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        {t('skillDetail.installAgentHint')}
+      </p>
+      <CommandBlock command={agentPrompt} />
+      <p className="text-xs text-green-600 dark:text-green-400">
+        {t('skillDetail.installAgentDone')}
+      </p>
     </div>
   )
 }
