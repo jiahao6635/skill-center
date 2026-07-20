@@ -35,7 +35,7 @@ export function buildInstallCommand(namespace: string, slug: string, baseUrl: st
 
 export function buildQoderworkPrompt(namespace: string, slug: string, baseUrl: string): string {
   const installTarget = buildInstallTarget(namespace, slug)
-  return `请安装技能：npx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
+  return `请帮我安装技能。先执行登录命令（如果 clawhub 未安装请先安装）：\nnpx clawhub login --registry ${baseUrl} --token <your_token>\n然后执行安装命令：\nnpx clawhub install ${installTarget} --workdir ~/.qoderwork --registry ${baseUrl}`
 }
 
 export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
@@ -81,34 +81,19 @@ function CommandBlock({ command }: CommandBlockProps) {
   )
 }
 
-export function buildLoginCommand(baseUrl: string): string {
-  return `npx clawhub login --registry ${baseUrl} --token <your_token>`
-}
-
 export function InstallCommand({ namespace, slug }: InstallCommandProps) {
   const { t } = useTranslation()
   const baseUrl = useMemo(() => getBaseUrl(), [])
-  const loginCommand = useMemo(() => buildLoginCommand(baseUrl), [baseUrl])
   const qoderworkPrompt = useMemo(() => buildQoderworkPrompt(namespace, slug, baseUrl), [baseUrl, namespace, slug])
 
   return (
-    <div className="space-y-4">
-      {/* Login guidance - prominent info banner */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/30">
-        <div className="flex items-start gap-3">
-          <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
-          <div className="space-y-2">
-            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-              {t('skillDetail.installLoginTitle')}
-            </p>
-            <p className="text-sm text-blue-800 dark:text-blue-200">
-              {t('skillDetail.installLoginHint')}
-            </p>
-          </div>
-        </div>
-        <div className="mt-3">
-          <CommandBlock command={loginCommand} />
-        </div>
+    <div className="space-y-3">
+      {/* Token hint */}
+      <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-900/50 dark:bg-blue-950/30">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+        <p className="text-xs text-blue-800 dark:text-blue-200">
+          {t('skillDetail.installLoginHint')}
+        </p>
       </div>
 
       {/* QoderWork install prompt */}
