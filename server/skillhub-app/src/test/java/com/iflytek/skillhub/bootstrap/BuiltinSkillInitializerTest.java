@@ -61,7 +61,9 @@ class BuiltinSkillInitializerTest {
     private static final ManifestItem ITEM = new ManifestItem(
             "skillhub-hello",
             "1.0.0",
-            "https://bjcdn.openstorage.cn/skills/skillhub-hello.zip"
+            "https://bjcdn.openstorage.cn/skills/skillhub-hello.zip",
+            null,
+            null
     );
 
     @Mock private BuiltinSkillManifestLoader manifestLoader;
@@ -215,7 +217,9 @@ class BuiltinSkillInitializerTest {
         ManifestItem malformed = new ManifestItem(
                 "skillhub-hello",
                 "1.0.0",
-                "https://bjcdn.openstorage.cn/skills/%zz.zip"
+                "https://bjcdn.openstorage.cn/skills/%zz.zip",
+                null,
+                null
         );
         givenManifestAndSystemPublisher(List.of(malformed));
         when(skillRepository.findByNamespaceIdAndSlug(1L, "skillhub-hello")).thenReturn(List.of());

@@ -71,9 +71,8 @@ public class BuiltinSkillManifestLoader {
             JsonNode itemNode = skillsNode.get(index);
             String slug = text(itemNode, "slug");
             String version = text(itemNode, "version");
-            String url = text(itemNode, "url");
-            if (!StringUtils.hasText(slug) || !StringUtils.hasText(version) || !StringUtils.hasText(url)) {
-                log.warn("Skipping built-in skill manifest item {} because slug, version, and url are required", index);
+            if (!StringUtils.hasText(slug) || !StringUtils.hasText(version)) {
+                log.warn("Skipping built-in skill manifest item {} because slug and version are required", index);
                 continue;
             }
             try {
@@ -90,7 +89,30 @@ public class BuiltinSkillManifestLoader {
                 continue;
             }
 
-            items.add(new ManifestItem(slug, version, url));
+            // Support two source formats:
+            // 1. URL-based: { "slug": "...", "version": "...", "url": "https://..." }
+            // 2. Classpath-files: { "slug": "...", "version": "...", "source": { "type": "classpath-files", "basePath": "...", "files": [...] } }
+            JsonNode sourceNode = itemNode.get("source");
+            if (sourceNode != null && sourceNode.isObject()) {
+                String type = text(sourceNode, "type");
+                if ("classpath-files".equals(type)) {
+                    String basePath = text(sourceNode, "basePath");
+                    List<String> files = textList(sourceNode, "files");
+                    if (!StringUtils.hasText(basePath) || files.isEmpty()) {
+                        log.warn("Skipping built-in skill manifest item {} because classpath-files source requires basePath and files", index);
+                        continue;
+                    }
+                    items.add(new ManifestItem(slug, version, null, basePath, files));
+                    continue;
+                }
+            }
+
+            String url = text(itemNode, "url");
+            if (!StringUtils.hasText(url)) {
+                log.warn("Skipping built-in skill manifest item {} because either url or source is required", index);
+                continue;
+            }
+            items.add(new ManifestItem(slug, version, url, null, null));
         }
         return List.copyOf(items);
     }
@@ -103,6 +125,23 @@ public class BuiltinSkillManifestLoader {
         return value.asText().trim();
     }
 
-    public record ManifestItem(String slug, String version, String url) {
+    private static List<String> textList(JsonNode node, String fieldName) {
+        JsonNode value = node.get(fieldName);
+        if (value == null || !value.isArray()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        for (JsonNode element : value) {
+            if (element.isTextual() && StringUtils.hasText(element.asText())) {
+                result.add(element.asText().trim());
+            }
+        }
+        return List.copyOf(result);
+    }
+
+    public record ManifestItem(String slug, String version, String url, String basePath, List<String> files) {
+        public boolean isClasspathSource() {
+            return basePath != null;
+        }
     }
 }

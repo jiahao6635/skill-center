@@ -27,12 +27,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
@@ -197,20 +201,28 @@ public class BuiltinSkillInitializer {
             return skipBeforeDownload.get();
         }
 
-        Optional<URI> packageUri = parsePackageUri(item);
-        if (packageUri.isEmpty()) {
-            return SyncOutcome.FAILED;
-        }
+        List<PackageEntry> entries;
+        if (item.isClasspathSource()) {
+            entries = loadClasspathEntries(item);
+            if (entries == null) {
+                return SyncOutcome.FAILED;
+            }
+        } else {
+            Optional<URI> packageUri = parsePackageUri(item);
+            if (packageUri.isEmpty()) {
+                return SyncOutcome.FAILED;
+            }
 
-        Optional<byte[]> packageBytes = downloader.download(packageUri.get());
-        if (packageBytes.isEmpty()) {
-            log.warn("Skipping built-in skill slug={} version={} because package download failed",
-                    item.slug(), item.version());
-            return SyncOutcome.FAILED;
-        }
+            Optional<byte[]> packageBytes = downloader.download(packageUri.get());
+            if (packageBytes.isEmpty()) {
+                log.warn("Skipping built-in skill slug={} version={} because package download failed",
+                        item.slug(), item.version());
+                return SyncOutcome.FAILED;
+            }
 
-        SkillPackageArchiveExtractor.ExtractionResult extractionResult = extractor.extract(packageBytes.get());
-        List<PackageEntry> entries = extractionResult.entries();
+            SkillPackageArchiveExtractor.ExtractionResult extractionResult = extractor.extract(packageBytes.get());
+            entries = extractionResult.entries();
+        }
         SkillMetadata metadata = parseSkillMetadata(entries);
         String packageSlug = SlugValidator.slugify(metadata.name());
         if (!item.slug().equals(packageSlug)) {
@@ -269,6 +281,37 @@ public class BuiltinSkillInitializer {
                     item.slug(), item.version(), exception.getMessage());
             return Optional.empty();
         }
+    }
+
+    private List<PackageEntry> loadClasspathEntries(ManifestItem item) {
+        List<PackageEntry> entries = new ArrayList<>();
+        for (String filePath : item.files()) {
+            String resourcePath = item.basePath() + "/" + filePath;
+            ClassPathResource resource = new ClassPathResource(resourcePath);
+            if (!resource.exists()) {
+                log.warn("Skipping built-in skill slug={} version={} because classpath resource not found: {}",
+                        item.slug(), item.version(), resourcePath);
+                return null;
+            }
+            try (InputStream inputStream = resource.getInputStream()) {
+                byte[] content = inputStream.readAllBytes();
+                String contentType = guessContentType(filePath);
+                entries.add(new PackageEntry(filePath, content, content.length, contentType));
+            } catch (IOException exception) {
+                log.warn("Skipping built-in skill slug={} version={} because failed to read classpath resource {}: {}",
+                        item.slug(), item.version(), resourcePath, exception.getMessage());
+                return null;
+            }
+        }
+        return entries;
+    }
+
+    private static String guessContentType(String path) {
+        if (path.endsWith(".md")) return "text/markdown";
+        if (path.endsWith(".json")) return "application/json";
+        if (path.endsWith(".yaml") || path.endsWith(".yml")) return "text/yaml";
+        if (path.endsWith(".txt")) return "text/plain";
+        return "application/octet-stream";
     }
 
     private SkillMetadata parseSkillMetadata(List<PackageEntry> entries) {

@@ -9,6 +9,17 @@
       "slug": "agentguard",
       "version": "1.1",
       "url": "https://bjcdn.openstorage.cn/aicontest/2026-06-12/9d063bc7-223a-4762-adeb-305c268aa29e.zip"
+    },
+    {
+      "slug": "skill-center",
+      "version": "1.0.0",
+      "source": {
+        "type": "classpath-files",
+        "basePath": "builtin-skills/packages/skill-center/1.0.0",
+        "files": [
+          "SKILL.md"
+        ]
+      }
     }
   ]
 }
