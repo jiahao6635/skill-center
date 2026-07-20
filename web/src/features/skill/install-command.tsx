@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, Info } from 'lucide-react'
 import { Button } from '@/shared/ui/button.tsx'
 import { useCopyToClipboard } from '@/shared/lib/clipboard.ts'
 
@@ -93,15 +93,22 @@ export function InstallCommand({ namespace, slug }: InstallCommandProps) {
 
   return (
     <div className="space-y-4">
-      {/* Login guidance */}
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-foreground">
-          {t('skillDetail.installLoginTitle')}
-        </p>
-        <CommandBlock command={loginCommand} />
-        <p className="text-xs text-muted-foreground">
-          {t('skillDetail.installLoginHint')}
-        </p>
+      {/* Login guidance - prominent info banner */}
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-950/30">
+        <div className="flex items-start gap-3">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+              {t('skillDetail.installLoginTitle')}
+            </p>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              {t('skillDetail.installLoginHint')}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3">
+          <CommandBlock command={loginCommand} />
+        </div>
       </div>
 
       {/* QoderWork install prompt */}
