@@ -330,6 +330,15 @@
     "deviceRetry": "Retry",
     "deviceAuthorizeFailed": "Authorization failed, please retry"
   },
+  "cliToken": {
+    "loading": "Generating token...",
+    "loadingDesc": "Please wait while we create your access credentials",
+    "error": "Generation failed",
+    "success": "Token Ready",
+    "successDesc": "Copy the token below to complete setup",
+    "tokenLabel": "Access Token",
+    "usageHint": "Use this command to save the token:"
+  },
   "dashboard": {
     "title": "Dashboard",
     "subtitle": "View your account, skills, and access credentials in one place",

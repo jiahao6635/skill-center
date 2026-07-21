@@ -330,6 +330,15 @@
     "deviceRetry": "重试",
     "deviceAuthorizeFailed": "授权失败，请重试"
   },
+  "cliToken": {
+    "loading": "正在生成令牌...",
+    "loadingDesc": "请稍候，正在为您创建访问凭证",
+    "error": "生成失败",
+    "success": "令牌已就绪",
+    "successDesc": "请复制下方令牌并完成配置",
+    "tokenLabel": "访问令牌",
+    "usageHint": "使用以下命令保存令牌："
+  },
   "dashboard": {
     "title": "Dashboard",
     "subtitle": "统一查看账户信息、技能资产与访问凭证",
