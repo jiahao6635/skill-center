@@ -337,6 +337,7 @@
     "success": "Token Ready",
     "successDesc": "Copy the token below to complete setup",
     "tokenLabel": "Access Token",
+    "expiresAt": "Expires on {{date}}",
     "usageHint": "Use this command to save the token:"
   },
   "dashboard": {

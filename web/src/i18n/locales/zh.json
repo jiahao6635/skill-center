@@ -337,6 +337,7 @@
     "success": "令牌已就绪",
     "successDesc": "请复制下方令牌并完成配置",
     "tokenLabel": "访问令牌",
+    "expiresAt": "有效期至 {{date}}",
     "usageHint": "使用以下命令保存令牌："
   },
   "dashboard": {

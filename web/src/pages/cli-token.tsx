@@ -22,6 +22,7 @@ export function CliTokenPage() {
 
   const [user, setUser] = useState<User | null | undefined>(undefined)
   const [token, setToken] = useState<string | null>(null)
+  const [expiresAt, setExpiresAt] = useState<string>('')
   const [error, setError] = useState<string>('')
 
   useEffect(() => {
@@ -37,11 +38,15 @@ export function CliTokenPage() {
       navigate({ to: '/login', search: { returnTo: '/cli/token' } })
       return
     }
-    // Logged in — create token
+    // Logged in — create token with 7-day expiration
+    const expires = new Date()
+    expires.setDate(expires.getDate() + 7)
+    setExpiresAt(expires.toLocaleDateString())
     tokenApi
       .createToken({
         name: 'CLI Auto Token',
         scopes: ['skill:read', 'skill:publish'],
+        expiresAt: expires.toISOString(),
       })
       .then((response) => setToken(response.token))
       .catch((err) => setError(err instanceof Error ? err.message : 'Token creation failed'))
@@ -99,7 +104,10 @@ export function CliTokenPage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">{t('cliToken.tokenLabel')}</label>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">{t('cliToken.tokenLabel')}</label>
+              <span className="text-xs text-muted-foreground">{t('cliToken.expiresAt', { date: expiresAt })}</span>
+            </div>
             <pre
               id="cli-token"
               data-token={token}
