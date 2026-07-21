@@ -111,7 +111,7 @@ describe('install-command', () => {
     expect(html).toContain('break-all')
   })
 
-  it('renders install method tabs with only a short active underline', () => {
+  it('renders the agent prompt with skill-center instruction and installer fallback', () => {
     setMockWindow('https://app.example.com')
 
     const html = renderToStaticMarkup(createElement(InstallCommand, {
@@ -119,13 +119,11 @@ describe('install-command', () => {
       slug: 'meeting-minutes-generator',
     }))
 
-    expect(html).toContain('after:w-6')
-    expect(html).toContain('after:h-0.5')
-    expect(html).not.toContain('rounded-lg border bg-background/80 p-1')
-    expect(html).not.toContain('flex-1 rounded-md')
+    expect(html).toContain('使用 skill-center 技能帮我安装 meeting-minutes-generator')
+    expect(html).toContain('如果还没有安装 skill-center 技能，请先安装：https://app.example.com/registry/skill-center-installer.md')
   })
 
-  it('renders ClawHub CLI as the default install method', () => {
+  it('renders the agent prompt with namespace-prefixed target for team skills', () => {
     setMockWindow('https://app.example.com')
 
     const html = renderToStaticMarkup(createElement(InstallCommand, {
@@ -133,10 +131,7 @@ describe('install-command', () => {
       slug: 'meeting-minutes-generator',
     }))
 
-    expect(html).toContain('skillDetail.installMethodClawhub')
-    expect(html).toContain('skillDetail.installMethodSkillhub')
-    expect(html).toContain('aria-selected="true"')
-    expect(html).toContain('npx clawhub install team-alpha--meeting-minutes-generator --registry https://app.example.com')
-    expect(html).not.toContain('npx @astron-team/skillhub@latest install meeting-minutes-generator --namespace team-alpha --registry https://app.example.com')
+    expect(html).toContain('使用 skill-center 技能帮我安装 team-alpha--meeting-minutes-generator')
+    expect(html).toContain('如果还没有安装 skill-center 技能，请先安装：https://app.example.com/registry/skill-center-installer.md')
   })
 })

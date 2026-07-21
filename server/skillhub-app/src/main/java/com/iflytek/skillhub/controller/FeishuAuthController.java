@@ -106,9 +106,12 @@ public class FeishuAuthController {
 
         try {
             PlatformPrincipal principal = feishuOAuthService.handleCallback(code, state, session);
+
+            // Consume returnTo BEFORE establishing session (which rotates the session ID
+            // and may lose session attributes in Spring Session Redis).
+            String redirectTarget = oauthLoginFlowService.consumeReturnTo(session);
             platformSessionService.establishSession(principal, request);
 
-            String redirectTarget = oauthLoginFlowService.consumeReturnTo(request.getSession(false));
             if (redirectTarget == null) {
                 redirectTarget = OAuthLoginRedirectSupport.DEFAULT_TARGET_URL;
             }

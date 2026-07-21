@@ -33,9 +33,10 @@ export function buildInstallCommand(namespace: string, slug: string, baseUrl: st
   return `npx clawhub install ${installTarget} --registry ${baseUrl}`
 }
 
-export function buildAgentPrompt(namespace: string, slug: string, _baseUrl: string): string {
+export function buildAgentPrompt(namespace: string, slug: string, baseUrl: string): string {
   const installTarget = buildInstallTarget(namespace, slug)
-  return `帮我安装技能 ${installTarget}`
+  const installerUrl = `${baseUrl}/registry/skill-center-installer.md`
+  return `使用 skill-center 技能帮我安装 ${installTarget}。如果还没有安装 skill-center 技能，请先安装：${installerUrl}`
 }
 
 export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
