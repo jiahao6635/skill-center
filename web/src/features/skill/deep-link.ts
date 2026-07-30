@@ -19,7 +19,7 @@ export interface SkillInstallConfig {
 
 const SKILL_NAME_PATTERN = /^[a-z0-9\-_]+$/
 const PROTOCOL_SCHEME = 'qoder-work'
-const LAUNCH_TIMEOUT_MS = 3000
+const LAUNCH_TIMEOUT_MS = 300_000
 
 export { LAUNCH_TIMEOUT_MS }
 

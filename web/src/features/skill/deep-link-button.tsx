@@ -25,7 +25,7 @@ export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkBu
 
     const config: SkillInstallConfig = {
       scope: namespace === 'global' ? 'global' : 'team',
-      download_url: `${baseUrl}/api/v1/skills/${namespace}/${slug}/download`,
+      download_url: `${baseUrl}/api/cli/v1/skills/${namespace}/${slug}/download`,
       source: 'official',
     }
 
