@@ -57,11 +57,11 @@ export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkBu
 
     setIsLoading(true)
     try {
-      const response = await fetchJson<{ data: DownloadTokenResponse }>(
+      const response = await fetchJson<DownloadTokenResponse>(
         '/api/web/auth/download-token',
         { method: 'POST' }
       )
-      const token = response.data?.token
+      const token = response.token
       window.location.href = buildConfig(token)
     } catch {
       // If token fetch fails, still navigate without token
