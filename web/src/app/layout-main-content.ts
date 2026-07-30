@@ -31,6 +31,13 @@ export function getAppMainContentLayout(pathname: string): AppMainContentLayout 
     }
   }
 
+  if (pathname.startsWith('/link/')) {
+    return {
+      mainClassName: CENTERED_MAIN_CLASS_NAME,
+      contentClassName: 'mx-auto w-full max-w-lg',
+    }
+  }
+
   if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) {
     return {
       mainClassName: CENTERED_MAIN_CLASS_NAME,

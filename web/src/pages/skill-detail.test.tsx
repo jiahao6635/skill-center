@@ -157,6 +157,11 @@ vi.mock('@/features/skill/file-tree', () => ({
 
 vi.mock('@/features/skill/install-command', () => ({
   InstallCommand: () => <div>install</div>,
+  getBaseUrl: () => 'https://example.com',
+}))
+
+vi.mock('@/features/skill/deep-link-button', () => ({
+  DeepLinkButton: () => <div>deep-link</div>,
 }))
 
 vi.mock('@/features/social/rating-input', () => ({

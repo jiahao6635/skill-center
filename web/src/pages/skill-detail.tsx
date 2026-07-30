@@ -11,6 +11,7 @@ import type { FileTreeNode } from '@/features/skill/file-tree-builder.ts'
 import type { SkillFile } from '@/api/types.ts'
 import { InstallCommand } from '@/features/skill/install-command.tsx'
 import { ShareButton } from '@/features/skill/share-button.tsx'
+import { DeepLinkButton } from '@/features/skill/deep-link-button.tsx'
 import { SkillLabelPanel } from '@/features/skill/skill-label-panel.tsx'
 import {
   getOverviewCollapseMaxHeight,
@@ -1225,6 +1226,15 @@ export function SkillDetailPage() {
           slug={slug}
           description={skill.summary}
         />
+
+        {publishedVersion && (
+          <DeepLinkButton
+            namespace={namespace}
+            slug={slug}
+            version={publishedVersion.version}
+            summary={skill.summary}
+          />
+        )}
 
         {skill.canManageLifecycle && selectedVersionEntry && (
           <SecurityAuditSummary skillId={skill.id} versionId={selectedVersionEntry.id} versionStatus={selectedVersionEntry.status} />

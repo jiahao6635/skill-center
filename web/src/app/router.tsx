@@ -136,6 +136,10 @@ const AdminLabelsPage = createRoleProtectedRouteComponent(
   'AdminLabelsPage',
   ['SUPER_ADMIN'],
 )
+const DeepLinkInstallPage = createLazyRouteComponent(
+  () => import('@/pages/deep-link-install.tsx'),
+  'DeepLinkInstallPage',
+)
 
 function DefaultNotFound() {
   return (
@@ -443,6 +447,12 @@ const adminLabelsRoute = createRoute({
   component: AdminLabelsPage,
 })
 
+const deepLinkInstallRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/link/skill/install',
+  component: DeepLinkInstallPage,
+})
+
 const routeTree = rootRoute.addChildren([
   landingRoute,
   skillsRoute,
@@ -480,6 +490,7 @@ const routeTree = rootRoute.addChildren([
   adminUsersRoute,
   adminAuditLogRoute,
   adminLabelsRoute,
+  deepLinkInstallRoute,
 ])
 
 export const router = createRouter({

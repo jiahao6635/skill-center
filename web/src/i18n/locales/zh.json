@@ -1035,7 +1035,8 @@
       "button": "分享",
       "copied": "已复制",
       "defaultDescription": "实用技能"
-    }
+    },
+    "deepLinkOpen": "在 QoderWork 中打开"
   },
   "skillCompare": {
     "pageTitle": "版本对比",
@@ -1581,5 +1582,27 @@
       "report": "举报通知",
       "reportDesc": "举报提交或处理完成时通知"
     }
+  },
+  "deepLink": {
+    "installTitle": "安装技能",
+    "loading": "正在解析安装配置...",
+    "invalidName": "技能名称格式无效",
+    "invalidConfig": "无法解析安装配置",
+    "missingFields": "缺少必填字段：{{fields}}",
+    "skillInfoTitle": "待安装技能",
+    "scopeLabel": "范围",
+    "versionLabel": "版本",
+    "sourceLabel": "来源",
+    "descriptionLabel": "描述",
+    "launchButton": "在 QoderWork 中打开",
+    "launching": "正在启动 QoderWork...",
+    "launched": "QoderWork 已启动",
+    "launchedDesc": "请切换到 QoderWork 完成安装。",
+    "timeoutTitle": "未检测到 QoderWork",
+    "timeoutDesc": "如果尚未安装 QoderWork，请先安装后再试。",
+    "retryButton": "重试",
+    "downloadHint": "下载 QoderWork",
+    "errorTitle": "安装错误",
+    "confirmHint": "请确认以下技能信息，然后点击按钮安装"
   }
 }
