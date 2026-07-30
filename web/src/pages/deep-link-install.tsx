@@ -17,16 +17,6 @@ const ORIGINAL_PARAMS = new URLSearchParams(ORIGINAL_URL_SEARCH)
 
 type PageState = 'loading' | 'error' | 'ready' | 'launching' | 'launched' | 'timeout'
 
-/**
- * Detect iOS Safari — iframe-based protocol launch does not work on iOS Safari,
- * so we fall back to direct window.location.href assignment.
- */
-function isIOSSafari(): boolean {
-  if (typeof navigator === 'undefined') return false
-  const ua = navigator.userAgent
-  return /iPad|iPhone|iPod/.test(ua) && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua)
-}
-
 export function DeepLinkInstallPage() {
   const { t, i18n } = useTranslation()
   const [pageState, setPageState] = useState<PageState>('loading')
@@ -34,7 +24,6 @@ export function DeepLinkInstallPage() {
   const [name, setName] = useState('')
   const [configRaw, setConfigRaw] = useState('')
   const [config, setConfig] = useState<SkillInstallConfig | null>(null)
-  const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stateRef = useRef<PageState>('loading')
 
@@ -43,13 +32,9 @@ export function DeepLinkInstallPage() {
     stateRef.current = pageState
   }, [pageState])
 
-  // Clean up iframe and timeout on unmount
+  // Clean up timeout on unmount
   useEffect(() => {
     return () => {
-      if (iframeRef.current) {
-        iframeRef.current.remove()
-        iframeRef.current = null
-      }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
@@ -105,11 +90,6 @@ export function DeepLinkInstallPage() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && stateRef.current === 'launching') {
         setPageState('launched')
-        // Clean up
-        if (iframeRef.current) {
-          iframeRef.current.remove()
-          iframeRef.current = null
-        }
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current)
           timeoutRef.current = null
@@ -127,30 +107,15 @@ export function DeepLinkInstallPage() {
     const protocolUrl = buildProtocolUrl(name, configRaw)
     setPageState('launching')
 
-    if (isIOSSafari()) {
-      // iOS Safari: direct location assignment
-      window.location.href = protocolUrl
-    } else {
-      // Desktop/Android: hidden iframe approach
-      const iframe = document.createElement('iframe')
-      iframe.style.display = 'none'
-      iframe.style.width = '0'
-      iframe.style.height = '0'
-      iframe.src = protocolUrl
-      document.body.appendChild(iframe)
-      iframeRef.current = iframe
-    }
+    // Use window.location.assign to navigate to the custom protocol URL.
+    // The browser will show a "Open QoderWork?" dialog without actually
+    // leaving the page, so the timeout detection still works.
+    window.location.assign(protocolUrl)
 
     // Set timeout to detect if app is not installed
     timeoutRef.current = setTimeout(() => {
-      // Only transition to timeout if we're still in launching state and page is visible
       if (stateRef.current === 'launching' && document.visibilityState === 'visible') {
         setPageState('timeout')
-        // Clean up iframe
-        if (iframeRef.current) {
-          iframeRef.current.remove()
-          iframeRef.current = null
-        }
       }
     }, LAUNCH_TIMEOUT_MS)
   }, [name, configRaw])
@@ -170,10 +135,6 @@ export function DeepLinkInstallPage() {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
-    }
-    if (iframeRef.current) {
-      iframeRef.current.remove()
-      iframeRef.current = null
     }
     launchApp()
   }
