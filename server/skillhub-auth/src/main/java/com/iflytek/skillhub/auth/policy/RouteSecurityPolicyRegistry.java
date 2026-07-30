@@ -39,6 +39,7 @@ public class RouteSecurityPolicyRegistry {
             RouteAuthorizationPolicy.authenticated(HttpMethod.GET, "/api/v1/skills/*/rating"),
             RouteAuthorizationPolicy.authenticated(HttpMethod.GET, "/api/web/skills/*/star"),
             RouteAuthorizationPolicy.authenticated(HttpMethod.GET, "/api/web/skills/*/rating"),
+            RouteAuthorizationPolicy.authenticated(HttpMethod.POST, "/api/web/auth/download-token"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/v1/skills"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/v1/skills/*/*"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/v1/skills/*/*/versions"),
