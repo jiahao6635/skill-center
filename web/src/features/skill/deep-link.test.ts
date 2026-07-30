@@ -101,6 +101,35 @@ describe('encodeConfigParam', () => {
     const decoded = decodeConfigParam(encoded)
     expect(decoded).toEqual(config)
   })
+
+  it('handles Chinese and other Unicode characters', () => {
+    const config: SkillInstallConfig = {
+      scope: 'team',
+      skill_name: 'my-skill',
+      skill_name_zh: '数据分析技能',
+      description: 'A skill for data analysis',
+      description_zh: '这是一个用于数据分析的技能，支持多种数据源。',
+      download_url: 'https://example.com/dl',
+      source: 'official',
+    }
+    const encoded = encodeConfigParam(config)
+    const decoded = decodeConfigParam(encoded)
+    expect(decoded).toEqual(config)
+    expect(decoded?.skill_name_zh).toBe('数据分析技能')
+    expect(decoded?.description_zh).toBe('这是一个用于数据分析的技能，支持多种数据源。')
+  })
+
+  it('handles emoji characters', () => {
+    const config: SkillInstallConfig = {
+      scope: 'global',
+      description: 'Skill with emoji 🚀🎉',
+      download_url: 'https://example.com/dl',
+    }
+    const encoded = encodeConfigParam(config)
+    const decoded = decodeConfigParam(encoded)
+    expect(decoded).toEqual(config)
+    expect(decoded?.description).toBe('Skill with emoji 🚀🎉')
+  })
 })
 
 describe('buildProtocolUrl', () => {

@@ -43,7 +43,13 @@ export function decodeConfigParam(raw: string): SkillInstallConfig | null {
     const padNeeded = (4 - (base64.length % 4)) % 4
     base64 += '='.repeat(padNeeded)
 
-    const json = atob(base64)
+    const binary = atob(base64)
+    // Decode UTF-8 bytes back to string
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    const json = new TextDecoder().decode(bytes)
     const parsed: unknown = JSON.parse(json)
 
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
@@ -56,11 +62,16 @@ export function decodeConfigParam(raw: string): SkillInstallConfig | null {
 }
 
 /**
- * Encode a SkillInstallConfig to URL-safe base64.
+ * Encode a SkillInstallConfig to base64.
+ *
+ * Handles Unicode characters (Chinese, emojis, etc.) by converting to UTF-8
+ * bytes before base64 encoding, since btoa() only supports Latin1.
  */
 export function encodeConfigParam(config: SkillInstallConfig): string {
   const json = JSON.stringify(config)
-  return btoa(json)
+  const bytes = new TextEncoder().encode(json)
+  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('')
+  return btoa(binary)
 }
 
 /**
