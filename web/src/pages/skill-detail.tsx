@@ -1227,14 +1227,12 @@ export function SkillDetailPage() {
           description={skill.summary}
         />
 
-        {publishedVersion && (
-          <DeepLinkButton
-            namespace={namespace}
-            slug={slug}
-            version={publishedVersion.version}
-            summary={skill.summary}
-          />
-        )}
+        <DeepLinkButton
+          namespace={namespace}
+          slug={slug}
+          version={publishedVersion?.version}
+          summary={skill.summary}
+        />
 
         {skill.canManageLifecycle && selectedVersionEntry && (
           <SecurityAuditSummary skillId={skill.id} versionId={selectedVersionEntry.id} versionStatus={selectedVersionEntry.status} />
