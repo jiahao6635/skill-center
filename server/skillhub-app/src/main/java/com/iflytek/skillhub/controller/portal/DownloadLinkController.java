@@ -7,6 +7,7 @@ import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.service.SkillDownloadLinkService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,11 +26,14 @@ import java.util.Map;
 public class DownloadLinkController extends BaseApiController {
 
     private final SkillDownloadLinkService skillDownloadLinkService;
+    private final String publicBaseUrl;
 
     public DownloadLinkController(ApiResponseFactory responseFactory,
-                                  SkillDownloadLinkService skillDownloadLinkService) {
+                                  SkillDownloadLinkService skillDownloadLinkService,
+                                  @Value("${skillhub.public.base-url:}") String publicBaseUrl) {
         super(responseFactory);
         this.skillDownloadLinkService = skillDownloadLinkService;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     @PostMapping("/{namespace}/{slug}/download-link")
@@ -55,6 +59,13 @@ public class DownloadLinkController extends BaseApiController {
     }
 
     private String buildBaseUrl(HttpServletRequest request) {
+        // In production SSL terminates at the ALB and nginx forwards plain HTTP
+        // (X-Forwarded-Proto=http), so the request scheme/headers cannot be
+        // trusted to yield https. Prefer the explicit public base URL, exactly
+        // as the OAuth callback URL construction does.
+        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
+            return stripTrailingSlash(publicBaseUrl);
+        }
         String proto = request.getHeader("X-Forwarded-Proto");
         if (proto == null || proto.isBlank()) {
             proto = request.getScheme();
@@ -67,6 +78,14 @@ public class DownloadLinkController extends BaseApiController {
             host = request.getServerName() + ":" + request.getServerPort();
         }
         return proto + "://" + host;
+    }
+
+    private static String stripTrailingSlash(String value) {
+        int end = value.length();
+        while (end > 0 && value.charAt(end - 1) == '/') {
+            end--;
+        }
+        return value.substring(0, end);
     }
 
     public record DownloadLinkResponse(String downloadUrl, String expiresAt) {}

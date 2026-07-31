@@ -38,9 +38,14 @@ class DownloadLinkControllerTest {
 
     @BeforeEach
     void setUp() {
+        mockMvc = buildMockMvc("");
+    }
+
+    private MockMvc buildMockMvc(String publicBaseUrl) {
         ApiResponseFactory responseFactory = new ApiResponseFactory(new StaticMessageSource(), Clock.systemUTC());
-        DownloadLinkController controller = new DownloadLinkController(responseFactory, skillDownloadLinkService);
-        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+        DownloadLinkController controller =
+                new DownloadLinkController(responseFactory, skillDownloadLinkService, publicBaseUrl);
+        return MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
@@ -82,5 +87,21 @@ class DownloadLinkControllerTest {
                         .header("Host", "skill-center.test"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.downloadUrl").value("http://skill-center.test/api/cli/v1/skills/global/demo-skill/download"));
+    }
+
+    @Test
+    void createDownloadLink_PublicBaseUrlConfigured_UsesItOverRequestHeaders() throws Exception {
+        // Mirrors production: SSL terminates at the ALB, so the public base URL
+        // (https) must win over the plain-http request headers.
+        MockMvc secureMockMvc = buildMockMvc("https://skill-center.sigmob.com");
+        when(skillDownloadLinkService.issueDownloadLink("global", "demo-skill", null, "user-1", Map.of()))
+                .thenReturn(SkillDownloadLinkService.IssueResult.redirect("tok-123", Instant.parse("2026-01-01T00:10:00Z")));
+
+        secureMockMvc.perform(post("/api/web/skills/global/demo-skill/download-link")
+                        .header("Host", "internal-host")
+                        .header("X-Forwarded-Proto", "http"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.downloadUrl")
+                        .value("https://skill-center.sigmob.com/api/cli/v1/download-link/tok-123"));
     }
 }
