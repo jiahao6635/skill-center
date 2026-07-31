@@ -583,6 +583,139 @@ class SkillDownloadServiceTest {
         verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
     }
 
+    @Test
+    void testPresignDownload_Success_DoesNotRecordDownload() throws Exception {
+        String namespaceSlug = "team-ai";
+        String skillSlug = "demo-skill";
+        String userId = "user-100";
+        Map<Long, NamespaceRole> userNsRoles = Map.of(1L, NamespaceRole.MEMBER);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Team AI", "owner-1");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, userId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setDisplayName("Demo Skill");
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(10L);
+
+        SkillVersion version = new SkillVersion(1L, "1.0.0", userId);
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
+        String storageKey = "packages/1/10/bundle.zip";
+        ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, userId, userNsRoles)).thenReturn(true);
+        when(skillVersionRepository.findBySkillIdAndVersion(1L, "1.0.0")).thenReturn(Optional.of(version));
+        when(objectStorageService.exists(storageKey)).thenReturn(true);
+        when(objectStorageService.getMetadata(storageKey)).thenReturn(metadata);
+        when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Demo Skill-1.0.0.zip")))
+                .thenReturn("https://oss.example.com/presigned");
+
+        SkillDownloadService.PresignedDownload result =
+                service.presignDownload(namespaceSlug, skillSlug, "1.0.0", userId, userNsRoles);
+
+        assertEquals("https://oss.example.com/presigned", result.presignedUrl());
+        assertEquals(1L, result.skillId());
+        assertEquals(10L, result.versionId());
+        assertEquals("Demo Skill-1.0.0.zip", result.filename());
+        assertTrue(result.published());
+        // Metric is deferred to fetch time — must NOT be recorded here.
+        verify(skillRepository, never()).incrementDownloadCount(anyLong());
+        verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
+        verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
+    }
+
+    @Test
+    void testPresignDownload_BlankVersion_UsesLatestAndPassesNullUrl() throws Exception {
+        String namespaceSlug = "global";
+        String skillSlug = "demo-skill";
+        String userId = "user-100";
+
+        Namespace namespace = new Namespace(namespaceSlug, "Global", "owner-1");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, userId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setDisplayName("Demo Skill");
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(10L);
+
+        SkillVersion version = new SkillVersion(1L, "1.0.0", userId);
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
+        String storageKey = "packages/1/10/bundle.zip";
+        ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, userId, Map.of())).thenReturn(true);
+        when(skillVersionRepository.findById(10L)).thenReturn(Optional.of(version));
+        when(objectStorageService.exists(storageKey)).thenReturn(true);
+        when(objectStorageService.getMetadata(storageKey)).thenReturn(metadata);
+        when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Demo Skill-1.0.0.zip")))
+                .thenReturn(null);
+
+        SkillDownloadService.PresignedDownload result =
+                service.presignDownload(namespaceSlug, skillSlug, null, userId, Map.of());
+
+        assertNull(result.presignedUrl());
+        assertEquals(1L, result.skillId());
+        assertEquals(10L, result.versionId());
+        assertTrue(result.published());
+        verify(skillRepository, never()).incrementDownloadCount(anyLong());
+    }
+
+    @Test
+    void testPresignDownload_DraftVersion_MarksNotPublished() throws Exception {
+        String namespaceSlug = "team-ai";
+        String skillSlug = "demo-skill";
+        String userId = "user-100";
+        Map<Long, NamespaceRole> userNsRoles = Map.of(1L, NamespaceRole.MEMBER);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Team AI", "owner-1");
+        setId(namespace, 1L);
+        // Owner matches userId so the draft (UPLOADED) version is downloadable.
+        Skill skill = new Skill(1L, skillSlug, userId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setDisplayName("Demo Skill");
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(10L);
+
+        SkillVersion version = new SkillVersion(1L, "1.0.0", userId);
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.UPLOADED);
+        String storageKey = "packages/1/10/bundle.zip";
+        ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, userId, userNsRoles)).thenReturn(true);
+        when(skillVersionRepository.findBySkillIdAndVersion(1L, "1.0.0")).thenReturn(Optional.of(version));
+        when(objectStorageService.exists(storageKey)).thenReturn(true);
+        when(objectStorageService.getMetadata(storageKey)).thenReturn(metadata);
+        when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Demo Skill-1.0.0.zip")))
+                .thenReturn("https://oss.example.com/presigned");
+
+        SkillDownloadService.PresignedDownload result =
+                service.presignDownload(namespaceSlug, skillSlug, "1.0.0", userId, userNsRoles);
+
+        // Draft installs must not contribute to download metrics.
+        assertFalse(result.published());
+        verify(skillRepository, never()).incrementDownloadCount(anyLong());
+    }
+
+    @Test
+    void testRecordDownloadById_IncrementsCountersAndPublishesEvent() {
+        service.recordDownloadById(7L, 42L);
+
+        verify(skillRepository).incrementDownloadCount(7L);
+        verify(skillVersionStatsRepository).incrementDownloadCount(42L, 7L);
+        verify(eventPublisher).publishEvent(any(SkillDownloadedEvent.class));
+    }
+
     private void setId(Object entity, Long id) throws Exception {
         Field idField = entity.getClass().getDeclaredField("id");
         idField.setAccessible(true);

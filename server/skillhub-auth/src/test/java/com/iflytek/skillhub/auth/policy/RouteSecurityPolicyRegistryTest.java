@@ -113,6 +113,29 @@ class RouteSecurityPolicyRegistryTest {
     }
 
     @Test
+    void authorizationPolicies_shouldDeclareDownloadLinkRoutes() {
+        boolean issueMatched = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> policy.method() == HttpMethod.POST
+                        && "/api/web/skills/*/*/download-link".equals(policy.pattern())
+                        && policy.accessLevel() == RouteSecurityPolicyRegistry.AccessLevel.AUTHENTICATED);
+        boolean redirectMatched = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> policy.method() == HttpMethod.GET
+                        && "/api/cli/v1/download-link/*".equals(policy.pattern())
+                        && policy.accessLevel() == RouteSecurityPolicyRegistry.AccessLevel.PERMIT_ALL);
+
+        assertTrue(issueMatched);
+        assertTrue(redirectMatched);
+    }
+
+    @Test
+    void authorizationPolicies_shouldNotDeclareLegacyDownloadTokenRoute() {
+        boolean matched = registry.authorizationPolicies().stream()
+                .anyMatch(policy -> "/api/web/auth/download-token".equals(policy.pattern()));
+
+        assertFalse(matched);
+    }
+
+    @Test
     void shouldIgnoreCsrf_onlyForBearerTokensAndDeviceTokenFlow() {
         assertFalse(registry.shouldIgnoreCsrf("POST", "/api/v1/admin/users", null, false));
         assertFalse(registry.shouldIgnoreCsrf("POST", "/api/v1/auth/local/change-password", null, false));

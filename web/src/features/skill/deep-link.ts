@@ -15,7 +15,6 @@ export interface SkillInstallConfig {
   description_zh?: string
   download_url: string
   source?: string
-  auth_token?: string
 }
 
 const SKILL_NAME_PATTERN = /^[a-z0-9\-_]+$/

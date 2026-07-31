@@ -84,6 +84,21 @@ public class SkillDownloadService {
     }
 
     /**
+     * Outcome of presigning a download: the storage presigned URL plus the
+     * identifiers needed to record the download when it actually happens.
+     *
+     * <p>{@code presignedUrl} is {@code null} when the backing storage cannot
+     * produce presigned URLs (e.g. local file storage in dev); callers should
+     * then fall back to a streamed download endpoint.
+     *
+     * <p>{@code published} mirrors the PUBLISHED guard used by the streamed
+     * download path: only published versions should contribute to download
+     * metrics, so draft (UPLOADED/PENDING_REVIEW) deep-link installs are not
+     * counted.
+     */
+    public record PresignedDownload(String presignedUrl, Long skillId, Long versionId, String filename, boolean published) {}
+
+    /**
      * Downloads the latest published version available to the caller.
      */
     public DownloadResult downloadLatest(
@@ -162,6 +177,60 @@ public class SkillDownloadService {
         return buildDownloadResult(skill, version);
     }
 
+    /**
+     * Validates visibility/access and produces a presigned download URL without
+     * recording any download metric.
+     *
+     * <p>Used by the deep-link flow: the metric is recorded later, when the
+     * client actually fetches the package through the redirect endpoint.
+     *
+     * @param versionStr explicit version, or {@code null}/blank to target the
+     *                   latest published version
+     */
+    public PresignedDownload presignDownload(
+            String namespaceSlug,
+            String skillSlug,
+            String versionStr,
+            String currentUserId,
+            Map<Long, NamespaceRole> userNsRoles) {
+
+        Namespace namespace = findNamespace(namespaceSlug);
+        Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
+        assertCanDownload(namespace, skill, currentUserId, userNsRoles);
+        assertPublishedAccessible(skill);
+
+        SkillVersion version = resolveDownloadableVersion(skill, versionStr);
+        assertDownloadableVersion(skill, version, currentUserId, userNsRoles);
+
+        DownloadResult result = buildDownloadResult(skill, version);
+        boolean published = version.getStatus() == SkillVersionStatus.PUBLISHED;
+        return new PresignedDownload(result.presignedUrl(), skill.getId(), version.getId(), result.filename(), published);
+    }
+
+    /**
+     * Records a published download by identifiers only.
+     *
+     * <p>Extracted so the deep-link redirect endpoint can count a download at
+     * fetch time without holding the full aggregate in memory.
+     */
+    public void recordDownloadById(Long skillId, Long versionId) {
+        skillRepository.incrementDownloadCount(skillId);
+        skillVersionStatsRepository.incrementDownloadCount(versionId, skillId);
+        eventPublisher.publishEvent(new SkillDownloadedEvent(skillId, versionId));
+    }
+
+    private SkillVersion resolveDownloadableVersion(Skill skill, String versionStr) {
+        if (versionStr == null || versionStr.isBlank()) {
+            if (skill.getLatestVersionId() == null) {
+                throw new DomainBadRequestException("error.skill.version.latest.unavailable", skill.getSlug());
+            }
+            return skillVersionRepository.findById(skill.getLatestVersionId())
+                    .orElseThrow(() -> new DomainBadRequestException("error.skill.version.latest.notFound"));
+        }
+        return skillVersionRepository.findBySkillIdAndVersion(skill.getId(), versionStr)
+                .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", versionStr));
+    }
+
     private DownloadResult downloadVersion(Skill skill,
                                            SkillVersion version,
                                            String currentUserId,
@@ -178,9 +247,7 @@ public class SkillDownloadService {
     }
 
     private void recordPublishedDownload(Skill skill, SkillVersion version) {
-        skillRepository.incrementDownloadCount(skill.getId());
-        skillVersionStatsRepository.incrementDownloadCount(version.getId(), skill.getId());
-        eventPublisher.publishEvent(new SkillDownloadedEvent(skill.getId(), version.getId()));
+        recordDownloadById(skill.getId(), version.getId());
     }
 
     private DownloadResult buildDownloadResult(Skill skill, SkillVersion version) {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { MonitorSmartphone, Loader2 } from 'lucide-react'
 import { getBaseUrl } from './install-command.tsx'
 import { buildDeepLinkUrl, encodeConfigParam, type SkillInstallConfig } from './deep-link.ts'
-import { fetchJson } from '@/api/client.ts'
+import { fetchJson, getCsrfHeaders } from '@/api/client.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
 
 interface DeepLinkButtonProps {
@@ -13,17 +13,18 @@ interface DeepLinkButtonProps {
   summary?: string
 }
 
-type DownloadTokenResponse = {
-  token: string
+type DownloadLinkResponse = {
+  downloadUrl: string
   expiresAt: string
 }
 
 /**
  * Button that navigates to the deep link intermediate page.
  *
- * When clicked, it first requests a short-lived download token from the
- * backend (for authenticated users), then navigates to the intermediate page
- * with the token embedded in the config.
+ * When clicked, it requests a short-lived download URL from the backend (for
+ * authenticated users), then navigates to the intermediate page with that URL
+ * embedded in the config. QoderWork fetches the URL directly — no auth token is
+ * needed on the client side.
  */
 export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkButtonProps) {
   const { t } = useTranslation()
@@ -32,44 +33,45 @@ export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkBu
 
   const baseUrl = getBaseUrl()
 
-  const buildConfig = useCallback((authToken?: string): string => {
+  const buildConfig = useCallback((downloadUrl: string): string => {
     const config: SkillInstallConfig = {
       scope: namespace === 'global' ? 'global' : 'team',
-      download_url: `${baseUrl}/api/cli/v1/skills/${namespace}/${slug}/download`,
+      download_url: downloadUrl,
       source: 'official',
     }
 
     if (version) config.version = version
     if (slug) config.skill_name = slug
     if (summary) config.description = summary
-    if (authToken) config.auth_token = authToken
 
     const encoded = encodeConfigParam(config)
     return buildDeepLinkUrl(baseUrl, slug, encoded)
   }, [namespace, slug, version, summary, baseUrl])
 
+  const fallbackDownloadUrl = `${baseUrl}/api/cli/v1/skills/${namespace}/${slug}/download`
+
   const handleClick = useCallback(async () => {
     if (!isAuthenticated) {
-      // Not logged in — navigate without token (will only work for public skills)
-      window.location.href = buildConfig()
+      // Not logged in — use the public CLI download endpoint (public skills only)
+      window.location.href = buildConfig(fallbackDownloadUrl)
       return
     }
 
     setIsLoading(true)
     try {
-      const response = await fetchJson<DownloadTokenResponse>(
-        '/api/web/auth/download-token',
-        { method: 'POST' }
+      const params = version ? `?version=${encodeURIComponent(version)}` : ''
+      const response = await fetchJson<DownloadLinkResponse>(
+        `/api/web/skills/${namespace}/${slug}/download-link${params}`,
+        { method: 'POST', headers: getCsrfHeaders() }
       )
-      const token = response.token
-      window.location.href = buildConfig(token)
+      window.location.href = buildConfig(response.downloadUrl)
     } catch {
-      // If token fetch fails, still navigate without token
-      window.location.href = buildConfig()
+      // If issuing the link fails, fall back to the public CLI download endpoint
+      window.location.href = buildConfig(fallbackDownloadUrl)
     } finally {
       setIsLoading(false)
     }
-  }, [isAuthenticated, buildConfig])
+  }, [isAuthenticated, buildConfig, fallbackDownloadUrl, namespace, slug, version])
 
   return (
     <button
