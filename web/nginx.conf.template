@@ -14,6 +14,14 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # index.html must never be cached: it references content-hashed asset URLs,
+    # so a stale copy would keep loading old JS chunks after a new deploy
+    # (symptom: UI fixes only appear after a hard refresh). Hashed assets under
+    # /assets/ are immutable and safe to cache long-term.
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
     location /api/ {
         proxy_pass ${SKILLHUB_API_UPSTREAM};
         proxy_set_header Host $host;
