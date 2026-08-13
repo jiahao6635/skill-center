@@ -61,23 +61,32 @@ public class NamespaceController extends BaseApiController {
     @GetMapping("/namespaces")
     public ApiResponse<PageResponse<NamespaceResponse>> listNamespaces(
             Pageable pageable,
-            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
-        return ok("response.success.read", namespacePortalQueryAppService.listNamespaces(pageable, userNsRoles));
+            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles,
+            @AuthenticationPrincipal PlatformPrincipal principal) {
+        return ok("response.success.read",
+                namespacePortalQueryAppService.listNamespaces(pageable, userNsRoles, platformRoles(principal)));
     }
 
     @GetMapping("/me/namespaces")
     public ApiResponse<List<MyNamespaceResponse>> listMyNamespaces(
             @RequestAttribute("userId") String userId,
-            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
-        return ok("response.success.read", namespacePortalQueryAppService.listMyNamespaces(userNsRoles));
+            @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles,
+            @AuthenticationPrincipal PlatformPrincipal principal) {
+        return ok("response.success.read",
+                namespacePortalQueryAppService.listMyNamespaces(userNsRoles, platformRoles(principal)));
     }
 
     @GetMapping("/namespaces/{slug}")
     public ApiResponse<NamespaceResponse> getNamespace(@PathVariable String slug,
                                                        @RequestAttribute("userId") String userId,
-                                                       @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
+                                                       @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles,
+                                                       @AuthenticationPrincipal PlatformPrincipal principal) {
         return ok("response.success.read",
-                namespacePortalQueryAppService.getNamespace(slug, userId, userNsRoles));
+                namespacePortalQueryAppService.getNamespace(slug, userId, userNsRoles, platformRoles(principal)));
+    }
+
+    private Set<String> platformRoles(PlatformPrincipal principal) {
+        return principal != null && principal.platformRoles() != null ? principal.platformRoles() : Set.of();
     }
 
     @PostMapping("/namespaces")

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { formatLocalDateTime, toLocalDateTimeInputValue } from './date-time.ts'
+import { formatCompactDateTime, formatLocalDateTime, toLocalDateTimeInputValue } from './date-time.ts'
 
 describe('formatLocalDateTime', () => {
   it('returns an em dash for empty values', () => {
@@ -58,5 +58,18 @@ describe('formatLocalDateTime', () => {
     expect(toLocalDateTimeInputValue('2026-03-17T12:30:00Z')).toBe(
       toLocalDateTimeInputValue(new Date('2026-03-17T12:30:00Z'))
     )
+  })
+})
+
+describe('formatCompactDateTime', () => {
+  it('returns an em dash for empty or invalid values', () => {
+    expect(formatCompactDateTime(undefined)).toBe('—')
+    expect(formatCompactDateTime(null)).toBe('—')
+    expect(formatCompactDateTime('')).toBe('—')
+    expect(formatCompactDateTime('not-a-date')).toBe('—')
+  })
+
+  it('formats local timestamps as yyyy-MM-dd HH:mm', () => {
+    expect(formatCompactDateTime('2026-08-13T15:04:09')).toBe('2026-08-13 15:04')
   })
 })

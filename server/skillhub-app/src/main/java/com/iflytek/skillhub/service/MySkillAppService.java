@@ -16,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 /**
  * Application service that assembles the current user's owned and starred
@@ -166,6 +167,10 @@ public class MySkillAppService {
                 .filter(skill -> matchesNamespace(skill, finalNamespaceId))
                 .filter(skill -> matchesKeyword(skill, normalizedKeyword))
                 .filter(skill -> matchesFilter(skill, filter, platformRoles))
+                .sorted(Comparator
+                        .comparing(Skill::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(Skill::getId, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .reversed())
                 .toList();
 
         int fromIndex = Math.min(page * size, filtered.size());

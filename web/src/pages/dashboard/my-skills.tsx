@@ -15,6 +15,7 @@ import { useMyNamespaces } from '@/shared/hooks/use-namespace-queries.ts'
 import { useMySkills, useSubmitPromotion } from '@/shared/hooks/use-user-queries.ts'
 import { useDebounce } from '@/shared/hooks/use-debounce.ts'
 import { getHeadlineVersion, getPublishedVersion, getOwnerPreviewVersion, hasPendingOwnerPreview } from '@/shared/lib/skill-lifecycle.ts'
+import { formatCompactDateTime } from '@/shared/lib/date-time.ts'
 import { formatCompactCount } from '@/shared/lib/number-format.ts'
 import { toast } from '@/shared/lib/toast.ts'
 import { buildReturnTo } from '@/shared/lib/auth-route.ts'
@@ -378,6 +379,9 @@ export function MySkillsPage() {
                           {headlineVersion ? (
                             <span className="font-mono text-xs">v{headlineVersion.version}</span>
                           ) : null}
+                          <span className="flex items-center gap-1" title={t('mySkills.updatedAt')}>
+                            {t('mySkills.updatedAt')}: {formatCompactDateTime(skill.updatedAt)}
+                          </span>
                           <span className="flex items-center gap-1">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />

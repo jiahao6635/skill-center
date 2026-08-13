@@ -96,6 +96,22 @@ class NamespacePortalControllerTest {
     }
 
     @Test
+    void listMyNamespaces_superAdminSeesNamespacesWithoutMembership() throws Exception {
+        Namespace owned = namespace(1L, "owned-team", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
+        Namespace other = namespace(2L, "other-team", NamespaceStatus.ACTIVE, NamespaceType.TEAM);
+        given(namespaceRepository.findAll()).willReturn(List.of(other, owned));
+        given(namespaceMemberRepository.findByUserId("admin-1")).willReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/me/namespaces")
+                        .with(auth("admin-1", Set.of("SUPER_ADMIN")))
+                        .requestAttr("userId", "admin-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data[0].slug").value("other-team"))
+                .andExpect(jsonPath("$.data[1].slug").value("owned-team"));
+    }
+
+    @Test
     void getNamespace_requiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/namespaces/team-a"))
                 .andExpect(status().isUnauthorized());

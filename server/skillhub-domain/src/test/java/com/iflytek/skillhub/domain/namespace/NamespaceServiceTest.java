@@ -12,7 +12,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -186,6 +188,32 @@ class NamespaceServiceTest {
 
         assertThrows(DomainBadRequestException.class, () ->
                 namespaceService.getNamespaceBySlug("nonexistent"));
+    }
+
+    @Test
+    void getNamespaceBySlugForRead_hidesArchivedNamespaceFromNonMembers() throws Exception {
+        Namespace namespace = new Namespace("archived-team", "Archived Team", "owner-1");
+        setField(namespace, "id", 9L);
+        namespace.setStatus(NamespaceStatus.ARCHIVED);
+        when(namespaceRepository.findBySlug("archived-team")).thenReturn(Optional.of(namespace));
+
+        DomainBadRequestException exception = assertThrows(DomainBadRequestException.class, () ->
+                namespaceService.getNamespaceBySlugForRead("archived-team", "user-1", Map.of(), Set.of()));
+
+        assertEquals("error.namespace.slug.notFound", exception.messageCode());
+    }
+
+    @Test
+    void getNamespaceBySlugForRead_allowsSuperAdminToReadArchivedNamespace() throws Exception {
+        Namespace namespace = new Namespace("archived-team", "Archived Team", "owner-1");
+        setField(namespace, "id", 9L);
+        namespace.setStatus(NamespaceStatus.ARCHIVED);
+        when(namespaceRepository.findBySlug("archived-team")).thenReturn(Optional.of(namespace));
+
+        Namespace result = namespaceService.getNamespaceBySlugForRead(
+                "archived-team", "admin-1", Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertEquals("archived-team", result.getSlug());
     }
 
     @Test

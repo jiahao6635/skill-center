@@ -641,9 +641,14 @@ class SkillPublishServiceTest {
         when(skillPackageValidator.validate(entries)).thenReturn(ValidationResult.pass());
         when(skillMetadataParser.parse(skillMdContent)).thenReturn(metadata);
         when(prePublishValidator.validate(any())).thenReturn(ValidationResult.pass());
-        when(skillRepository.findByNamespaceIdAndSlug(any(), eq("test-skill"))).thenReturn(List.of(new Skill(1L, "test-skill", publisherId, SkillVisibility.PUBLIC)));
-        when(skillRepository.findByNamespaceIdAndSlugAndOwnerId(any(), eq("test-skill"), eq(publisherId))).thenReturn(Optional.of(new Skill(1L, "test-skill", publisherId, SkillVisibility.PUBLIC)));
+        Skill existing = new Skill(1L, "test-skill", publisherId, SkillVisibility.PUBLIC);
+        setId(existing, 7L);
+        when(skillRepository.findByNamespaceIdAndSlug(any(), eq("test-skill"))).thenReturn(List.of(existing));
+        when(skillRepository.findByNamespaceIdAndSlugAndOwnerId(any(), eq("test-skill"), eq(publisherId)))
+                .thenReturn(Optional.of(existing));
+        when(skillVersionRepository.findBySkillId(7L)).thenReturn(List.of());
         when(skillVersionRepository.findBySkillIdAndVersion(any(), anyString())).thenReturn(Optional.empty());
+        when(skillRepository.save(any())).thenReturn(existing);
         when(skillVersionRepository.save(any(SkillVersion.class))).thenAnswer(invocation -> {
             SkillVersion saved = invocation.getArgument(0);
             if (saved.getId() == null) {
@@ -655,10 +660,51 @@ class SkillPublishServiceTest {
         SkillPublishService.PublishResult result = service.publishFromEntries(
                 namespaceSlug, entries, publisherId, SkillVisibility.PUBLIC, Set.of());
 
-        // Version should be auto-generated in format yyyyMMdd.HHmmss using system timezone
-        String version = result.version().getVersion();
-        assertTrue(version.matches("\\d{8}\\.\\d{6}"), "Version should match format yyyyMMdd.HHmmss");
-        assertTrue(version.startsWith("20260318"), "Version should start with date 20260318");
+        assertEquals("0.1.0", result.version().getVersion());
+    }
+
+    @Test
+    void testPublishFromEntries_ShouldBumpPatchWhenAutoVersioningExistingSkill() throws Exception {
+        String namespaceSlug = "test-ns";
+        String publisherId = "user-100";
+        String skillMdContent = "---\nname: test-skill\ndescription: Test\n---\nBody";
+
+        PackageEntry skillMd = new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown");
+        List<PackageEntry> entries = List.of(skillMd);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
+        setId(namespace, 1L);
+        NamespaceMember member = mock(NamespaceMember.class);
+        SkillMetadata metadata = new SkillMetadata("test-skill", "Test", null, "Body", Map.of());
+
+        Skill existing = new Skill(1L, "test-skill", publisherId, SkillVisibility.PUBLIC);
+        setId(existing, 7L);
+        SkillVersion older = new SkillVersion(7L, "0.1.0", publisherId);
+        SkillVersion newer = new SkillVersion(7L, "0.2.0", publisherId);
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(namespaceMemberRepository.findByNamespaceIdAndUserId(any(), eq(publisherId))).thenReturn(Optional.of(member));
+        when(skillPackageValidator.validate(entries)).thenReturn(ValidationResult.pass());
+        when(skillMetadataParser.parse(skillMdContent)).thenReturn(metadata);
+        when(prePublishValidator.validate(any())).thenReturn(ValidationResult.pass());
+        when(skillRepository.findByNamespaceIdAndSlug(any(), eq("test-skill"))).thenReturn(List.of(existing));
+        when(skillRepository.findByNamespaceIdAndSlugAndOwnerId(any(), eq("test-skill"), eq(publisherId)))
+                .thenReturn(Optional.of(existing));
+        when(skillVersionRepository.findBySkillId(7L)).thenReturn(List.of(older, newer));
+        when(skillVersionRepository.findBySkillIdAndVersion(any(), eq("0.2.1"))).thenReturn(Optional.empty());
+        when(skillRepository.save(any())).thenReturn(existing);
+        when(skillVersionRepository.save(any(SkillVersion.class))).thenAnswer(invocation -> {
+            SkillVersion saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                setId(saved, 11L);
+            }
+            return saved;
+        });
+
+        SkillPublishService.PublishResult result = service.publishFromEntries(
+                namespaceSlug, entries, publisherId, SkillVisibility.PUBLIC, Set.of());
+
+        assertEquals("0.2.1", result.version().getVersion());
     }
 
     @Test

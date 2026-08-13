@@ -56,8 +56,17 @@ public class NamespacePortalQueryAppService {
 
     @Transactional(readOnly = true)
     public PageResponse<NamespaceResponse> listNamespaces(Pageable pageable, Map<Long, NamespaceRole> userNamespaceRoles) {
+        return listNamespaces(pageable, userNamespaceRoles, Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<NamespaceResponse> listNamespaces(
+            Pageable pageable,
+            Map<Long, NamespaceRole> userNamespaceRoles,
+            Set<String> platformRoles) {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
-        if (namespaceRoles.isEmpty()) {
+        boolean isSuperAdmin = isSuperAdmin(platformRoles);
+        if (namespaceRoles.isEmpty() && !isSuperAdmin) {
             Page<NamespaceResponse> empty = new PageImpl<>(
                     List.of(),
                     PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()),
@@ -66,7 +75,7 @@ public class NamespacePortalQueryAppService {
             return PageResponse.from(empty);
         }
 
-        List<Namespace> scopedNamespaces = namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList()).stream()
+        List<Namespace> scopedNamespaces = loadNamespaces(namespaceRoles, isSuperAdmin).stream()
                 .filter(namespace -> namespace.getStatus() == NamespaceStatus.ACTIVE)
                 .sorted(Comparator.comparing(Namespace::getSlug))
                 .toList();
@@ -84,32 +93,67 @@ public class NamespacePortalQueryAppService {
 
     @Transactional(readOnly = true)
     public List<MyNamespaceResponse> listMyNamespaces(Map<Long, NamespaceRole> userNamespaceRoles) {
+        return listMyNamespaces(userNamespaceRoles, Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyNamespaceResponse> listMyNamespaces(
+            Map<Long, NamespaceRole> userNamespaceRoles,
+            Set<String> platformRoles) {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
-        if (namespaceRoles.isEmpty()) {
+        boolean isSuperAdmin = isSuperAdmin(platformRoles);
+        if (namespaceRoles.isEmpty() && !isSuperAdmin) {
             return List.of();
         }
 
-        return namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList()).stream()
+        return loadNamespaces(namespaceRoles, isSuperAdmin).stream()
                 .sorted(Comparator.comparing(Namespace::getSlug))
-                .map(namespace -> MyNamespaceResponse.from(
-                        namespace,
-                        namespaceRoles.get(namespace.getId()),
-                        namespaceAccessPolicy,
-                        namespaceService.canDelete(namespace, namespaceRoles.get(namespace.getId()))))
+                .map(namespace -> {
+                    NamespaceRole currentRole = namespaceRoles.get(namespace.getId());
+                    return MyNamespaceResponse.from(
+                            namespace,
+                            currentRole,
+                            namespaceAccessPolicy,
+                            namespaceService.canDelete(namespace, currentRole));
+                })
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public NamespaceResponse getNamespace(String slug, String userId, Map<Long, NamespaceRole> userNamespaceRoles) {
+        return getNamespace(slug, userId, userNamespaceRoles, Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    public NamespaceResponse getNamespace(
+            String slug,
+            String userId,
+            Map<Long, NamespaceRole> userNamespaceRoles,
+            Set<String> platformRoles) {
         Map<Long, NamespaceRole> namespaceRoles = userNamespaceRoles != null ? userNamespaceRoles : Map.of();
         Namespace namespace = namespaceService.getNamespaceBySlugForRead(
                 slug,
                 userId,
-                namespaceRoles);
-        if (!namespaceRoles.containsKey(namespace.getId())) {
+                namespaceRoles,
+                platformRoles);
+        if (!namespaceRoles.containsKey(namespace.getId()) && !isSuperAdmin(platformRoles)) {
             throw new DomainForbiddenException("error.namespace.membership.required");
         }
         return NamespaceResponse.from(namespace);
+    }
+
+    private List<Namespace> loadNamespaces(Map<Long, NamespaceRole> namespaceRoles, boolean includeAll) {
+        if (includeAll) {
+            return namespaceRepository.findAll();
+        }
+        if (namespaceRoles.isEmpty()) {
+            return List.of();
+        }
+        return namespaceRepository.findByIdIn(namespaceRoles.keySet().stream().toList());
+    }
+
+    private boolean isSuperAdmin(Set<String> platformRoles) {
+        return platformRoles != null && platformRoles.contains("SUPER_ADMIN");
     }
 
     @Transactional(readOnly = true)

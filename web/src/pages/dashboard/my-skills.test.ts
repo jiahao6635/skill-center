@@ -126,6 +126,7 @@ describe('MySkillsPage', () => {
             downloadCount: 42,
             status: 'PUBLISHED',
             visibility: 'PRIVATE',
+            updatedAt: '2026-08-13T15:04:09',
             canSubmitPromotion: false,
           },
         ],
@@ -151,6 +152,13 @@ describe('MySkillsPage', () => {
         visibility: 'PRIVATE',
       },
     })
+  })
+
+  it('shows last modified time in compact format', () => {
+    const html = renderToStaticMarkup(createElement(MySkillsPage))
+
+    expect(html).toContain('mySkills.updatedAt')
+    expect(html).toContain('2026-08-13 15:04')
   })
 
   it('does not render update action for archived skills', () => {

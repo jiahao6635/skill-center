@@ -21,6 +21,8 @@ import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.dto.MemberResponse;
+import com.iflytek.skillhub.dto.MyNamespaceResponse;
+import com.iflytek.skillhub.dto.NamespaceResponse;
 import com.iflytek.skillhub.dto.PageResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
@@ -67,7 +69,7 @@ class NamespacePortalQueryAppServiceTest {
         var response = service.listMyNamespaces(Map.of(
                 2L, NamespaceRole.ADMIN,
                 1L, NamespaceRole.OWNER
-        ));
+        ), Set.of());
 
         assertThat(response).hasSize(2);
         assertThat(response.get(0).slug()).isEqualTo("alpha");
@@ -93,7 +95,8 @@ class NamespacePortalQueryAppServiceTest {
                         1L, NamespaceRole.MEMBER,
                         2L, NamespaceRole.ADMIN,
                         3L, NamespaceRole.OWNER
-                )
+                ),
+                Set.of()
         );
 
         assertThat(response.items()).hasSize(2);
@@ -104,11 +107,55 @@ class NamespacePortalQueryAppServiceTest {
     @Test
     void getNamespace_throwsWhenCurrentUserIsNotNamespaceMember() {
         Namespace namespace = namespace(1L, "team-a");
-        when(namespaceService.getNamespaceBySlugForRead("team-a", "user-1", Map.of()))
+        when(namespaceService.getNamespaceBySlugForRead("team-a", "user-1", Map.of(), Set.of()))
                 .thenReturn(namespace);
 
-        assertThatThrownBy(() -> service.getNamespace("team-a", "user-1", Map.of()))
+        assertThatThrownBy(() -> service.getNamespace("team-a", "user-1", Map.of(), Set.of()))
                 .isInstanceOf(DomainForbiddenException.class);
+    }
+
+    @Test
+    void listNamespaces_superAdminSeesActiveNamespacesTheyDoNotBelongTo() {
+        Namespace teamA = namespace(1L, "team-a");
+        Namespace teamB = namespace(2L, "team-b");
+        Namespace archived = namespace(3L, "archived");
+        archived.setStatus(NamespaceStatus.ARCHIVED);
+
+        when(namespaceRepository.findAll()).thenReturn(List.of(teamB, archived, teamA));
+
+        var response = service.listNamespaces(PageRequest.of(0, 10), Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertThat(response.items()).extracting(NamespaceResponse::slug)
+                .containsExactly("team-a", "team-b");
+    }
+
+    @Test
+    void listMyNamespaces_superAdminSeesNamespacesWithoutMembership() {
+        Namespace teamA = namespace(1L, "team-a");
+        Namespace teamB = namespace(2L, "team-b");
+        when(namespaceRepository.findAll()).thenReturn(List.of(teamB, teamA));
+        when(namespaceAccessPolicy.isImmutable(any())).thenReturn(false);
+        when(namespaceAccessPolicy.canFreeze(any(), any())).thenReturn(false);
+        when(namespaceAccessPolicy.canUnfreeze(any(), any())).thenReturn(false);
+        when(namespaceAccessPolicy.canArchive(any(), any())).thenReturn(false);
+        when(namespaceAccessPolicy.canRestore(any(), any())).thenReturn(false);
+        when(namespaceService.canDelete(any(), any())).thenReturn(false);
+
+        var response = service.listMyNamespaces(Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertThat(response).extracting(MyNamespaceResponse::slug).containsExactly("team-a", "team-b");
+        assertThat(response.get(0).currentUserRole()).isNull();
+    }
+
+    @Test
+    void getNamespace_allowsSuperAdminWithoutMembership() {
+        Namespace namespace = namespace(1L, "team-a");
+        when(namespaceService.getNamespaceBySlugForRead("team-a", "admin-1", Map.of(), Set.of("SUPER_ADMIN")))
+                .thenReturn(namespace);
+
+        var response = service.getNamespace("team-a", "admin-1", Map.of(), Set.of("SUPER_ADMIN"));
+
+        assertThat(response.slug()).isEqualTo("team-a");
     }
 
     private Namespace namespace(Long id, String slug) {

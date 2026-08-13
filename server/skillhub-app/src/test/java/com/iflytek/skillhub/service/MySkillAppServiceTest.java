@@ -363,6 +363,27 @@ class MySkillAppServiceTest {
         assertThat(result.items()).extracting("slug").containsExactly("ai-alpha");
     }
 
+    @Test
+    void listMySkills_sortsFilteredResultsByUpdatedAtDescending() {
+        Skill older = createSkill(1L, 101L, "older-skill", "user-1");
+        ReflectionTestUtils.setField(older, "updatedAt", Instant.parse("2026-03-10T10:00:00Z"));
+        Skill newer = createSkill(2L, 101L, "newer-skill", "user-1");
+        ReflectionTestUtils.setField(newer, "updatedAt", Instant.parse("2026-03-16T10:00:00Z"));
+        SkillVersion olderVersion = createVersion(1L, 10L, "1.0.0", SkillVersionStatus.PUBLISHED, "2026-03-10T09:30:00Z");
+        SkillVersion newerVersion = createVersion(2L, 20L, "1.0.0", SkillVersionStatus.PUBLISHED, "2026-03-16T09:30:00Z");
+
+        given(skillRepository.findByOwnerId("user-1")).willReturn(List.of(older, newer));
+        given(skillVersionRepository.findBySkillIdAndStatus(1L, SkillVersionStatus.PUBLISHED)).willReturn(List.of(olderVersion));
+        given(skillVersionRepository.findBySkillIdAndStatus(2L, SkillVersionStatus.PUBLISHED)).willReturn(List.of(newerVersion));
+        given(skillVersionRepository.findBySkillId(1L)).willReturn(List.of(olderVersion));
+        given(skillVersionRepository.findBySkillId(2L)).willReturn(List.of(newerVersion));
+        given(namespaceRepository.findByIdIn(List.of(101L))).willReturn(List.of(namespace(101L, "team-ai")));
+
+        var result = service.listMySkills("user-1", 0, 10, "PUBLISHED", Set.of("USER"));
+
+        assertThat(result.items()).extracting("slug").containsExactly("newer-skill", "older-skill");
+    }
+
 
     private Skill createSkill(Long id, Long namespaceId, String slug, String ownerId) {
         Skill skill = new Skill(namespaceId, slug, ownerId, SkillVisibility.PUBLIC);

@@ -39,8 +39,6 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
@@ -60,8 +58,7 @@ import java.util.zip.ZipOutputStream;
 @Service
 public class SkillPublishService {
 
-    private static final DateTimeFormatter AUTO_VERSION_FORMATTER =
-            DateTimeFormatter.ofPattern("yyyyMMdd.HHmmss").withZone(ZoneId.systemDefault());
+    private static final String INITIAL_AUTO_VERSION = "0.1.0";
     private static final Logger log = LoggerFactory.getLogger(SkillPublishService.class);
 
     public record PublishResult(
@@ -201,17 +198,17 @@ public class SkillPublishService {
             return new DryRunResult(false, errors, warnings, null, null);
         }
 
-        if (metadata.version() == null || metadata.version().isBlank()) {
-            resolvedVersion = AUTO_VERSION_FORMATTER.format(currentTime());
-        } else {
-            resolvedVersion = metadata.version();
-        }
-
         try {
             resolvedSlug = SlugValidator.slugify(metadata.name());
         } catch (Exception e) {
             errors.add("Invalid skill name for slug generation: " + e.getMessage());
             return new DryRunResult(false, errors, warnings, resolvedSlug, resolvedVersion);
+        }
+
+        if (metadata.version() == null || metadata.version().isBlank()) {
+            resolvedVersion = resolveAutoVersion(namespace.getId(), resolvedSlug, publisherId);
+        } else {
+            resolvedVersion = metadata.version();
         }
 
         // 5. Pre-publish validation (credential scan)
@@ -361,11 +358,11 @@ public class SkillPublishService {
 
         String skillMdContent = new String(skillMd.content());
         SkillMetadata metadata = skillMetadataParser.parse(skillMdContent);
+        String skillSlug = SlugValidator.slugify(metadata.name());
         if (metadata.version() == null || metadata.version().isBlank()) {
-            String autoVersion = AUTO_VERSION_FORMATTER.format(currentTime());
+            String autoVersion = resolveAutoVersion(namespace.getId(), skillSlug, publisherId);
             metadata = new SkillMetadata(metadata.name(), metadata.description(), autoVersion, metadata.body(), metadata.frontmatter());
         }
-        String skillSlug = SlugValidator.slugify(metadata.name());
 
         // 5. Run PrePublishValidator
         PrePublishValidator.SkillPackageContext context = new PrePublishValidator.SkillPackageContext(
@@ -563,6 +560,98 @@ public class SkillPublishService {
 
         // 13. Return identifiers for the created version
         return new PublishResult(skill.getId(), skill.getSlug(), version);
+    }
+
+    private String resolveAutoVersion(Long namespaceId, String skillSlug, String publisherId) {
+        if (skillSlug == null || skillSlug.isBlank()) {
+            return INITIAL_AUTO_VERSION;
+        }
+        return skillRepository.findByNamespaceIdAndSlugAndOwnerId(namespaceId, skillSlug, publisherId)
+                .map(this::nextAutoVersion)
+                .orElse(INITIAL_AUTO_VERSION);
+    }
+
+    private String nextAutoVersion(Skill skill) {
+        return skillVersionRepository.findBySkillId(skill.getId()).stream()
+                .map(SkillVersion::getVersion)
+                .max(this::compareSemver)
+                .map(this::bumpPatchOrFallback)
+                .orElse(INITIAL_AUTO_VERSION);
+    }
+
+    private String bumpPatchOrFallback(String currentVersion) {
+        Semver parsed = Semver.tryParse(currentVersion);
+        if (parsed == null) {
+            return INITIAL_AUTO_VERSION;
+        }
+        return parsed.bumpPatch().toString();
+    }
+
+    private int compareSemver(String left, String right) {
+        Semver leftVersion = Semver.tryParse(left);
+        Semver rightVersion = Semver.tryParse(right);
+        if (leftVersion == null && rightVersion == null) {
+            return 0;
+        }
+        if (leftVersion == null) {
+            return -1;
+        }
+        if (rightVersion == null) {
+            return 1;
+        }
+        return leftVersion.compareTo(rightVersion);
+    }
+
+    private record Semver(int major, int minor, int patch) implements Comparable<Semver> {
+        static Semver tryParse(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return null;
+            }
+            String core = raw.strip();
+            int plus = core.indexOf('+');
+            if (plus >= 0) {
+                core = core.substring(0, plus);
+            }
+            int dash = core.indexOf('-');
+            if (dash >= 0) {
+                core = core.substring(0, dash);
+            }
+            String[] parts = core.split("\\.");
+            if (parts.length != 3) {
+                return null;
+            }
+            try {
+                return new Semver(
+                        Integer.parseInt(parts[0]),
+                        Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[2])
+                );
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+
+        Semver bumpPatch() {
+            return new Semver(major, minor, patch + 1);
+        }
+
+        @Override
+        public int compareTo(Semver other) {
+            int majorCompare = Integer.compare(major, other.major);
+            if (majorCompare != 0) {
+                return majorCompare;
+            }
+            int minorCompare = Integer.compare(minor, other.minor);
+            if (minorCompare != 0) {
+                return minorCompare;
+            }
+            return Integer.compare(patch, other.patch);
+        }
+
+        @Override
+        public String toString() {
+            return major + "." + minor + "." + patch;
+        }
     }
 
     private void deleteReplaceableVersionArtifacts(Skill skill, SkillVersion version, String namespaceSlug) {

@@ -199,6 +199,9 @@
     "resultCount": "Found <1>{{count}}</1> results",
     "loadingMore": "Updating search results..."
   },
+  "skill": {
+    "updatedAt": "Last modified"
+  },
   "searchBar": {
     "placeholder": "Search skills...",
     "button": "Search",
@@ -395,6 +398,7 @@
     "statusHidden": "Hidden",
     "statusScanning": "Scanning",
     "statusScanFailed": "Scan Failed",
+    "updatedAt": "Last modified",
     "archiveConfirmTitle": "Archive skill",
     "archiveConfirmDescription": "After archiving, regular users will no longer be able to view or download \"{{skill}}\". Continue?",
     "unarchiveConfirmTitle": "Restore skill",

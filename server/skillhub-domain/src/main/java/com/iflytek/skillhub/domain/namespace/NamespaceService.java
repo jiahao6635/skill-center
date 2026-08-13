@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Domain service for namespace lifecycle and membership-gated mutations.
@@ -99,8 +100,19 @@ public class NamespaceService {
      * all other callers see archived namespaces as not found.
      */
     public Namespace getNamespaceBySlugForRead(String slug, String userId, Map<Long, NamespaceRole> userNsRoles) {
+        return getNamespaceBySlugForRead(slug, userId, userNsRoles, Set.of());
+    }
+
+    public Namespace getNamespaceBySlugForRead(
+            String slug,
+            String userId,
+            Map<Long, NamespaceRole> userNsRoles,
+            Set<String> platformRoles) {
         Namespace namespace = getNamespaceBySlug(slug);
         if (namespace.getStatus() != NamespaceStatus.ARCHIVED) {
+            return namespace;
+        }
+        if (platformRoles != null && platformRoles.contains("SUPER_ADMIN")) {
             return namespace;
         }
         if (userId != null && userNsRoles != null && userNsRoles.containsKey(namespace.getId())) {
