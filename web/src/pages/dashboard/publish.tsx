@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { UploadZone } from '@/features/publish/upload-zone.tsx'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs.tsx'
+import { Input } from '@/shared/ui/input.tsx'
 import {
   extractPrecheckWarnings,
   isFrontmatterFailureMessage,
@@ -29,13 +31,16 @@ import { toast } from '@/shared/lib/toast.ts'
 import { ApiError } from '@/api/client.ts'
 
 const EMPTY_NAMESPACE_VALUE = '__select_namespace__'
+type PublishSource = 'upload' | 'link'
 
 export function PublishPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const search = useSearch({ from: '/dashboard/publish' })
   const prefill = normalizePublishPrefill(search)
+  const [source, setSource] = useState<PublishSource>('upload')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [shareUrl, setShareUrl] = useState('')
   const [namespaceSlug, setNamespaceSlug] = useState<string>(prefill.namespace)
   const [visibility, setVisibility] = useState<string>(prefill.visibility)
   const [warningDialogOpen, setWarningDialogOpen] = useState(false)
@@ -65,16 +70,28 @@ export function PublishPage() {
     setWarningDialogOpen(false)
   }
 
+  const handleSourceChange = (value: string) => {
+    setSource(value === 'link' ? 'link' : 'upload')
+    setPrecheckWarnings([])
+    setWarningDialogOpen(false)
+  }
+
+  const trimmedShareUrl = shareUrl.trim()
+  const canPublish = Boolean(
+    namespaceSlug && (source === 'link' ? trimmedShareUrl : selectedFile),
+  )
+
   const publishSkill = async (confirmWarnings = false) => {
-    if (!selectedFile || !namespaceSlug) {
-      toast.error(t('publish.selectRequired'))
+    if (!canPublish) {
+      toast.error(source === 'link' ? t('publish.selectRequiredLink') : t('publish.selectRequired'))
       return
     }
 
     try {
       const result = await publishMutation.mutateAsync({
         namespace: namespaceSlug,
-        file: selectedFile,
+        file: source === 'upload' ? selectedFile ?? undefined : undefined,
+        url: source === 'link' ? trimmedShareUrl : undefined,
         visibility,
         confirmWarnings,
       })
@@ -195,40 +212,65 @@ export function PublishPage() {
         </div>
 
         <div className="space-y-3">
-          <Label className="text-sm font-semibold font-heading">{t('publish.file')}</Label>
-          <UploadZone
-            key={selectedFile ? `${selectedFile.name}-${selectedFile.lastModified}` : 'empty'}
-            onFileSelect={handleFileSelect}
-            disabled={publishMutation.isPending}
-          />
-          {selectedFile && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 px-4 py-3">
-              <div className="min-w-0 text-sm text-muted-foreground flex items-center gap-2">
-                <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="truncate">
-                  {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                </span>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleRemoveSelectedFile}
+          <Label className="text-sm font-semibold font-heading">{t('publish.source')}</Label>
+          <Tabs value={source} onValueChange={handleSourceChange}>
+            <TabsList className="w-full">
+              <TabsTrigger value="upload">{t('publish.sourceUpload')}</TabsTrigger>
+              <TabsTrigger value="link">{t('publish.sourceLink')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload" className="space-y-3 pt-4">
+              <Label className="text-sm font-semibold font-heading">{t('publish.file')}</Label>
+              <UploadZone
+                key={selectedFile ? `${selectedFile.name}-${selectedFile.lastModified}` : 'empty'}
+                onFileSelect={handleFileSelect}
                 disabled={publishMutation.isPending}
-              >
-                {t('publish.removeSelectedFile')}
-              </Button>
-            </div>
-          )}
+              />
+              {selectedFile && (
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 px-4 py-3">
+                  <div className="min-w-0 text-sm text-muted-foreground flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="truncate">
+                      {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemoveSelectedFile}
+                    disabled={publishMutation.isPending}
+                  >
+                    {t('publish.removeSelectedFile')}
+                  </Button>
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="link" className="space-y-3 pt-4">
+              <Label htmlFor="share-url" className="text-sm font-semibold font-heading">{t('publish.url')}</Label>
+              <Input
+                id="share-url"
+                type="url"
+                value={shareUrl}
+                onChange={(event) => {
+                  setShareUrl(event.target.value)
+                  setPrecheckWarnings([])
+                  setWarningDialogOpen(false)
+                }}
+                placeholder={t('publish.urlPlaceholder')}
+                disabled={publishMutation.isPending}
+              />
+              <p className="text-xs text-muted-foreground">{t('publish.urlHint')}</p>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <Button
           className="w-full text-primary-foreground disabled:text-primary-foreground"
           size="lg"
           onClick={handlePublish}
-          disabled={!selectedFile || !namespaceSlug || publishMutation.isPending}
+          disabled={!canPublish || publishMutation.isPending}
         >
           {publishMutation.isPending ? t('publish.publishing') : t('publish.confirm')}
         </Button>

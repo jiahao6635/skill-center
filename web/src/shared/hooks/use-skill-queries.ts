@@ -44,12 +44,39 @@ async function getSkillDocumentation(namespace: string, slug: string, version: s
   return fetchText(`${WEB_API_PREFIX}/skills/${cleanNamespace}/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/file?path=${encodeURIComponent(path)}`)
 }
 
-async function publishSkill(params: { namespace: string; file: File; visibility: string; confirmWarnings?: boolean }): Promise<PublishResult> {
+export type PublishSkillParams = {
+  namespace: string
+  visibility: string
+  confirmWarnings?: boolean
+  file?: File
+  url?: string
+}
+
+async function publishSkill(params: PublishSkillParams): Promise<PublishResult> {
   const cleanNamespace = params.namespace.startsWith('@') ? params.namespace.slice(1) : params.namespace
+  const confirmWarnings = params.confirmWarnings === true
+
+  if (params.url?.trim()) {
+    return fetchJson<PublishResult>(`${WEB_API_PREFIX}/skills/${cleanNamespace}/publish-from-url`, {
+      method: 'POST',
+      headers: getCsrfHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        url: params.url.trim(),
+        visibility: params.visibility,
+        confirmWarnings,
+      }),
+      timeoutMs: PUBLISH_REQUEST_TIMEOUT_MS,
+    })
+  }
+
+  if (!params.file) {
+    throw new Error('A skill package file or share URL is required')
+  }
+
   const formData = new FormData()
   formData.append('file', params.file)
   formData.append('visibility', params.visibility)
-  formData.append('confirmWarnings', String(params.confirmWarnings === true))
+  formData.append('confirmWarnings', String(confirmWarnings))
 
   return fetchJson<PublishResult>(`${WEB_API_PREFIX}/skills/${cleanNamespace}/publish`, {
     method: 'POST',

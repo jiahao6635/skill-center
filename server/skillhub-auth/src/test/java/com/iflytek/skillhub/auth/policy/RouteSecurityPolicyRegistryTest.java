@@ -20,6 +20,12 @@ class RouteSecurityPolicyRegistryTest {
         assertFalse(denied.allowed());
         assertEquals("skill:publish", denied.requiredScope());
         assertTrue(allowed.allowed());
+
+        var urlDenied = registry.authorizeApiToken("POST", "/api/web/skills/global/publish-from-url", Set.of("skill:read"));
+        var urlAllowed = registry.authorizeApiToken("POST", "/api/web/skills/global/publish-from-url", Set.of("skill:publish"));
+        assertFalse(urlDenied.allowed());
+        assertEquals("skill:publish", urlDenied.requiredScope());
+        assertTrue(urlAllowed.allowed());
     }
 
     @Test

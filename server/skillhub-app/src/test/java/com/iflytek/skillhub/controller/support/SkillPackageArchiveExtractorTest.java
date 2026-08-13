@@ -29,6 +29,18 @@ class SkillPackageArchiveExtractorTest {
     }
 
     @Test
+    void extractFromBytesMatchesMultipartExtraction() throws Exception {
+        byte[] zip = createZip("SKILL.md", "---\nname: Demo\n---\n");
+
+        List<PackageEntry> fromBytes = extractor.extract(zip);
+        List<PackageEntry> fromMultipart = extractor.extract(new MockMultipartFile(
+                "file", "skill.zip", "application/zip", zip));
+
+        assertEquals(1, fromBytes.size());
+        assertEquals(fromMultipart.get(0).path(), fromBytes.get(0).path());
+    }
+
+    @Test
     void shouldRejectPathTraversalEntry() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
             "file",

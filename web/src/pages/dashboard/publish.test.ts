@@ -48,6 +48,17 @@ vi.mock('@/shared/ui/card', () => ({
   Card: ({ children }: { children: unknown }) => children,
 }))
 
+vi.mock('@/shared/ui/tabs', () => ({
+  Tabs: ({ children }: { children: unknown }) => children,
+  TabsList: ({ children }: { children: unknown }) => children,
+  TabsTrigger: ({ children }: { children: unknown }) => children,
+  TabsContent: ({ children }: { children: unknown }) => children,
+}))
+
+vi.mock('@/shared/ui/input', () => ({
+  Input: () => null,
+}))
+
 vi.mock('@/shared/hooks/use-skill-queries', () => ({
   usePublishSkill: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
@@ -58,6 +69,10 @@ vi.mock('@/shared/hooks/use-namespace-queries', () => ({
 
 vi.mock('@/shared/components/dashboard-page-header', () => ({
   DashboardPageHeader: () => null,
+}))
+
+vi.mock('@/shared/components/confirm-dialog', () => ({
+  ConfirmDialog: () => null,
 }))
 
 vi.mock('@/shared/lib/toast', () => ({
@@ -99,5 +114,12 @@ describe('PublishPage', () => {
 
   it('exports a named component function', () => {
     expect(typeof PublishPage).toBe('function')
+  })
+
+  it('renders paste-link publish entry', () => {
+    const html = renderToStaticMarkup(createElement(PublishPage))
+
+    expect(html).toContain('publish.sourceLink')
+    expect(html).toContain('publish.urlHint')
   })
 })
