@@ -85,6 +85,9 @@ class SkillReviewSubmitServiceTest {
             assertEquals(SkillVersionStatus.PENDING_REVIEW, version.getStatus());
             assertEquals(SkillVisibility.PUBLIC, version.getRequestedVisibility());
             verify(reviewTaskRepository).save(any(ReviewTask.class));
+            // Reviewers must be notified from this path too (in-app + Feishu).
+            verify(eventPublisher).publishEvent(any(
+                    com.iflytek.skillhub.domain.event.ReviewSubmittedEvent.class));
         }
 
         @Test
@@ -112,6 +115,9 @@ class SkillReviewSubmitServiceTest {
             assertEquals(SkillVersionStatus.PENDING_REVIEW, version.getStatus());
             assertEquals(SkillVisibility.PUBLIC, version.getRequestedVisibility());
             verify(reviewTaskRepository).save(any(ReviewTask.class));
+            // Reviewers must be notified from this path too (in-app + Feishu).
+            verify(eventPublisher).publishEvent(any(
+                    com.iflytek.skillhub.domain.event.ReviewSubmittedEvent.class));
         }
 
         @Test

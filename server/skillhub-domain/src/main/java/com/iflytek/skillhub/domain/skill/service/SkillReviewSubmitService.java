@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.domain.skill.service;
 
+import com.iflytek.skillhub.domain.event.ReviewSubmittedEvent;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.review.ReviewTask;
@@ -95,7 +96,12 @@ public class SkillReviewSubmitService {
 
         // Create review task
         ReviewTask reviewTask = new ReviewTask(versionId, skill.getNamespaceId(), actorUserId);
-        reviewTaskRepository.save(reviewTask);
+        ReviewTask saved = reviewTaskRepository.save(reviewTask);
+
+        // Notify reviewers (in-app + Feishu). ReviewService.submitReview emits the
+        // same event; the lifecycle path must too or reviewers get no notification.
+        eventPublisher.publishEvent(new ReviewSubmittedEvent(
+                saved.getId(), skill.getId(), versionId, actorUserId, skill.getNamespaceId()));
     }
 
     /**

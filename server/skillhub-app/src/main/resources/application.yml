@@ -113,6 +113,15 @@ skillhub:
       email-from-name: ${SKILLHUB_AUTH_PASSWORD_RESET_FROM_NAME:SkillHub}
   public:
     base-url: ${SKILLHUB_PUBLIC_BASE_URL:}
+  integration:
+    feishu:
+      # Outbound Feishu bot for the review workflow (interactive cards + callbacks).
+      # Distinct from skillhub.auth.feishu (login); reuses the same app credentials by default.
+      enabled: ${SKILLHUB_INTEGRATION_FEISHU_ENABLED:false}
+      app-id: ${FEISHU_APP_ID:}
+      app-secret: ${FEISHU_APP_SECRET:}
+      verification-token: ${SKILLHUB_INTEGRATION_FEISHU_VERIFICATION_TOKEN:}
+      encrypt-key: ${SKILLHUB_INTEGRATION_FEISHU_ENCRYPT_KEY:}
   access-policy:
     mode: OPEN
   storage:
