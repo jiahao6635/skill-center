@@ -11,7 +11,6 @@ import org.mockito.ArgumentMatchers;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,7 +35,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -220,24 +218,6 @@ class SkillPublishControllerTest {
                 .with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
-    }
-
-    @Test
-    void publishFromUrl_returnsBadRequestForUnsupportedLink() throws Exception {
-        PlatformPrincipal principal = new PlatformPrincipal(
-            "usr_1", "publisher", "publisher@example.com", "", "local", Set.of("SUPER_ADMIN"));
-        var auth = new UsernamePasswordAuthenticationToken(
-            principal, null, List.of(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN")));
-
-        mockMvc.perform(post("/api/v1/skills/global/publish-from-url")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
-                    {"url":"https://example.com/not-supported","visibility":"PUBLIC"}
-                    """)
-                .with(authentication(auth))
-                .with(csrf()))
-            .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.msg").value(org.hamcrest.Matchers.containsString("QoderWork")));
     }
 
     private byte[] buildZipBytes() throws Exception {

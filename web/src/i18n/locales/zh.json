@@ -1394,12 +1394,6 @@
       "private": "私有"
     },
     "file": "技能包文件",
-    "source": "发布方式",
-    "sourceUpload": "上传压缩包",
-    "sourceLink": "粘贴链接",
-    "url": "分享链接",
-    "urlPlaceholder": "https://qoder.com/link/qoder-work/skill/install?shareId=...",
-    "urlHint": "目前支持 QoderWork 技能分享链接。系统会自动下载技能包并走现有发布流程。",
     "removeSelectedFile": "删除已选文件",
     "publishing": "发布中...",
     "confirm": "确认发布",
@@ -1422,8 +1416,7 @@
     "warningConfirmCancel": "返回修改",
     "frontmatterFailedTitle": "SKILL.md 格式有误",
     "frontmatterFailedDescription": "请检查 SKILL.md 顶部 frontmatter 的 YAML 格式。若字段值中包含冒号，请用引号包裹。",
-    "selectRequired": "请选择命名空间和文件",
-    "selectRequiredLink": "请选择命名空间并粘贴分享链接"
+    "selectRequired": "请选择命名空间和文件"
   },
   "toast": {
     "success": "成功",

@@ -6,10 +6,8 @@ import com.iflytek.skillhub.domain.skill.validation.SkillPackagePolicy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -33,24 +31,9 @@ public class SkillPackageArchiveExtractor {
     }
 
     public List<PackageEntry> extract(MultipartFile file) throws IOException {
-        return extract(file.getSize(), file.getInputStream());
-    }
-
-    public List<PackageEntry> extract(byte[] zipBytes) throws IOException {
-        if (zipBytes == null) {
-            throw new IllegalArgumentException("Package is empty");
-        }
-        return extract(zipBytes.length, new ByteArrayInputStream(zipBytes));
-    }
-
-    public ExtractionResult extractWithWarnings(byte[] zipBytes) throws IOException {
-        return promoteSingleSkillMdDirectory(extract(zipBytes));
-    }
-
-    private List<PackageEntry> extract(long declaredSize, InputStream inputStream) throws IOException {
-        if (declaredSize > maxTotalPackageSize) {
+        if (file.getSize() > maxTotalPackageSize) {
             throw new IllegalArgumentException(
-                    "Package too large: " + declaredSize + " bytes (max: "
+                    "Package too large: " + file.getSize() + " bytes (max: "
                             + maxTotalPackageSize + ")"
             );
         }
@@ -58,7 +41,7 @@ public class SkillPackageArchiveExtractor {
         List<PackageEntry> entries = new ArrayList<>();
         long totalSize = 0;
 
-        try (ZipInputStream zis = new ZipInputStream(inputStream)) {
+        try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
             ZipEntry zipEntry;
             while ((zipEntry = zis.getNextEntry()) != null) {
                 if (zipEntry.isDirectory()) {

@@ -660,38 +660,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/web/skills/{namespace}/publish-from-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["publishFromUrl"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/skills/{namespace}/publish-from-url": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["publishFromUrl_1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/web/reviews/{id}/withdraw": {
         parameters: {
             query?: never;
@@ -3630,11 +3598,6 @@ export interface components {
         SkillReportSubmitRequest: {
             reason?: string;
             details?: string;
-        };
-        PublishFromUrlRequest: {
-            url: string;
-            visibility: string;
-            confirmWarnings?: boolean;
         };
         ApiResponseSkillReportMutationResponse: {
             /** Format: int32 */
@@ -6612,58 +6575,6 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                 };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
-                };
-            };
-        };
-    };
-    publishFromUrl: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                namespace: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishFromUrlRequest"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
-                };
-            };
-        };
-    };
-    publishFromUrl_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                namespace: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PublishFromUrlRequest"];
             };
         };
         responses: {

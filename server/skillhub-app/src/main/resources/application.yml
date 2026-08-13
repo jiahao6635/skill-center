@@ -167,30 +167,6 @@ skillhub:
     max-package-size: 104857600 # 100MB
     # allowed-file-extensions: uses SkillPackagePolicy.ALLOWED_EXTENSIONS by default
     # Override via SKILLHUB_PUBLISH_ALLOWED_FILE_EXTENSIONS env var if needed
-    share-link:
-      connect-timeout: 5s
-      request-timeout: 30s
-      max-redirects: 5
-      qoderwork:
-        enabled: ${SKILLHUB_PUBLISH_QODERWORK_ENABLED:true}
-        access-token: ${SKILLHUB_PUBLISH_QODERWORK_ACCESS_TOKEN:}
-        api-bases:
-          - https://openapi.qoder.com.cn
-          - https://openapi.qoder.sh
-          - https://api.qoder.com
-        allowed-hosts:
-          - qoder.com
-          - qoder.com.cn
-          - qoder.sh
-          - aliyuncs.com
-          - aliyun.com
-          - alicdn.com
-          - aliapp.org
-          - qiniucdn.com
-          - qiniucs.com
-          - myqcloud.com
-          - volces.com
-          - openstorage.cn
   profile:
     moderation:
       machine-review: ${SKILLHUB_PROFILE_MACHINE_REVIEW_ENABLED:true} # Enable machine review (e.g. sensitive word detection)

@@ -1393,12 +1393,6 @@
       "private": "Private"
     },
     "file": "Skill Package File",
-    "source": "Publish method",
-    "sourceUpload": "Upload zip",
-    "sourceLink": "Paste link",
-    "url": "Share link",
-    "urlPlaceholder": "https://qoder.com/link/qoder-work/skill/install?shareId=...",
-    "urlHint": "QoderWork skill share links are supported. SkillHub downloads the package and continues the existing publish flow.",
     "removeSelectedFile": "Remove selected file",
     "publishing": "Publishing...",
     "confirm": "Confirm Publish",
@@ -1421,8 +1415,7 @@
     "warningConfirmCancel": "Go back and fix",
     "frontmatterFailedTitle": "SKILL.md format is invalid",
     "frontmatterFailedDescription": "Please check the YAML frontmatter at the top of SKILL.md. If a field value contains a colon, wrap it in quotes.",
-    "selectRequired": "Please select namespace and file",
-    "selectRequiredLink": "Please select a namespace and paste a share link"
+    "selectRequired": "Please select namespace and file"
   },
   "toast": {
     "success": "Success",

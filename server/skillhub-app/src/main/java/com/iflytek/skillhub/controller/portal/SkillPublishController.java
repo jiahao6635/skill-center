@@ -9,13 +9,9 @@ import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
-import com.iflytek.skillhub.dto.PublishFromUrlRequest;
 import com.iflytek.skillhub.dto.PublishResponse;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
 import com.iflytek.skillhub.ratelimit.RateLimit;
-import com.iflytek.skillhub.service.sharelink.SkillShareLinkPublishService;
-import io.swagger.v3.oas.annotations.Operation;
-import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,18 +31,15 @@ public class SkillPublishController extends BaseApiController {
 
     private final SkillPublishService skillPublishService;
     private final SkillPackageArchiveExtractor skillPackageArchiveExtractor;
-    private final SkillShareLinkPublishService skillShareLinkPublishService;
     private final SkillHubMetrics skillHubMetrics;
 
     public SkillPublishController(SkillPublishService skillPublishService,
                                   SkillPackageArchiveExtractor skillPackageArchiveExtractor,
-                                  SkillShareLinkPublishService skillShareLinkPublishService,
                                   ApiResponseFactory responseFactory,
                                   SkillHubMetrics skillHubMetrics) {
         super(responseFactory);
         this.skillPublishService = skillPublishService;
         this.skillPackageArchiveExtractor = skillPackageArchiveExtractor;
-        this.skillShareLinkPublishService = skillShareLinkPublishService;
         this.skillHubMetrics = skillHubMetrics;
     }
 
@@ -102,20 +95,6 @@ public class SkillPublishController extends BaseApiController {
         );
         skillHubMetrics.incrementSkillPublish(namespace, publishResult.version().getStatus().name());
 
-        return ok("response.success.published", response);
-    }
-
-    /**
-     * Resolves a supported skill share URL, downloads the package, and publishes it.
-     */
-    @PostMapping("/{namespace}/publish-from-url")
-    @Operation(operationId = "publishFromUrl")
-    @RateLimit(category = "publish", authenticated = 10, anonymous = 0)
-    public ApiResponse<PublishResponse> publishFromUrl(
-            @PathVariable String namespace,
-            @Valid @RequestBody PublishFromUrlRequest request,
-            @AuthenticationPrincipal PlatformPrincipal principal) {
-        PublishResponse response = skillShareLinkPublishService.publish(namespace, request, principal);
         return ok("response.success.published", response);
     }
 }
