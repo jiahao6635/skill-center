@@ -74,17 +74,14 @@ public class FeishuReviewListener {
     }
 
     /**
-     * Reviewers eligible to act: namespace OWNER/ADMIN for TEAM namespaces, and
-     * always platform SKILL_ADMIN/SUPER_ADMIN (the only reviewers for GLOBAL).
+     * Feishu 通知范围：仅 TEAM 命名空间的技能，且只发给该命名空间的 OWNER/ADMIN。
+     * GLOBAL 命名空间（以及查不到命名空间的情况）一律不发；平台管理员也不再发。
      */
     private Set<String> resolveReviewers(Long namespaceId) {
-        Set<String> reviewers = new LinkedHashSet<>();
         Namespace namespace = namespaceRepository.findById(namespaceId).orElse(null);
-        boolean global = namespace != null && namespace.getType() == NamespaceType.GLOBAL;
-        if (!global) {
-            reviewers.addAll(recipientResolver.resolveNamespaceAdmins(namespaceId));
+        if (namespace == null || namespace.getType() != NamespaceType.TEAM) {
+            return Set.of();
         }
-        reviewers.addAll(recipientResolver.resolvePlatformSkillAdmins());
-        return reviewers;
+        return new LinkedHashSet<>(recipientResolver.resolveNamespaceAdmins(namespaceId));
     }
 }

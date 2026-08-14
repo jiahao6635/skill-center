@@ -34,32 +34,34 @@ class FeishuReviewListenerTest {
     }
 
     @Test
-    void teamNamespace_sendsToNamespaceAdminsAndPlatformAdmins() {
+    void teamNamespace_sendsOnlyToNamespaceAdmins() {
         Namespace ns = mock(Namespace.class);
         when(ns.getType()).thenReturn(NamespaceType.TEAM);
         when(namespaceRepository.findById(5L)).thenReturn(Optional.of(ns));
         when(messenger.buildContext(7L)).thenReturn(ctx());
         when(recipientResolver.resolveNamespaceAdmins(5L)).thenReturn(List.of("nsAdmin"));
-        when(recipientResolver.resolvePlatformSkillAdmins()).thenReturn(List.of("platformAdmin"));
 
         listener.onReviewSubmitted(new ReviewSubmittedEvent(7L, 1L, 2L, "alice", 5L));
 
         verify(messenger).sendActionCard(eq("nsAdmin"), any());
-        verify(messenger).sendActionCard(eq("platformAdmin"), any());
+        // 平台管理员不再收到飞书通知
+        verify(recipientResolver, never()).resolvePlatformSkillAdmins();
+        verify(messenger, never()).sendActionCard(eq("platformAdmin"), any());
     }
 
     @Test
-    void globalNamespace_sendsOnlyToPlatformAdmins() {
+    void globalNamespace_sendsToNobody() {
         Namespace ns = mock(Namespace.class);
         when(ns.getType()).thenReturn(NamespaceType.GLOBAL);
         when(namespaceRepository.findById(5L)).thenReturn(Optional.of(ns));
         when(messenger.buildContext(7L)).thenReturn(ctx());
-        when(recipientResolver.resolvePlatformSkillAdmins()).thenReturn(List.of("platformAdmin"));
 
         listener.onReviewSubmitted(new ReviewSubmittedEvent(7L, 1L, 2L, "alice", 5L));
 
+        // GLOBAL 命名空间技能一律不发飞书
         verify(recipientResolver, never()).resolveNamespaceAdmins(any());
-        verify(messenger).sendActionCard(eq("platformAdmin"), any());
+        verify(recipientResolver, never()).resolvePlatformSkillAdmins();
+        verify(messenger, never()).sendActionCard(any(), any());
     }
 
     @Test
