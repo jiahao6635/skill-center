@@ -29,7 +29,6 @@ public class RouteSecurityPolicyRegistry {
             RouteAuthorizationPolicy.permitAll(null, "/api/v1/auth/device/**"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/login/oauth2/feishu"),
             RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/login/oauth2/feishu/callback"),
-            RouteAuthorizationPolicy.permitAll(HttpMethod.POST, "/api/feishu/card-callback"),
             RouteAuthorizationPolicy.permitAll(null, "/api/v1/check"),
             RouteAuthorizationPolicy.permitAll(null, "/actuator/health"),
             RouteAuthorizationPolicy.permitAll(null, "/v3/api-docs/**"),
@@ -97,7 +96,6 @@ public class RouteSecurityPolicyRegistry {
             ApiTokenPolicy.allow(null, "/api/v1/auth/me"),
             ApiTokenPolicy.allow(null, "/api/v1/auth/device/**"),
             ApiTokenPolicy.allow(null, "/api/v1/check"),
-            ApiTokenPolicy.allow(HttpMethod.POST, "/api/feishu/card-callback"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/whoami"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/search"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/v1/skills"),
@@ -171,10 +169,7 @@ public class RouteSecurityPolicyRegistry {
             return false;
         }
         return "/api/v1/auth/device/code".equals(path)
-                || "/api/v1/auth/device/token".equals(path)
-                // Feishu card callback is authenticated by verification token/signature,
-                // not a session, and has no CSRF token to present.
-                || "/api/feishu/card-callback".equals(path);
+                || "/api/v1/auth/device/token".equals(path);
     }
 
     public boolean shouldProjectRequestContext(String path) {

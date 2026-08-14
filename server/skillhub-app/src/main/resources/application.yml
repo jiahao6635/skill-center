@@ -115,13 +115,15 @@ skillhub:
     base-url: ${SKILLHUB_PUBLIC_BASE_URL:}
   integration:
     feishu:
-      # Outbound Feishu bot for the review workflow (interactive cards + callbacks).
+      # Feishu bot for the review workflow: sends interactive review cards and
+      # receives card actions over a WebSocket long connection (no public inbound
+      # endpoint required — the backend only needs outbound network access).
       # Distinct from skillhub.auth.feishu (login); reuses the same app credentials by default.
+      # Only app-id/app-secret are needed for the long connection; the long
+      # connection handles encryption/verification internally.
       enabled: ${SKILLHUB_INTEGRATION_FEISHU_ENABLED:false}
       app-id: ${FEISHU_APP_ID:}
       app-secret: ${FEISHU_APP_SECRET:}
-      verification-token: ${SKILLHUB_INTEGRATION_FEISHU_VERIFICATION_TOKEN:}
-      encrypt-key: ${SKILLHUB_INTEGRATION_FEISHU_ENCRYPT_KEY:}
   access-policy:
     mode: OPEN
   storage:

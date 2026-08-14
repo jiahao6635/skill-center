@@ -23,12 +23,6 @@ public class FeishuBotProperties {
     /** Feishu app secret from the developer console (defaults to the OAuth app secret). */
     private String appSecret;
 
-    /** Verification token configured for the card callback endpoint. */
-    private String verificationToken;
-
-    /** Optional AES encrypt key; when set, callback payloads are AES-decrypted. */
-    private String encryptKey;
-
     public boolean isEnabled() {
         return enabled;
     }
@@ -51,21 +45,5 @@ public class FeishuBotProperties {
 
     public void setAppSecret(String appSecret) {
         this.appSecret = appSecret;
-    }
-
-    public String getVerificationToken() {
-        return verificationToken;
-    }
-
-    public void setVerificationToken(String verificationToken) {
-        this.verificationToken = verificationToken;
-    }
-
-    public String getEncryptKey() {
-        return encryptKey;
-    }
-
-    public void setEncryptKey(String encryptKey) {
-        this.encryptKey = encryptKey;
     }
 }
