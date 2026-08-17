@@ -144,8 +144,14 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
             skillVersionRepository.findById(payload.versionId())
                     .filter(version -> version.getStatus() == SkillVersionStatus.SCANNING)
                     .ifPresent(version -> {
-                        version.setStatus(SkillVersionStatus.SCAN_FAILED);
-                        skillVersionRepository.save(version);
+                        if (version.isAutoPublishOnScanPass()) {
+                            // Review-exempt version whose scan gate failed: fall back to human review
+                            // rather than SCAN_FAILED so the update is not silently dropped.
+                            securityScanService.fallbackToReview(version.getId());
+                        } else {
+                            version.setStatus(SkillVersionStatus.SCAN_FAILED);
+                            skillVersionRepository.save(version);
+                        }
                     });
         } finally {
             cleanupTempPath(payload.cleanupPath());

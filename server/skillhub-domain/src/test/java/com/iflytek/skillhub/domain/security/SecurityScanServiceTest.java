@@ -1,9 +1,18 @@
 package com.iflytek.skillhub.domain.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iflytek.skillhub.domain.event.ReviewSubmittedEvent;
+import com.iflytek.skillhub.domain.event.SkillPublishedEvent;
+import com.iflytek.skillhub.domain.review.ReviewTask;
+import com.iflytek.skillhub.domain.review.ReviewTaskRepository;
+import com.iflytek.skillhub.domain.review.ReviewTaskStatus;
+import com.iflytek.skillhub.domain.skill.Skill;
+import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
+import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.skill.service.SkillPublicationService;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
@@ -20,6 +30,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +45,18 @@ class SecurityScanServiceTest {
     @Mock
     private ScanTaskProducer scanTaskProducer;
 
+    @Mock
+    private SkillPublicationService skillPublicationService;
+
+    @Mock
+    private SkillRepository skillRepository;
+
+    @Mock
+    private ReviewTaskRepository reviewTaskRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private SecurityScanService service;
 
     @BeforeEach
@@ -43,6 +66,10 @@ class SecurityScanServiceTest {
                 skillVersionRepository,
                 scanTaskProducer,
                 new ObjectMapper(),
+                skillPublicationService,
+                skillRepository,
+                reviewTaskRepository,
+                eventPublisher,
                 "local",
                 true
         );
@@ -99,6 +126,10 @@ class SecurityScanServiceTest {
                 skillVersionRepository,
                 scanTaskProducer,
                 new ObjectMapper(),
+                skillPublicationService,
+                skillRepository,
+                reviewTaskRepository,
+                eventPublisher,
                 "upload",
                 true
         );
@@ -149,6 +180,10 @@ class SecurityScanServiceTest {
                 skillVersionRepository,
                 scanTaskProducer,
                 new ObjectMapper(),
+                skillPublicationService,
+                skillRepository,
+                reviewTaskRepository,
+                eventPublisher,
                 "upload",
                 true
         );
@@ -257,6 +292,72 @@ class SecurityScanServiceTest {
         assertThat(audit.getIsSafe()).isTrue();
         assertThat(version.getStatus()).isEqualTo(SkillVersionStatus.PUBLISHED);
         verify(skillVersionRepository).save(version);
+    }
+
+    @Test
+    void processScanResult_autoPublishExemptSafeVerdict_publishesViaPublicationService() {
+        SecurityAudit audit = new SecurityAudit(42L, ScannerType.SKILL_SCANNER);
+        SkillVersion version = new SkillVersion(8L, "1.1.0", "publisher-1");
+        version.setStatus(SkillVersionStatus.SCANNING);
+        version.setAutoPublishOnScanPass(true);
+        Skill skill = new Skill(20L, "my-skill", "publisher-1", SkillVisibility.PUBLIC);
+
+        given(auditRepository.findLatestActiveByVersionIdAndScannerType(42L, ScannerType.SKILL_SCANNER))
+                .willReturn(Optional.of(audit));
+        given(skillVersionRepository.findById(42L)).willReturn(Optional.of(version));
+        given(skillRepository.findById(8L)).willReturn(Optional.of(skill));
+
+        SecurityScanResponse response = new SecurityScanResponse(
+                "scan-safe", SecurityVerdict.SAFE, 0, null, List.of(), 0.5);
+
+        service.processScanResult(42L, ScannerType.SKILL_SCANNER, response);
+
+        verify(skillPublicationService).publishVersion(skill, version, "publisher-1");
+        verify(reviewTaskRepository, never()).save(org.mockito.ArgumentMatchers.any(ReviewTask.class));
+    }
+
+    @Test
+    void processScanResult_autoPublishExemptNonSafeVerdict_fallsBackToReview() throws Exception {
+        SecurityAudit audit = new SecurityAudit(42L, ScannerType.SKILL_SCANNER);
+        SkillVersion version = new SkillVersion(8L, "1.1.0", "publisher-1");
+        setId(version, 42L);
+        version.setStatus(SkillVersionStatus.SCANNING);
+        version.setAutoPublishOnScanPass(true);
+        Skill skill = new Skill(20L, "my-skill", "publisher-1", SkillVisibility.PUBLIC);
+
+        given(auditRepository.findLatestActiveByVersionIdAndScannerType(42L, ScannerType.SKILL_SCANNER))
+                .willReturn(Optional.of(audit));
+        given(skillVersionRepository.findById(42L)).willReturn(Optional.of(version));
+        given(skillRepository.findById(8L)).willReturn(Optional.of(skill));
+        given(reviewTaskRepository.findBySkillVersionIdAndStatus(42L, ReviewTaskStatus.PENDING))
+                .willReturn(Optional.empty());
+        given(reviewTaskRepository.save(org.mockito.ArgumentMatchers.any(ReviewTask.class)))
+                .willAnswer(inv -> inv.getArgument(0));
+
+        SecurityScanResponse response = new SecurityScanResponse(
+                "scan-danger", SecurityVerdict.DANGEROUS, 1, "HIGH", List.of(), 0.5);
+
+        service.processScanResult(42L, ScannerType.SKILL_SCANNER, response);
+
+        assertThat(version.getStatus()).isEqualTo(SkillVersionStatus.PENDING_REVIEW);
+        assertThat(version.isAutoPublishOnScanPass()).isFalse();
+        verify(skillPublicationService, never()).publishVersion(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(reviewTaskRepository).save(org.mockito.ArgumentMatchers.any(ReviewTask.class));
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(ReviewSubmittedEvent.class));
+    }
+
+    @Test
+    void fallbackToReview_nonExemptVersion_isNoOp() {
+        SkillVersion version = new SkillVersion(8L, "1.1.0", "publisher-1");
+        version.setStatus(SkillVersionStatus.SCANNING);
+        // not on the fast path
+        given(skillVersionRepository.findById(42L)).willReturn(Optional.of(version));
+
+        service.fallbackToReview(42L);
+
+        assertThat(version.getStatus()).isEqualTo(SkillVersionStatus.SCANNING);
+        verify(reviewTaskRepository, never()).save(org.mockito.ArgumentMatchers.any(ReviewTask.class));
     }
 
     private void setId(Object target, Long id) throws Exception {

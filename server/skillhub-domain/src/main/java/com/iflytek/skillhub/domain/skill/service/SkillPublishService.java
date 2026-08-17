@@ -6,8 +6,10 @@ import com.iflytek.skillhub.domain.event.SkillPublishedEvent;
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceMemberRepository;
 import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
+import com.iflytek.skillhub.domain.namespace.NamespaceMember;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
+import com.iflytek.skillhub.domain.namespace.NamespaceType;
 import com.iflytek.skillhub.domain.namespace.SlugValidator;
 import com.iflytek.skillhub.domain.review.ReviewTaskStatus;
 import com.iflytek.skillhub.domain.review.ReviewTask;
@@ -438,6 +440,10 @@ public class SkillPublishService {
             deleteReplaceableVersionArtifacts(skill, matchedVersion, namespaceSlug);
         }
 
+        // 7b. Determine review-exempt fast path: a trusted TEAM manager updating an already-published
+        // skill may skip human review, letting the security scan act as the sole publish gate.
+        boolean autoReviewExempt = isAutoReviewExempt(namespace, skill, publisherId, visibility, isSuperAdmin);
+
         // 8. Create SkillVersion
         SkillVersion version = new SkillVersion(skill.getId(), metadata.version(), publisherId);
         version.setRequestedVisibility(visibility);
@@ -449,6 +455,10 @@ public class SkillPublishService {
             // PRIVATE skill goes to UPLOADED status, no review task created
             version.setStatus(SkillVersionStatus.UPLOADED);
             version.setPublishedAt(currentTime());
+        } else if (autoReviewExempt) {
+            // Review-exempt: enter SCANNING now; the scan verdict decides publish vs. fallback review.
+            version.setStatus(SkillVersionStatus.SCANNING);
+            version.setAutoPublishOnScanPass(true);
         } else {
             version.setStatus(SkillVersionStatus.PENDING_REVIEW);
         }
@@ -525,8 +535,8 @@ public class SkillPublishService {
         version.setDownloadReady(!skillFiles.isEmpty());
         skillVersionRepository.save(version);
 
-        // Create review task for PUBLIC/NAMESPACE_ONLY (not PRIVATE)
-        if (!autoPublish && visibility != SkillVisibility.PRIVATE) {
+        // Create review task for PUBLIC/NAMESPACE_ONLY (not PRIVATE, not review-exempt fast path)
+        if (!autoPublish && visibility != SkillVisibility.PRIVATE && !autoReviewExempt) {
             ReviewTask reviewTask = new ReviewTask(version.getId(), namespace.getId(), publisherId);
             ReviewTask savedReviewTask = reviewTaskRepository.save(reviewTask);
             eventPublisher.publishEvent(new ReviewSubmittedEvent(
@@ -685,6 +695,44 @@ public class SkillPublishService {
 
     private boolean requiresSecurityScanner(SkillVisibility visibility) {
         return visibility == SkillVisibility.PUBLIC || visibility == SkillVisibility.NAMESPACE_ONLY;
+    }
+
+    /**
+     * Determines whether this publish qualifies for the review-exempt fast path.
+     *
+     * <p>All of the following must hold: the namespace is a TEAM (not GLOBAL); the publisher is an
+     * OWNER or ADMIN of that namespace; the skill already has a PUBLISHED version (this is an update,
+     * not a first release); the visibility is not PRIVATE; the security scanner is enabled (so the
+     * scan can act as the publish gate); and the publisher is not a super admin (super admins already
+     * auto-publish). Exemption only skips human review — the security scan remains mandatory.
+     */
+    private boolean isAutoReviewExempt(Namespace namespace,
+                                       Skill skill,
+                                       String publisherId,
+                                       SkillVisibility visibility,
+                                       boolean isSuperAdmin) {
+        if (isSuperAdmin) {
+            return false;
+        }
+        if (visibility == SkillVisibility.PRIVATE) {
+            return false;
+        }
+        if (!securityScanService.isEnabled()) {
+            return false;
+        }
+        if (namespace.getType() != NamespaceType.TEAM) {
+            return false;
+        }
+        NamespaceRole role = namespaceMemberRepository
+                .findByNamespaceIdAndUserId(namespace.getId(), publisherId)
+                .map(NamespaceMember::getRole)
+                .orElse(null);
+        if (role != NamespaceRole.OWNER && role != NamespaceRole.ADMIN) {
+            return false;
+        }
+        return !skillVersionRepository
+                .findBySkillIdAndStatus(skill.getId(), SkillVersionStatus.PUBLISHED)
+                .isEmpty();
     }
 
     private String resolveNamespaceSlug(Long namespaceId) {

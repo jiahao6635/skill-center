@@ -1,6 +1,5 @@
 package com.iflytek.skillhub.domain.review;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
@@ -8,7 +7,6 @@ import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
 import com.iflytek.skillhub.domain.event.ReviewApprovedEvent;
 import com.iflytek.skillhub.domain.event.ReviewRejectedEvent;
 import com.iflytek.skillhub.domain.event.ReviewSubmittedEvent;
-import com.iflytek.skillhub.domain.event.SkillPublishedEvent;
 import com.iflytek.skillhub.domain.governance.GovernanceNotificationService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
@@ -18,8 +16,8 @@ import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
-import com.iflytek.skillhub.domain.skill.metadata.SkillMetadata;
 import com.iflytek.skillhub.domain.skill.service.SkillGovernanceService;
+import com.iflytek.skillhub.domain.skill.service.SkillPublicationService;
 import jakarta.persistence.EntityManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ConcurrentModificationException;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -49,8 +46,8 @@ public class ReviewService {
     private final NamespaceRepository namespaceRepository;
     private final ReviewPermissionChecker permissionChecker;
     private final ApplicationEventPublisher eventPublisher;
-    private final ObjectMapper objectMapper;
     private final SkillGovernanceService skillGovernanceService;
+    private final SkillPublicationService skillPublicationService;
     private final GovernanceNotificationService governanceNotificationService;
     private final EntityManager entityManager;
     private final Clock clock;
@@ -61,8 +58,8 @@ public class ReviewService {
                          NamespaceRepository namespaceRepository,
                          ReviewPermissionChecker permissionChecker,
                          ApplicationEventPublisher eventPublisher,
-                         ObjectMapper objectMapper,
                          SkillGovernanceService skillGovernanceService,
+                         SkillPublicationService skillPublicationService,
                          GovernanceNotificationService governanceNotificationService,
                          EntityManager entityManager,
                          Clock clock) {
@@ -72,8 +69,8 @@ public class ReviewService {
         this.namespaceRepository = namespaceRepository;
         this.permissionChecker = permissionChecker;
         this.eventPublisher = eventPublisher;
-        this.objectMapper = objectMapper;
         this.skillGovernanceService = skillGovernanceService;
+        this.skillPublicationService = skillPublicationService;
         this.governanceNotificationService = governanceNotificationService;
         this.entityManager = entityManager;
         this.clock = clock;
@@ -205,33 +202,10 @@ public class ReviewService {
         Skill skill = skillRepository.findById(skillVersion.getSkillId())
                 .orElseThrow(() -> new DomainNotFoundException("skill.not_found", skillVersion.getSkillId()));
 
-        // Check no other owner has a published skill with the same slug
-        List<Skill> sameSlugSkills = skillRepository.findByNamespaceIdAndSlug(skill.getNamespaceId(), skill.getSlug());
-        for (Skill other : sameSlugSkills) {
-            if (!other.getId().equals(skill.getId())) {
-                boolean otherHasPublished = !skillVersionRepository
-                        .findBySkillIdAndStatus(other.getId(), SkillVersionStatus.PUBLISHED)
-                        .isEmpty();
-                if (otherHasPublished) {
-                    throw new DomainBadRequestException("error.skill.approve.nameConflict", skill.getSlug());
-                }
-            }
-        }
+        // Publish via the shared publication service (name-conflict guard, status/pointer/metadata
+        // transition, and SkillPublishedEvent) so human-review and review-exempt flows stay in lockstep.
+        skillPublicationService.publishVersion(skill, skillVersion, reviewerId);
 
-        skillVersion.setStatus(SkillVersionStatus.PUBLISHED);
-        skillVersion.setPublishedAt(currentTime());
-        skillVersionRepository.save(skillVersion);
-
-        skill.setLatestVersionId(skillVersion.getId());
-        if (skillVersion.getRequestedVisibility() != null) {
-            skill.setVisibility(skillVersion.getRequestedVisibility());
-        }
-        applyPublishedMetadata(skill, skillVersion);
-        skill.setUpdatedBy(reviewerId);
-        skillRepository.save(skill);
-
-        eventPublisher.publishEvent(new SkillPublishedEvent(
-                skill.getId(), skillVersion.getId(), reviewerId));
         eventPublisher.publishEvent(new ReviewApprovedEvent(
                 task.getId(), skill.getId(), skillVersion.getId(),
                 reviewerId, task.getSubmittedBy()));
@@ -340,21 +314,6 @@ public class ReviewService {
                                  Map<Long, NamespaceRole> userNamespaceRoles,
                                  Set<String> platformRoles) {
         return permissionChecker.canViewReview(task, userId, namespaceType, userNamespaceRoles, platformRoles);
-    }
-
-    private void applyPublishedMetadata(Skill skill, SkillVersion skillVersion) {
-        String metadataJson = skillVersion.getParsedMetadataJson();
-        if (metadataJson == null || metadataJson.isBlank()) {
-            return;
-        }
-
-        try {
-            SkillMetadata metadata = objectMapper.readValue(metadataJson, SkillMetadata.class);
-            skill.setDisplayName(metadata.name());
-            skill.setSummary(metadata.description());
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to deserialize skill metadata", e);
-        }
     }
 
     private void assertNamespaceActive(Namespace namespace) {

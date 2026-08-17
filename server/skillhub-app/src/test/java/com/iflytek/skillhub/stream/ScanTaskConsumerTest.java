@@ -119,6 +119,40 @@ class ScanTaskConsumerTest {
     }
 
     @Test
+    void markFailed_reviewExemptVersion_fallsBackToReviewInsteadOfScanFailed() throws Exception {
+        SkillVersion version = new SkillVersion(8L, "1.1.0", "publisher-1");
+        setField(version, "id", 42L);
+        version.setStatus(SkillVersionStatus.SCANNING);
+        version.setAutoPublishOnScanPass(true);
+
+        InMemorySkillVersionRepository skillVersionRepository = new InMemorySkillVersionRepository(version);
+        StubSecurityScanService securityScanService = new StubSecurityScanService();
+        TestableScanTaskConsumer consumer = new TestableScanTaskConsumer(
+                new StubSecurityScanner(),
+                securityScanService,
+                skillVersionRepository,
+                new InMemoryScanTaskProducer(),
+                new InMemoryObjectStorageService()
+        );
+        Files.createDirectories(SCAN_TEMP_DIR);
+        Path tempFile = Files.createTempFile(SCAN_TEMP_DIR, "scan-task-consumer-exempt-failure", ".zip");
+        ScanTaskConsumer.ScanTaskPayload payload = new ScanTaskConsumer.ScanTaskPayload(
+                "task-exempt-fail",
+                42L,
+                tempFile.toString(),
+                null,
+                ScannerType.SKILL_SCANNER
+        );
+
+        consumer.invokeMarkFailed(payload, "scan failed");
+
+        assertThat(securityScanService.lastFallbackVersionId).isEqualTo(42L);
+        assertThat(skillVersionRepository.savedVersion).isNull();
+        assertThat(version.getStatus()).isEqualTo(SkillVersionStatus.SCANNING);
+        assertThat(Files.exists(tempFile)).isFalse();
+    }
+
+    @Test
     void retryMessage_republishesTaskWithRetryCount() {
         InMemoryScanTaskProducer producer = new InMemoryScanTaskProducer();
         TestableScanTaskConsumer consumer = new TestableScanTaskConsumer(
@@ -359,10 +393,11 @@ class ScanTaskConsumerTest {
         private Long lastVersionId;
         private ScannerType lastScannerType;
         private SecurityScanResponse lastResponse;
+        private Long lastFallbackVersionId;
 
         private StubSecurityScanService() {
             super(null, null, task -> {
-            }, new com.fasterxml.jackson.databind.ObjectMapper(), "local", true);
+            }, new com.fasterxml.jackson.databind.ObjectMapper(), null, null, null, null, "local", true);
         }
 
         @Override
@@ -370,6 +405,11 @@ class ScanTaskConsumerTest {
             this.lastVersionId = versionId;
             this.lastScannerType = scannerType;
             this.lastResponse = response;
+        }
+
+        @Override
+        public void fallbackToReview(Long versionId) {
+            this.lastFallbackVersionId = versionId;
         }
     }
 

@@ -2,14 +2,22 @@ package com.iflytek.skillhub.domain.security;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iflytek.skillhub.domain.event.ReviewSubmittedEvent;
+import com.iflytek.skillhub.domain.review.ReviewTask;
+import com.iflytek.skillhub.domain.review.ReviewTaskRepository;
+import com.iflytek.skillhub.domain.review.ReviewTaskStatus;
+import com.iflytek.skillhub.domain.skill.Skill;
+import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
+import com.iflytek.skillhub.domain.skill.service.SkillPublicationService;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +42,10 @@ public class SecurityScanService {
     private final SkillVersionRepository skillVersionRepository;
     private final ScanTaskProducer scanTaskProducer;
     private final ObjectMapper objectMapper;
+    private final SkillPublicationService skillPublicationService;
+    private final SkillRepository skillRepository;
+    private final ReviewTaskRepository reviewTaskRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final String scanMode;
     private final boolean enabled;
 
@@ -41,12 +53,20 @@ public class SecurityScanService {
                                SkillVersionRepository skillVersionRepository,
                                ScanTaskProducer scanTaskProducer,
                                ObjectMapper objectMapper,
+                               SkillPublicationService skillPublicationService,
+                               SkillRepository skillRepository,
+                               ReviewTaskRepository reviewTaskRepository,
+                               ApplicationEventPublisher eventPublisher,
                                @Value("${skillhub.security.scanner.mode:local}") String scanMode,
                                @Value("${skillhub.security.scanner.enabled:false}") boolean enabled) {
         this.auditRepository = auditRepository;
         this.skillVersionRepository = skillVersionRepository;
         this.scanTaskProducer = scanTaskProducer;
         this.objectMapper = objectMapper;
+        this.skillPublicationService = skillPublicationService;
+        this.skillRepository = skillRepository;
+        this.reviewTaskRepository = reviewTaskRepository;
+        this.eventPublisher = eventPublisher;
         this.scanMode = scanMode;
         this.enabled = enabled;
     }
@@ -113,11 +133,63 @@ public class SecurityScanService {
         if (version.getStatus() == SkillVersionStatus.SCANNING) {
             if (version.getRequestedVisibility() == SkillVisibility.PRIVATE) {
                 version.setStatus(SkillVersionStatus.UPLOADED);
+                skillVersionRepository.save(version);
+            } else if (version.isAutoPublishOnScanPass()) {
+                // Review-exempt fast path: the scan is the sole publish gate.
+                if (response.verdict() == SecurityVerdict.SAFE) {
+                    Skill skill = skillRepository.findById(version.getSkillId())
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "Skill not found: " + version.getSkillId()));
+                    skillPublicationService.publishVersion(skill, version, version.getCreatedBy());
+                } else {
+                    // Any non-SAFE verdict falls back to mandatory human review.
+                    fallbackToReview(version);
+                }
             } else {
                 version.setStatus(SkillVersionStatus.PENDING_REVIEW);
+                skillVersionRepository.save(version);
             }
+        } else {
+            skillVersionRepository.save(version);
         }
+    }
+
+    /**
+     * Falls a review-exempt version back to the normal human-review flow, e.g. when the scan verdict
+     * is not SAFE or the scan failed outright. Clears the fast-path flag, moves the version to
+     * PENDING_REVIEW, creates a ReviewTask (attributed to the original publisher), and emits a
+     * {@link ReviewSubmittedEvent}. No-op if the version is not on the fast path.
+     */
+    @Transactional
+    public void fallbackToReview(Long versionId) {
+        SkillVersion version = skillVersionRepository.findById(versionId)
+                .orElseThrow(() -> new IllegalStateException("SkillVersion not found: " + versionId));
+        if (!version.isAutoPublishOnScanPass()) {
+            return;
+        }
+        fallbackToReview(version);
+    }
+
+    private void fallbackToReview(SkillVersion version) {
+        version.setAutoPublishOnScanPass(false);
+        version.setStatus(SkillVersionStatus.PENDING_REVIEW);
         skillVersionRepository.save(version);
+
+        Skill skill = skillRepository.findById(version.getSkillId())
+                .orElseThrow(() -> new IllegalStateException("Skill not found: " + version.getSkillId()));
+
+        // Guard against a duplicate task if one already exists for this version.
+        if (reviewTaskRepository.findBySkillVersionIdAndStatus(version.getId(), ReviewTaskStatus.PENDING).isPresent()) {
+            return;
+        }
+        ReviewTask reviewTask = new ReviewTask(version.getId(), skill.getNamespaceId(), version.getCreatedBy());
+        ReviewTask saved = reviewTaskRepository.save(reviewTask);
+        eventPublisher.publishEvent(new ReviewSubmittedEvent(
+                saved.getId(),
+                skill.getId(),
+                version.getId(),
+                saved.getSubmittedBy(),
+                saved.getNamespaceId()));
     }
 
     private Path saveTempDirectory(Long versionId, List<PackageEntry> entries) {

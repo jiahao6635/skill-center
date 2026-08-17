@@ -54,6 +54,15 @@ public class SkillVersion {
     @Column(name = "download_ready", nullable = false)
     private boolean downloadReady;
 
+    /**
+     * When {@code true}, this version is on the review-exempt fast path: it enters SCANNING
+     * without a human review task, and the security scan acts as the publish gate. On a SAFE
+     * verdict it auto-publishes; on any non-SAFE verdict (or scanner failure) it falls back to
+     * the normal PENDING_REVIEW flow.
+     */
+    @Column(name = "auto_publish_on_scan_pass", nullable = false)
+    private boolean autoPublishOnScanPass;
+
     @Column(name = "yanked_at")
     private Instant yankedAt;
 
@@ -137,6 +146,10 @@ public class SkillVersion {
         return downloadReady;
     }
 
+    public boolean isAutoPublishOnScanPass() {
+        return autoPublishOnScanPass;
+    }
+
     public Instant getYankedAt() {
         return yankedAt;
     }
@@ -196,6 +209,10 @@ public class SkillVersion {
 
     public void setDownloadReady(boolean downloadReady) {
         this.downloadReady = downloadReady;
+    }
+
+    public void setAutoPublishOnScanPass(boolean autoPublishOnScanPass) {
+        this.autoPublishOnScanPass = autoPublishOnScanPass;
     }
 
     public void setYankedAt(Instant yankedAt) {
