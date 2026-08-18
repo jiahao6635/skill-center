@@ -1,10 +1,15 @@
 /**
- * Deep link utilities for launching QoderWork desktop app to install skills.
+ * Deep link utilities for launching Qoder / QoderWork to install skills.
  *
- * URL format:
- *   Web:    https://{domain}/link/skill/install?name={slug}&config={base64(JSON)}
- *   Protocol: qoder-work://skill/install?name={slug}&config={base64(JSON)}
+ * Web intermediate page:
+ *   https://{domain}/link/skill/install?name={slug}&config={base64(JSON)}[&client=qoder]
+ *
+ * Protocols:
+ *   QoderWork: qoder-work://skill/install?name={slug}&config={base64(JSON)}
+ *   Qoder:     qoder://aicoding.aicoding-deeplink/chat?text=/install-skill {url}&mode=agent
  */
+
+export type DeepLinkClient = 'qoder-work' | 'qoder'
 
 export interface SkillInstallConfig {
   scope: string
@@ -18,10 +23,19 @@ export interface SkillInstallConfig {
 }
 
 const SKILL_NAME_PATTERN = /^[a-z0-9\-_]+$/
-const PROTOCOL_SCHEME = 'qoder-work'
+const QODERWORK_PROTOCOL_SCHEME = 'qoder-work'
+const QODER_PROTOCOL_PREFIX = 'qoder://aicoding.aicoding-deeplink'
 const LAUNCH_TIMEOUT_MS = 300_000
 
 export { LAUNCH_TIMEOUT_MS }
+
+export function parseDeepLinkClient(raw: string | null | undefined): DeepLinkClient {
+  return raw === 'qoder' ? 'qoder' : 'qoder-work'
+}
+
+export function deepLinkAppName(client: DeepLinkClient): 'Qoder' | 'QoderWork' {
+  return client === 'qoder' ? 'Qoder' : 'QoderWork'
+}
 
 /**
  * Decode a URL-safe base64-encoded config parameter.
@@ -75,26 +89,53 @@ export function encodeConfigParam(config: SkillInstallConfig): string {
 }
 
 /**
- * Build the QoderWork protocol URL for skill installation.
+ * Build the Qoder protocol URL that opens Agent chat with /install-skill.
  *
- * Format: qoder-work://skill/install?name={name}&config={config}
+ * Format: qoder://aicoding.aicoding-deeplink/chat?text=/install-skill {url}&mode=agent
  */
-export function buildProtocolUrl(name: string, config: string): string {
+export function buildQoderProtocolUrl(downloadUrl: string): string {
+  const text = `/install-skill ${downloadUrl}`
+  return `${QODER_PROTOCOL_PREFIX}/chat?text=${encodeURIComponent(text)}&mode=agent`
+}
+
+/**
+ * Build the desktop protocol URL for skill installation.
+ *
+ * QoderWork: qoder-work://skill/install?name={name}&config={config}
+ * Qoder:     qoder://aicoding.aicoding-deeplink/chat?text=/install-skill {url}&mode=agent
+ */
+export function buildProtocolUrl(
+  name: string,
+  config: string,
+  client: DeepLinkClient = 'qoder-work',
+  downloadUrl?: string,
+): string {
+  if (client === 'qoder') {
+    return buildQoderProtocolUrl(downloadUrl ?? '')
+  }
   const params = new URLSearchParams()
   params.set('name', name)
   params.set('config', config)
-  return `${PROTOCOL_SCHEME}://skill/install?${params.toString()}`
+  return `${QODERWORK_PROTOCOL_SCHEME}://skill/install?${params.toString()}`
 }
 
 /**
  * Build the web intermediate page URL that will trigger the protocol launch.
  *
- * Format: {baseUrl}/link/skill/install?name={name}&config={config}
+ * Format: {baseUrl}/link/skill/install?name={name}&config={config}[&client=qoder]
  */
-export function buildDeepLinkUrl(baseUrl: string, name: string, config: string): string {
+export function buildDeepLinkUrl(
+  baseUrl: string,
+  name: string,
+  config: string,
+  client: DeepLinkClient = 'qoder-work',
+): string {
   const params = new URLSearchParams()
   params.set('name', name)
   params.set('config', config)
+  if (client !== 'qoder-work') {
+    params.set('client', client)
+  }
   const trimmedBase = baseUrl.replace(/\/+$/, '')
   return `${trimmedBase}/link/skill/install?${params.toString()}`
 }

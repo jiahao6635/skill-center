@@ -2,7 +2,12 @@ import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MonitorSmartphone, Loader2 } from 'lucide-react'
 import { getBaseUrl } from './install-command.tsx'
-import { buildDeepLinkUrl, encodeConfigParam, type SkillInstallConfig } from './deep-link.ts'
+import {
+  buildDeepLinkUrl,
+  encodeConfigParam,
+  type DeepLinkClient,
+  type SkillInstallConfig,
+} from './deep-link.ts'
 import { fetchJson, getCsrfHeaders } from '@/api/client.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
 
@@ -11,6 +16,7 @@ interface DeepLinkButtonProps {
   slug: string
   version?: string
   summary?: string
+  client?: DeepLinkClient
 }
 
 type DownloadLinkResponse = {
@@ -23,15 +29,23 @@ type DownloadLinkResponse = {
  *
  * When clicked, it requests a short-lived download URL from the backend (for
  * authenticated users), then navigates to the intermediate page with that URL
- * embedded in the config. QoderWork fetches the URL directly — no auth token is
- * needed on the client side.
+ * embedded in the config. The desktop client fetches the URL directly — no auth
+ * token is needed on the client side.
  */
-export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkButtonProps) {
+export function DeepLinkButton({
+  namespace,
+  slug,
+  version,
+  summary,
+  client = 'qoder-work',
+}: DeepLinkButtonProps) {
   const { t } = useTranslation()
   const { isAuthenticated } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const baseUrl = getBaseUrl()
+  const labelKey = client === 'qoder' ? 'skillDetail.deepLinkOpenQoder' : 'skillDetail.deepLinkOpen'
+  const testId = client === 'qoder' ? 'deep-link-install-qoder-button' : 'deep-link-install-button'
 
   const buildConfig = useCallback((downloadUrl: string): string => {
     const config: SkillInstallConfig = {
@@ -45,8 +59,8 @@ export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkBu
     if (summary) config.description = summary
 
     const encoded = encodeConfigParam(config)
-    return buildDeepLinkUrl(baseUrl, slug, encoded)
-  }, [namespace, slug, version, summary, baseUrl])
+    return buildDeepLinkUrl(baseUrl, slug, encoded, client)
+  }, [namespace, slug, version, summary, baseUrl, client])
 
   const fallbackDownloadUrl = `${baseUrl}/api/cli/v1/skills/${namespace}/${slug}/download`
 
@@ -76,7 +90,7 @@ export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkBu
   return (
     <button
       type="button"
-      data-testid="deep-link-install-button"
+      data-testid={testId}
       onClick={handleClick}
       disabled={isLoading}
       className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-muted/50 px-4 py-3 transition-colors hover:bg-muted/70 active:bg-muted/80 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -88,7 +102,7 @@ export function DeepLinkButton({ namespace, slug, version, summary }: DeepLinkBu
           <MonitorSmartphone className="h-4 w-4" />
         )}
         <span className="text-[13px] leading-relaxed text-foreground sm:text-sm">
-          {t('skillDetail.deepLinkOpen')}
+          {t(labelKey)}
         </span>
       </div>
     </button>

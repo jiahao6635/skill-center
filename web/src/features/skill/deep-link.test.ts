@@ -3,7 +3,10 @@ import {
   decodeConfigParam,
   encodeConfigParam,
   buildProtocolUrl,
+  buildQoderProtocolUrl,
   buildDeepLinkUrl,
+  parseDeepLinkClient,
+  deepLinkAppName,
   validateSkillName,
   validateConfig,
   type SkillInstallConfig,
@@ -143,12 +146,57 @@ describe('buildProtocolUrl', () => {
     expect(url).toContain('name=my-skill_v2')
     expect(url.startsWith('qoder-work://skill/install?')).toBe(true)
   })
+
+  it('builds Qoder protocol URL from download url', () => {
+    const url = buildProtocolUrl(
+      'my-skill',
+      'unused',
+      'qoder',
+      'https://example.com/download.zip',
+    )
+    expect(url).toBe(
+      'qoder://aicoding.aicoding-deeplink/chat?text=%2Finstall-skill%20https%3A%2F%2Fexample.com%2Fdownload.zip&mode=agent',
+    )
+  })
+})
+
+describe('buildQoderProtocolUrl', () => {
+  it('encodes /install-skill plus the package url', () => {
+    const url = buildQoderProtocolUrl('https://cdn.example.com/a.zip')
+    expect(url).toBe(
+      'qoder://aicoding.aicoding-deeplink/chat?text=%2Finstall-skill%20https%3A%2F%2Fcdn.example.com%2Fa.zip&mode=agent',
+    )
+  })
+})
+
+describe('parseDeepLinkClient', () => {
+  it('defaults unknown or missing values to qoder-work', () => {
+    expect(parseDeepLinkClient(null)).toBe('qoder-work')
+    expect(parseDeepLinkClient(undefined)).toBe('qoder-work')
+    expect(parseDeepLinkClient('other')).toBe('qoder-work')
+  })
+
+  it('accepts qoder', () => {
+    expect(parseDeepLinkClient('qoder')).toBe('qoder')
+  })
+})
+
+describe('deepLinkAppName', () => {
+  it('maps client ids to product names', () => {
+    expect(deepLinkAppName('qoder')).toBe('Qoder')
+    expect(deepLinkAppName('qoder-work')).toBe('QoderWork')
+  })
 })
 
 describe('buildDeepLinkUrl', () => {
   it('builds correct web intermediate URL', () => {
     const url = buildDeepLinkUrl('https://skill-center.example.com', 'my-skill', 'base64data')
     expect(url).toBe('https://skill-center.example.com/link/skill/install?name=my-skill&config=base64data')
+  })
+
+  it('appends client=qoder for Qoder installs', () => {
+    const url = buildDeepLinkUrl('https://example.com', 'skill', 'cfg', 'qoder')
+    expect(url).toBe('https://example.com/link/skill/install?name=skill&config=cfg&client=qoder')
   })
 
   it('trims trailing slashes from baseUrl', () => {

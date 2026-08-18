@@ -8,7 +8,10 @@ import {
   buildProtocolUrl,
   validateSkillName,
   validateConfig,
+  parseDeepLinkClient,
+  deepLinkAppName,
   LAUNCH_TIMEOUT_MS,
+  type DeepLinkClient,
   type SkillInstallConfig,
 } from '@/features/skill/deep-link.ts'
 
@@ -24,6 +27,7 @@ export function DeepLinkInstallPage() {
   const [name, setName] = useState('')
   const [configRaw, setConfigRaw] = useState('')
   const [config, setConfig] = useState<SkillInstallConfig | null>(null)
+  const [client, setClient] = useState<DeepLinkClient>('qoder-work')
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stateRef = useRef<PageState>('loading')
 
@@ -46,6 +50,8 @@ export function DeepLinkInstallPage() {
   useEffect(() => {
     const rawName = ORIGINAL_PARAMS.get('name')?.trim() || ''
     const rawConfig = ORIGINAL_PARAMS.get('config')?.trim() || ''
+    const resolvedClient = parseDeepLinkClient(ORIGINAL_PARAMS.get('client'))
+    setClient(resolvedClient)
 
     if (!rawName) {
       setPageState('error')
@@ -101,14 +107,17 @@ export function DeepLinkInstallPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
+  const appName = deepLinkAppName(client)
+
   const launchApp = useCallback(() => {
     if (!name || !configRaw) return
+    if (client === 'qoder' && !config?.download_url) return
 
-    const protocolUrl = buildProtocolUrl(name, configRaw)
+    const protocolUrl = buildProtocolUrl(name, configRaw, client, config?.download_url)
     setPageState('launching')
 
     // Use window.location.assign to navigate to the custom protocol URL.
-    // The browser will show a "Open QoderWork?" dialog without actually
+    // The browser will show an "Open {app}?" dialog without actually
     // leaving the page, so the timeout detection still works.
     window.location.assign(protocolUrl)
 
@@ -118,7 +127,7 @@ export function DeepLinkInstallPage() {
         setPageState('timeout')
       }
     }, LAUNCH_TIMEOUT_MS)
-  }, [name, configRaw])
+  }, [name, configRaw, client, config?.download_url])
 
   // Auto-launch on ready
   useEffect(() => {
@@ -190,8 +199,8 @@ export function DeepLinkInstallPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold font-heading">{t('deepLink.launched')}</h1>
-          <p className="text-muted-foreground">{t('deepLink.launchedDesc')}</p>
+          <h1 className="text-2xl font-bold font-heading">{t('deepLink.launched', { app: appName })}</h1>
+          <p className="text-muted-foreground">{t('deepLink.launchedDesc', { app: appName })}</p>
         </Card>
       </div>
     )
@@ -208,8 +217,8 @@ export function DeepLinkInstallPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold font-heading">{t('deepLink.timeoutTitle')}</h1>
-            <p className="text-muted-foreground">{t('deepLink.timeoutDesc')}</p>
+            <h1 className="text-2xl font-bold font-heading">{t('deepLink.timeoutTitle', { app: appName })}</h1>
+            <p className="text-muted-foreground">{t('deepLink.timeoutDesc', { app: appName })}</p>
           </div>
 
           <div className="space-y-3">
@@ -217,7 +226,7 @@ export function DeepLinkInstallPage() {
               {t('deepLink.retryButton')}
             </Button>
             <p className="text-xs text-center text-muted-foreground">
-              {t('deepLink.downloadHint')}
+              {t('deepLink.downloadHint', { app: appName })}
             </p>
           </div>
         </Card>
@@ -235,7 +244,7 @@ export function DeepLinkInstallPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold font-heading">{t('deepLink.launching')}</h1>
+          <h1 className="text-2xl font-bold font-heading">{t('deepLink.launching', { app: appName })}</h1>
           <p className="text-sm text-muted-foreground">{displayName}</p>
         </Card>
       </div>
@@ -295,7 +304,7 @@ export function DeepLinkInstallPage() {
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
-          {t('deepLink.launchButton')}
+          {t('deepLink.launchButton', { app: appName })}
         </Button>
       </Card>
     </div>

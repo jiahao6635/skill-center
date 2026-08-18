@@ -1040,7 +1040,8 @@
       "copied": "已复制",
       "defaultDescription": "实用技能"
     },
-    "deepLinkOpen": "在 QoderWork 中打开"
+    "deepLinkOpen": "在 QoderWork 中打开",
+    "deepLinkOpenQoder": "在 Qoder 中打开"
   },
   "skillCompare": {
     "pageTitle": "版本对比",
@@ -1598,14 +1599,14 @@
     "versionLabel": "版本",
     "sourceLabel": "来源",
     "descriptionLabel": "描述",
-    "launchButton": "在 QoderWork 中打开",
-    "launching": "正在启动 QoderWork...",
-    "launched": "QoderWork 已启动",
-    "launchedDesc": "请切换到 QoderWork 完成安装。",
-    "timeoutTitle": "未检测到 QoderWork",
-    "timeoutDesc": "如果尚未安装 QoderWork，请先安装后再试。",
+    "launchButton": "在 {{app}} 中打开",
+    "launching": "正在启动 {{app}}...",
+    "launched": "{{app}} 已启动",
+    "launchedDesc": "请切换到 {{app}} 完成安装。",
+    "timeoutTitle": "未检测到 {{app}}",
+    "timeoutDesc": "如果尚未安装 {{app}}，请先安装后再试。",
     "retryButton": "重试",
-    "downloadHint": "下载 QoderWork",
+    "downloadHint": "下载 {{app}}",
     "errorTitle": "安装错误",
     "confirmHint": "请确认以下技能信息，然后点击按钮安装"
   }

@@ -1232,6 +1232,14 @@ export function SkillDetailPage() {
           slug={slug}
           version={publishedVersion?.version}
           summary={skill.summary}
+          client="qoder"
+        />
+
+        <DeepLinkButton
+          namespace={namespace}
+          slug={slug}
+          version={publishedVersion?.version}
+          summary={skill.summary}
         />
 
         {skill.canManageLifecycle && selectedVersionEntry && (

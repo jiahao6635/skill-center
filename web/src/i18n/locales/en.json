@@ -1039,7 +1039,8 @@
       "copied": "Copied",
       "defaultDescription": "A useful skill"
     },
-    "deepLinkOpen": "Open in QoderWork"
+    "deepLinkOpen": "Open in QoderWork",
+    "deepLinkOpenQoder": "Open in Qoder"
   },
   "skillCompare": {
     "pageTitle": "Version Compare",
@@ -1597,14 +1598,14 @@
     "versionLabel": "Version",
     "sourceLabel": "Source",
     "descriptionLabel": "Description",
-    "launchButton": "Open in QoderWork",
-    "launching": "Launching QoderWork...",
-    "launched": "QoderWork has been launched",
-    "launchedDesc": "Check QoderWork to complete the installation.",
-    "timeoutTitle": "QoderWork not detected",
-    "timeoutDesc": "If QoderWork is not installed, please install it first and try again.",
+    "launchButton": "Open in {{app}}",
+    "launching": "Launching {{app}}...",
+    "launched": "{{app}} has been launched",
+    "launchedDesc": "Check {{app}} to complete the installation.",
+    "timeoutTitle": "{{app}} not detected",
+    "timeoutDesc": "If {{app}} is not installed, please install it first and try again.",
     "retryButton": "Retry",
-    "downloadHint": "Download QoderWork",
+    "downloadHint": "Download {{app}}",
     "errorTitle": "Install Error",
     "confirmHint": "Review the skill info below and click the button to install"
   }
