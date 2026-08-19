@@ -13,6 +13,7 @@ import { Pagination } from '@/shared/components/pagination.tsx'
 import { useSearchSkills } from '@/shared/hooks/use-skill-queries.ts'
 import { useVisibleLabels } from '@/shared/hooks/use-label-queries.ts'
 import { useMyStars } from '@/shared/hooks/use-user-queries.ts'
+import { ApiError, handleApiError } from '@/shared/lib/api-error.ts'
 import { formatNamespaceSearchInput, normalizeSearchQuery, parseNamespaceSearchInput } from '@/shared/lib/search-query.ts'
 import { Button } from '@/shared/ui/button.tsx'
 import { APP_SHELL_PAGE_CLASS_NAME } from '@/app/page-shell-style.ts'
@@ -118,15 +119,44 @@ export function SearchPage() {
     previousPageRef.current = page
   }, [page])
 
-  const { data, isLoading, isFetching } = useSearchSkills({
-    q,
-    namespace: namespace || undefined,
-    label: selectedLabel || undefined,
-    sort,
-    page,
-    size: PAGE_SIZE,
-    starredOnly,
-  })
+  const skipGlobalSearchError = Boolean(namespace) && !starredOnly
+  const searchQuery = useSearchSkills(
+    {
+      q,
+      namespace: namespace || undefined,
+      label: selectedLabel || undefined,
+      sort,
+      page,
+      size: PAGE_SIZE,
+      starredOnly,
+    },
+    {
+      skipGlobalErrorHandler: skipGlobalSearchError,
+      retry: (failureCount, error) => {
+        if (error instanceof ApiError && [400, 401, 403, 404].includes(error.status)) {
+          return false
+        }
+        return failureCount < 1
+      },
+    },
+  )
+  const { data, isLoading, isFetching } = searchQuery
+  const namespaceUnavailable =
+    skipGlobalSearchError &&
+    searchQuery.isError &&
+    searchQuery.error instanceof ApiError &&
+    searchQuery.error.status === 400
+
+  useEffect(() => {
+    if (!skipGlobalSearchError || !searchQuery.isError) {
+      return
+    }
+    const error = searchQuery.error
+    if (error instanceof ApiError && error.status === 400) {
+      return
+    }
+    handleApiError(error)
+  }, [searchQuery.error, searchQuery.isError, skipGlobalSearchError])
   const { data: labels } = useVisibleLabels()
   const {
     data: starredSkills,
@@ -201,10 +231,6 @@ export function SearchPage() {
     })
   }
 
-  const handleNamespaceClear = () => {
-    navigate({ to: '/search', search: { q, namespace: '', label: selectedLabel, sort, page: 0, starredOnly } })
-  }
-
   const handleStarredToggle = () => {
     if (!isAuthenticated) {
       navigate({
@@ -238,6 +264,18 @@ export function SearchPage() {
   const isPageLoading = starredOnly ? isLoadingStarred : isLoading
   const isUpdatingResults = starredOnly ? isFetchingStarred && !isLoadingStarred : isFetching && !isLoading
   const resultCount = starredOnly ? filteredStarredSkills.length : (data?.total ?? 0)
+  const emptyTitle = namespaceUnavailable
+    ? t('search.namespaceUnavailable')
+    : starredOnly
+      ? t('search.noStarredResults')
+      : t(namespace && !q ? 'search.noResultsInNamespace' : 'search.noResults', { namespace })
+  const emptyDescription = namespaceUnavailable
+    ? t('search.namespaceUnavailableHint')
+    : starredOnly
+      ? (q ? t('search.noStarredResultsFor', { q }) : t('search.noStarredSkills'))
+      : namespace
+        ? (q ? t('search.noResultsForInNamespace', { q, namespace }) : t('search.noResultsInNamespaceHint'))
+        : (q ? t('search.noResultsFor', { q }) : undefined)
 
   return (
     <div className={APP_SHELL_PAGE_CLASS_NAME}>
@@ -319,15 +357,6 @@ export function SearchPage() {
               {label.displayName}
             </Button>
           ))}
-          {namespace ? (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleNamespaceClear}
-            >
-              {t('search.namespaceFilter', { namespace })}
-            </Button>
-          ) : null}
         </div>
       </div>
 
@@ -358,12 +387,8 @@ export function SearchPage() {
         </>
       ) : (
         <EmptyState
-          title={starredOnly ? t('search.noStarredResults') : t('search.noResults')}
-          description={
-            starredOnly
-              ? (q ? t('search.noStarredResultsFor', { q }) : t('search.noStarredSkills'))
-              : (q ? t('search.noResultsFor', { q }) : undefined)
-          }
+          title={emptyTitle}
+          description={emptyDescription}
         />
       )}
     </div>
