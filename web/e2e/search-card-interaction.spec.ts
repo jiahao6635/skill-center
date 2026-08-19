@@ -225,7 +225,7 @@ test.describe('Search Card Navigation (Real API)', () => {
 
     const [newPage] = await Promise.all([
       context.waitForEvent('page'),
-      firstCard.click({ modifiers: ['Meta'] }),
+      firstCard.click({ modifiers: ['ControlOrMeta'] }),
     ])
     await newPage.waitForLoadState()
     await expect(newPage).toHaveURL(/\/space\//)
