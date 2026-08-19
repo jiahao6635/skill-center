@@ -61,6 +61,12 @@ import java.util.zip.ZipOutputStream;
 public class SkillPublishService {
 
     private static final String INITIAL_AUTO_VERSION = "0.1.0";
+    private static final Set<SkillVersionStatus> REPLACEABLE_VERSION_STATUSES = Set.of(
+            SkillVersionStatus.DRAFT,
+            SkillVersionStatus.SCAN_FAILED,
+            SkillVersionStatus.UPLOADED,
+            SkillVersionStatus.REJECTED
+    );
     private static final Logger log = LoggerFactory.getLogger(SkillPublishService.class);
 
     public record PublishResult(
@@ -665,7 +671,7 @@ public class SkillPublishService {
     }
 
     private void deleteReplaceableVersionArtifacts(Skill skill, SkillVersion version, String namespaceSlug) {
-        if (version.getStatus() == SkillVersionStatus.PUBLISHED) {
+        if (!REPLACEABLE_VERSION_STATUSES.contains(version.getStatus())) {
             throw new DomainBadRequestException("error.skill.version.exists", version.getVersion());
         }
 
@@ -676,8 +682,10 @@ public class SkillPublishService {
             skillRepository.flush();
         }
 
-        reviewTaskRepository.findBySkillVersionIdAndStatus(version.getId(), ReviewTaskStatus.PENDING)
-                .ifPresent(reviewTaskRepository::delete);
+        // Every review task referencing this version has to go, not just a PENDING one:
+        // a rejected version still owns a REJECTED task whose foreign key blocks the
+        // skill_version delete below, which surfaces to the caller as an HTTP 500.
+        reviewTaskRepository.deleteBySkillVersionIdIn(List.of(version.getId()));
 
         List<SkillFile> files = skillFileRepository.findByVersionId(version.getId());
         List<String> storageKeys = new ArrayList<>();
