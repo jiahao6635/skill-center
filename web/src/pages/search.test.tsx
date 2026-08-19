@@ -19,6 +19,11 @@ const skillCardProps: Array<{
   onNamespaceClick?: (slug: string) => void
 }> = []
 const searchSkillParams: Array<Record<string, unknown>> = []
+const searchSkillOptions: Array<{
+  skipGlobalErrorHandler?: boolean
+  retry?: (failureCount: number, error: Error) => boolean
+} | undefined> = []
+const handleApiErrorMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
@@ -115,11 +120,26 @@ vi.mock('@/app/page-shell-style', () => ({
 const useSearchSkillsMock = vi.fn()
 
 vi.mock('@/shared/hooks/use-skill-queries', () => ({
-  useSearchSkills: (params: Record<string, unknown>) => {
+  useSearchSkills: (
+    params: Record<string, unknown>,
+    options?: {
+      skipGlobalErrorHandler?: boolean
+      retry?: (failureCount: number, error: Error) => boolean
+    },
+  ) => {
     searchSkillParams.push(params)
+    searchSkillOptions.push(options)
     return useSearchSkillsMock()
   },
 }))
+
+vi.mock('@/shared/lib/api-error', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/lib/api-error.ts')>()
+  return {
+    ...actual,
+    handleApiError: (...args: unknown[]) => handleApiErrorMock(...args),
+  }
+})
 
 vi.mock('@/shared/hooks/use-label-queries', () => ({
   useVisibleLabels: () => ({
@@ -138,6 +158,7 @@ vi.mock('@/shared/hooks/use-user-queries', () => ({
   }),
 }))
 
+import { ApiError } from '@/shared/lib/api-error.ts'
 import { SearchPage } from './search.tsx'
 
 function findButton(label: string) {
@@ -162,6 +183,8 @@ describe('SearchPage', () => {
     namespaceFilterProps.length = 0
     skillCardProps.length = 0
     searchSkillParams.length = 0
+    searchSkillOptions.length = 0
+    handleApiErrorMock.mockReset()
     useSearchMock.mockReturnValue({
       q: 'agent',
       namespace: 'team-ai',
@@ -179,6 +202,8 @@ describe('SearchPage', () => {
       },
       isLoading: false,
       isFetching: false,
+      isError: false,
+      error: null,
     })
   })
 
@@ -394,6 +419,25 @@ describe('SearchPage', () => {
       page: 1,
       size: 12,
     })
+    expect(searchSkillOptions[0]).toMatchObject({
+      skipGlobalErrorHandler: true,
+    })
+    expect(typeof searchSkillOptions[0]?.retry).toBe('function')
+  })
+
+  it('does not retry namespaced 400 search failures', () => {
+    renderToStaticMarkup(<SearchPage />)
+    const retry = searchSkillOptions[0]?.retry
+
+    expect(retry?.(0, new ApiError('bad', 400))).toBe(false)
+    expect(retry?.(0, new ApiError('boom', 500))).toBe(true)
+    expect(retry?.(1, new ApiError('boom', 500))).toBe(false)
+  })
+
+  it('does not render a duplicate namespace clear chip', () => {
+    renderToStaticMarkup(<SearchPage />)
+
+    expect(buttonRecords.some((item) => item.label === 'search.namespaceFilter')).toBe(false)
   })
 
   it('extracts a leading namespace token from the search input', () => {
@@ -464,5 +508,113 @@ describe('SearchPage', () => {
     expect(html).toContain('empty-state')
     expect(html).toContain('search.noResults')
     expect(html).not.toContain('search.enterKeyword')
+  })
+
+  it('shows namespace-scoped empty copy when a keyword has no matches', () => {
+    useSearchSkillsMock.mockReturnValue({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 12,
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+    })
+
+    const html = renderToStaticMarkup(<SearchPage />)
+
+    expect(html).toContain('empty-state')
+    expect(html).toContain('search.noResults')
+    expect(html).toContain('search.noResultsForInNamespace')
+  })
+
+  it('shows namespace-scoped empty copy when a namespace has no visible skills', () => {
+    useSearchMock.mockReturnValue({
+      q: '',
+      namespace: 'team-ai',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: false,
+    })
+    useSearchSkillsMock.mockReturnValue({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 12,
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+    })
+
+    const html = renderToStaticMarkup(<SearchPage />)
+
+    expect(html).toContain('empty-state')
+    expect(html).toContain('search.noResultsInNamespace')
+    expect(html).toContain('search.noResultsInNamespaceHint')
+  })
+
+  it('shows namespaceUnavailable for a 400 without toasting', () => {
+    useSearchSkillsMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error: new ApiError('namespace missing', 400, 'namespace missing', 'namespace missing'),
+    })
+
+    const { container } = render(<SearchPage />)
+
+    expect(container.textContent).toContain('search.namespaceUnavailable')
+    expect(container.textContent).toContain('search.namespaceUnavailableHint')
+    expect(handleApiErrorMock).not.toHaveBeenCalled()
+  })
+
+  it('still toasts non-400 search errors when namespace skip is enabled', () => {
+    const error = new ApiError('server exploded', 500)
+    useSearchSkillsMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: true,
+      error,
+    })
+
+    render(<SearchPage />)
+
+    expect(handleApiErrorMock).toHaveBeenCalledWith(error)
+  })
+
+  it('shows starred empty state for a bad slug while starred-only is on', () => {
+    useSearchMock.mockReturnValue({
+      q: 'agent',
+      namespace: 'does-not-exist',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: true,
+    })
+    useSearchSkillsMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+    })
+
+    const html = renderToStaticMarkup(<SearchPage />)
+
+    expect(searchSkillOptions[0]).toMatchObject({
+      skipGlobalErrorHandler: false,
+    })
+    expect(html).toContain('search.noStarredResults')
+    expect(html).toContain('search.noStarredResultsFor')
+    expect(html).not.toContain('search.namespaceUnavailable')
   })
 })
