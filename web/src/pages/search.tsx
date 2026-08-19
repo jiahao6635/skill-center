@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import type { SkillSummary } from '@/api/types.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
 import { SearchBar } from '@/features/search/search-bar.tsx'
+import { SearchNamespaceFilter } from '@/features/search/search-namespace-filter.tsx'
 import { SkillCard } from '@/features/skill/skill-card.tsx'
 import { SkeletonList } from '@/shared/components/skeleton-loader.tsx'
 import { EmptyState } from '@/shared/components/empty-state.tsx'
@@ -134,22 +135,30 @@ export function SearchPage() {
   } = useMyStars(starredOnly && isAuthenticated)
   useEffect(() => {
     // Debounce URL updates while the user is typing so query state stays shareable without
-    // triggering a navigation on every keystroke.
+    // triggering a navigation on every keystroke. The empty-input path must share this
+    // timeout: a Select-driven namespace change leaves queryInput stale for one flush,
+    // and a synchronous empty navigate would undo the slug before the format effect
+    // rewrites the box to `@slug`.
     const parsedInput = parseNamespaceSearchInput(queryInput)
     if (parsedInput.query === q && parsedInput.namespace === namespace) {
       return
     }
 
-    if (!parsedInput.query && !parsedInput.namespace) {
-      startTransition(() => {
-        navigate({ to: '/search', search: { q: '', namespace: '', label: selectedLabel, sort, page: 0, starredOnly }, replace: page === 0 })
-      })
-      return
-    }
-
+    const isEmptyInput = !parsedInput.query && !parsedInput.namespace
     const timeoutId = window.setTimeout(() => {
       startTransition(() => {
-        navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+        navigate({
+          to: '/search',
+          search: {
+            q: parsedInput.query,
+            namespace: parsedInput.namespace,
+            label: selectedLabel,
+            sort,
+            page: 0,
+            starredOnly,
+          },
+          replace: isEmptyInput ? page === 0 : true,
+        })
       })
     }, 250)
 
@@ -176,6 +185,20 @@ export function SearchPage() {
   const handleLabelToggle = (label: string) => {
     const nextLabel = selectedLabel === label ? '' : label
     navigate({ to: '/search', search: { q, namespace, label: nextLabel, sort, page: 0, starredOnly } })
+  }
+
+  const handleNamespaceChange = (slug: string) => {
+    navigate({
+      to: '/search',
+      search: {
+        q,
+        namespace: slug || '',
+        label: selectedLabel,
+        sort,
+        page: 0,
+        starredOnly,
+      },
+    })
   }
 
   const handleNamespaceClear = () => {
@@ -272,7 +295,7 @@ export function SearchPage() {
           </div>
         ) : null}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">{t('search.filters.label')}</span>
           <Button
             variant={starredOnly ? 'default' : 'outline'}
@@ -281,6 +304,11 @@ export function SearchPage() {
           >
             {t('search.filterStarred')}
           </Button>
+          <SearchNamespaceFilter
+            value={namespace}
+            onChange={handleNamespaceChange}
+            isAuthenticated={isAuthenticated}
+          />
           {!starredOnly && labels?.map((label) => (
             <Button
               key={label.slug}

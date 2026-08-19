@@ -1,12 +1,20 @@
+/** @vitest-environment jsdom */
 import type { ReactNode } from 'react'
+import { act } from 'react'
+import { cleanup, render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const navigateMock = vi.fn()
 const useSearchMock = vi.fn()
 const buttonRecords: Array<{ label: string; variant?: string | null; onClick?: (() => void) | undefined }> = []
 const paginationProps: Array<{ onPageChange: (page: number) => void }> = []
 const searchBarProps: Array<{ value?: string; onSearch?: (query: string) => void }> = []
+const namespaceFilterProps: Array<{
+  value?: string
+  onChange?: (slug: string) => void
+  isAuthenticated?: boolean
+}> = []
 const searchSkillParams: Array<Record<string, unknown>> = []
 
 vi.mock('@tanstack/react-router', () => ({
@@ -39,6 +47,17 @@ vi.mock('@/features/search/search-bar', () => ({
   SearchBar: (props: { value?: string; onSearch?: (query: string) => void }) => {
     searchBarProps.push(props)
     return <div>search-bar</div>
+  },
+}))
+
+vi.mock('@/features/search/search-namespace-filter', () => ({
+  SearchNamespaceFilter: (props: {
+    value?: string
+    onChange?: (slug: string) => void
+    isAuthenticated?: boolean
+  }) => {
+    namespaceFilterProps.push(props)
+    return <div>search-namespace-filter</div>
   },
 }))
 
@@ -124,11 +143,17 @@ function findButton(label: string) {
 }
 
 describe('SearchPage', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     navigateMock.mockReset()
     buttonRecords.length = 0
     paginationProps.length = 0
     searchBarProps.length = 0
+    namespaceFilterProps.length = 0
     searchSkillParams.length = 0
     useSearchMock.mockReturnValue({
       q: 'agent',
@@ -222,6 +247,95 @@ describe('SearchPage', () => {
         starredOnly: true,
       },
     })
+  })
+
+  it('navigates from the namespace select without splicing q or issuing a second clear', () => {
+    const html = renderToStaticMarkup(<SearchPage />)
+
+    expect(html).toContain('search-namespace-filter')
+    expect(namespaceFilterProps[0]).toMatchObject({
+      value: 'team-ai',
+      isAuthenticated: true,
+    })
+
+    namespaceFilterProps[0]?.onChange?.('acme')
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: 'agent',
+        namespace: 'acme',
+        label: 'code-generation',
+        sort: 'downloads',
+        page: 0,
+        starredOnly: false,
+      },
+    })
+  })
+
+  it('clears the namespace select while keeping the existing keyword', () => {
+    renderToStaticMarkup(<SearchPage />)
+
+    namespaceFilterProps[0]?.onChange?.('')
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: 'agent',
+        namespace: '',
+        label: 'code-generation',
+        sort: 'downloads',
+        page: 0,
+        starredOnly: false,
+      },
+    })
+  })
+
+  it('keeps a selected namespace when the empty discovery box syncs URL state', async () => {
+    vi.useFakeTimers()
+    useSearchMock.mockReturnValue({
+      q: '',
+      namespace: '',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: false,
+    })
+
+    const { rerender } = render(<SearchPage />)
+    namespaceFilterProps[namespaceFilterProps.length - 1]?.onChange?.('acme')
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: '',
+        namespace: 'acme',
+        label: '',
+        sort: 'newest',
+        page: 0,
+        starredOnly: false,
+      },
+    })
+
+    useSearchMock.mockReturnValue({
+      q: '',
+      namespace: 'acme',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: false,
+    })
+    rerender(<SearchPage />)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250)
+    })
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock.mock.calls.some((call) => call[0]?.search?.namespace === '')).toBe(false)
   })
 
   it('passes the namespace URL state into skill search', () => {
