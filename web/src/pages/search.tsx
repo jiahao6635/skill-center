@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import type { SkillSummary } from '@/api/types.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
 import { SearchBar } from '@/features/search/search-bar.tsx'
+import { SearchNamespaceFilter } from '@/features/search/search-namespace-filter.tsx'
 import { SkillCard } from '@/features/skill/skill-card.tsx'
 import { SkeletonList } from '@/shared/components/skeleton-loader.tsx'
 import { EmptyState } from '@/shared/components/empty-state.tsx'
@@ -178,6 +179,20 @@ export function SearchPage() {
     navigate({ to: '/search', search: { q, namespace, label: nextLabel, sort, page: 0, starredOnly } })
   }
 
+  const handleNamespaceChange = (slug: string) => {
+    navigate({
+      to: '/search',
+      search: {
+        q,
+        namespace: slug || '',
+        label: selectedLabel,
+        sort,
+        page: 0,
+        starredOnly,
+      },
+    })
+  }
+
   const handleNamespaceClear = () => {
     navigate({ to: '/search', search: { q, namespace: '', label: selectedLabel, sort, page: 0, starredOnly } })
   }
@@ -272,7 +287,7 @@ export function SearchPage() {
           </div>
         ) : null}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">{t('search.filters.label')}</span>
           <Button
             variant={starredOnly ? 'default' : 'outline'}
@@ -281,6 +296,11 @@ export function SearchPage() {
           >
             {t('search.filterStarred')}
           </Button>
+          <SearchNamespaceFilter
+            value={namespace}
+            onChange={handleNamespaceChange}
+            isAuthenticated={isAuthenticated}
+          />
           {!starredOnly && labels?.map((label) => (
             <Button
               key={label.slug}
