@@ -56,25 +56,34 @@ export function SkillCard({ skill, onClick, onNamespaceClick, highlightStarred =
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between mb-3">
           <div className="space-y-2">
-            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
-              {hasNamespaceFilter ? (
-                <a
-                  href={skillHref}
-                  className="text-inherit no-underline after:absolute after:inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
-                  onClick={(event) => {
-                    if (!onClick) {
-                      return
-                    }
-                    event.preventDefault()
-                    onClick()
-                  }}
-                >
+            {hasNamespaceFilter ? (
+              <a
+                href={skillHref}
+                className="text-inherit no-underline after:absolute after:inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
+                onClick={(event) => {
+                  if (
+                    !onClick
+                    || event.metaKey
+                    || event.ctrlKey
+                    || event.shiftKey
+                    || event.altKey
+                    || event.button !== 0
+                  ) {
+                    return
+                  }
+                  event.preventDefault()
+                  onClick()
+                }}
+              >
+                <h3 className="font-semibold text-lg group-hover:text-primary transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
                   {skill.displayName}
-                </a>
-              ) : (
-                skill.displayName
-              )}
-            </h3>
+                </h3>
+              </a>
+            ) : (
+              <h3 className="font-semibold text-lg group-hover:text-primary transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
+                {skill.displayName}
+              </h3>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {hasNamespaceFilter ? (

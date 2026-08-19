@@ -60,6 +60,7 @@ describe('SkillCard namespace filter branch', () => {
     const titleLink = screen.getByRole('link', { name: 'Demo Skill' })
     expect(screen.getAllByRole('link')).toHaveLength(1)
     expect(titleLink.closest('[role="link"]')).toBeNull()
+    expect(titleLink.querySelector('h3')?.textContent).toBe('Demo Skill')
     expect(screen.getByRole('button', { name: 'search.filterByNamespace:acme' })).toBeTruthy()
   })
 
@@ -129,6 +130,27 @@ describe('SkillCard namespace filter branch', () => {
 
     expect(onClick).toHaveBeenCalledTimes(1)
     expect(onNamespaceClick).not.toHaveBeenCalled()
+  })
+
+  it('lets modified and non-primary clicks use the native href', () => {
+    const onClick = vi.fn()
+
+    render(
+      <SkillCard
+        skill={skill}
+        onClick={onClick}
+        onNamespaceClick={vi.fn()}
+      />,
+    )
+
+    const titleLink = screen.getByRole('link', { name: 'Demo Skill' })
+    fireEvent.click(titleLink, { metaKey: true, button: 0 })
+    fireEvent.click(titleLink, { ctrlKey: true, button: 0 })
+    fireEvent.click(titleLink, { shiftKey: true, button: 0 })
+    fireEvent.click(titleLink, { altKey: true, button: 0 })
+    fireEvent.click(titleLink, { button: 1 })
+
+    expect(onClick).not.toHaveBeenCalled()
   })
 })
 

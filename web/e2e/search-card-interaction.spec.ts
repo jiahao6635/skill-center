@@ -125,7 +125,8 @@ test.describe('Search Card Display (Real API)', () => {
     const firstCard = getSearchCard(page, current.skillName)
     await expect(firstCard).toBeVisible({ timeout: 8_000 })
     await expect(firstCard.getByRole('heading', { name: current.skillName, exact: true })).toBeVisible()
-    await expect(firstCard.getByText(`v${current.skill.version}`)).toBeVisible()
+    const cardShell = firstCard.locator('xpath=ancestor::*[contains(@class,"overflow-hidden")][1]')
+    await expect(cardShell.getByText(`v${current.skill.version}`)).toBeVisible()
   })
 
   // TC_SEARCH_INTERACT_039 P0 - version number format
@@ -217,7 +218,6 @@ test.describe('Search Card Navigation (Real API)', () => {
 
   // TC_SEARCH_INTERACT_009 P1 - Ctrl+click opens in new tab
   test('TC_SEARCH_INTERACT_009: Ctrl+click on card opens skill detail in new tab', async ({ page, context }) => {
-    test.skip(true, 'Skill cards render as clickable divs, so browser-level new-tab semantics do not apply.')
     const current = latestSeed(basicSeed!)
     await page.goto(SEARCH_URL(basicSeed!.keyword))
     const firstCard = getSearchCard(page, current.skillName)
