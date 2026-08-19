@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +16,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.review.ReviewService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
@@ -32,6 +34,7 @@ import java.util.Optional;
 class SkillLifecycleAppServiceTest {
 
     private final NamespaceRepository namespaceRepository = mock(NamespaceRepository.class);
+    private final SkillVersionDeletionLock skillVersionDeletionLock = mock(SkillVersionDeletionLock.class);
     private final SkillVersionRepository skillVersionRepository = mock(SkillVersionRepository.class);
     private final SkillGovernanceService skillGovernanceService = mock(SkillGovernanceService.class);
     private final ReviewService reviewService = mock(ReviewService.class);
@@ -41,6 +44,7 @@ class SkillLifecycleAppServiceTest {
     private final SkillSlugResolutionService skillSlugResolutionService = mock(SkillSlugResolutionService.class);
     private final SkillLifecycleAppService service = new SkillLifecycleAppService(
             namespaceRepository,
+            skillVersionDeletionLock,
             skillVersionRepository,
             skillGovernanceService,
             reviewService,
@@ -80,7 +84,7 @@ class SkillLifecycleAppServiceTest {
     }
 
     @Test
-    void deleteVersion_locksAllSkillVersionsBeforeDelegatingLifecycleMutation() {
+    void deleteVersion_acquiresDeletionLockBeforeReloadingTargetVersion() {
         Namespace namespace = new Namespace("global", "Global", "owner-1");
         ReflectionTestUtils.setField(namespace, "id", 7L);
         Skill skill = new Skill(7L, "demo-skill", "owner-1", SkillVisibility.PUBLIC);
@@ -88,9 +92,6 @@ class SkillLifecycleAppServiceTest {
         SkillVersion version = new SkillVersion(11L, "1.0.0", "owner-1");
         ReflectionTestUtils.setField(version, "id", 13L);
         version.setStatus(SkillVersionStatus.REJECTED);
-        SkillVersion retainedVersion = new SkillVersion(11L, "2.0.0", "owner-1");
-        ReflectionTestUtils.setField(retainedVersion, "id", 14L);
-        retainedVersion.setStatus(SkillVersionStatus.UPLOADED);
 
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(namespace));
         when(skillSlugResolutionService.resolve(
@@ -99,8 +100,9 @@ class SkillLifecycleAppServiceTest {
                 "owner-1",
                 SkillSlugResolutionService.Preference.CURRENT_USER
         )).thenReturn(skill);
-        when(skillVersionRepository.findBySkillIdForUpdate(11L))
-                .thenReturn(java.util.List.of(version, retainedVersion));
+        when(skillVersionDeletionLock.lockAndRefresh(11L)).thenReturn(Optional.of(skill));
+        when(skillVersionRepository.findBySkillIdAndVersion(11L, "1.0.0"))
+                .thenReturn(Optional.of(version));
 
         var response = service.deleteVersion(
                 "global",
@@ -113,8 +115,10 @@ class SkillLifecycleAppServiceTest {
 
         assertThat(response.versionId()).isEqualTo(13L);
         assertThat(response.action()).isEqualTo("DELETE_VERSION");
-        verify(skillVersionRepository).findBySkillIdForUpdate(11L);
-        verify(skillGovernanceService).deleteVersion(
+        var lockOrder = inOrder(skillVersionDeletionLock, skillVersionRepository, skillGovernanceService);
+        lockOrder.verify(skillVersionDeletionLock).lockAndRefresh(11L);
+        lockOrder.verify(skillVersionRepository).findBySkillIdAndVersion(11L, "1.0.0");
+        lockOrder.verify(skillGovernanceService).deleteVersion(
                 skill,
                 version,
                 "owner-1",

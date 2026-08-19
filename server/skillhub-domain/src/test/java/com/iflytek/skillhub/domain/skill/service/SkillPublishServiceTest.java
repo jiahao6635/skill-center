@@ -60,6 +60,8 @@ class SkillPublishServiceTest {
     @Mock
     private SkillRepository skillRepository;
     @Mock
+    private SkillVersionDeletionLock skillVersionDeletionLock;
+    @Mock
     private SkillVersionRepository skillVersionRepository;
     @Mock
     private SkillFileRepository skillFileRepository;
@@ -90,6 +92,7 @@ class SkillPublishServiceTest {
                 namespaceRepository,
                 namespaceMemberRepository,
                 skillRepository,
+                skillVersionDeletionLock,
                 skillVersionRepository,
                 skillFileRepository,
                 objectStorageService,
@@ -104,6 +107,8 @@ class SkillPublishServiceTest {
                 CLOCK
         );
         lenient().when(securityScanService.isEnabled()).thenReturn(true);
+        lenient().when(skillVersionDeletionLock.lockAndRefresh(any(Skill.class)))
+                .thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
         lenient().when(skillVersionRepository.findBySkillIdAndStatus(anyLong(), eq(SkillVersionStatus.PENDING_REVIEW)))
                 .thenReturn(List.of());
         lenient().when(reviewTaskRepository.save(any(ReviewTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -598,7 +603,8 @@ class SkillPublishServiceTest {
         );
 
         assertNull(skill.getLatestVersionId());
-        InOrder inOrder = inOrder(skillRepository, skillVersionRepository);
+        InOrder inOrder = inOrder(skillVersionDeletionLock, skillRepository, skillVersionRepository);
+        inOrder.verify(skillVersionDeletionLock).lockAndRefresh(skill);
         inOrder.verify(skillRepository).save(skill);
         inOrder.verify(skillRepository).flush();
         inOrder.verify(skillVersionRepository).delete(draftVersion);

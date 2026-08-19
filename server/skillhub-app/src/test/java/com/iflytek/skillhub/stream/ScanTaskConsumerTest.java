@@ -456,11 +456,6 @@ class ScanTaskConsumerTest {
         }
 
         @Override
-        public List<SkillVersion> findBySkillIdForUpdate(Long skillId) {
-            throw unsupported();
-        }
-
-        @Override
         public List<SkillVersion> findBySkillIdAndStatus(Long skillId, SkillVersionStatus status) {
             throw unsupported();
         }
@@ -473,6 +468,13 @@ class ScanTaskConsumerTest {
 
         @Override
         public void delete(SkillVersion version) {
+            throw unsupported();
+        }
+
+        @Override
+        public int deleteIfStatusIn(Long versionId,
+                                    Long skillId,
+                                    Collection<SkillVersionStatus> statuses) {
             throw unsupported();
         }
 

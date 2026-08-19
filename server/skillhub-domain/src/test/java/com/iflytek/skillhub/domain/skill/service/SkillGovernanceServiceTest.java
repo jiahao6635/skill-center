@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.doThrow;
@@ -39,6 +42,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -83,6 +88,8 @@ class SkillGovernanceServiceTest {
                 compensationService,
                 CLOCK
         );
+        lenient().when(skillVersionRepository.deleteIfStatusIn(anyLong(), anyLong(), anyCollection()))
+                .thenReturn(1);
     }
 
     @AfterEach
@@ -231,7 +238,16 @@ class SkillGovernanceServiceTest {
                         && keys.contains("packages/1/2/bundle.zip")));
         verify(skillFileRepository).deleteByVersionId(2L);
         verify(securityScanService).softDeleteByVersionId(2L);
-        verify(skillVersionRepository).delete(version);
+        verify(skillVersionRepository).deleteIfStatusIn(
+                org.mockito.ArgumentMatchers.eq(2L),
+                org.mockito.ArgumentMatchers.eq(1L),
+                argThat(statuses -> java.util.Set.copyOf(statuses).equals(java.util.EnumSet.of(
+                        SkillVersionStatus.DRAFT,
+                        SkillVersionStatus.REJECTED,
+                        SkillVersionStatus.SCAN_FAILED,
+                        SkillVersionStatus.UPLOADED
+                )))
+        );
         verify(auditLogService).record("owner", "DELETE_SKILL_VERSION", "SKILL_VERSION", 2L, null, "127.0.0.1", "JUnit", "{\"version\":\"1.0.0\"}");
     }
 
@@ -261,7 +277,11 @@ class SkillGovernanceServiceTest {
 
         InOrder deletionOrder = inOrder(reviewTaskRepository, skillVersionRepository);
         deletionOrder.verify(reviewTaskRepository).deleteBySkillVersionIdIn(java.util.List.of(2L));
-        deletionOrder.verify(skillVersionRepository).delete(rejectedVersion);
+        deletionOrder.verify(skillVersionRepository).deleteIfStatusIn(
+                org.mockito.ArgumentMatchers.eq(2L),
+                org.mockito.ArgumentMatchers.eq(1L),
+                anyCollection()
+        );
     }
 
     @Test
@@ -333,20 +353,29 @@ class SkillGovernanceServiceTest {
         );
     }
 
-    @Test
-    void deleteVersion_rejectsPublishedVersion() {
+    @ParameterizedTest
+    @EnumSource(value = SkillVersionStatus.class, names = {
+            "SCANNING", "PENDING_REVIEW", "PUBLISHED", "YANKED"
+    })
+    void deleteVersion_rejectsUnsupportedStatus(SkillVersionStatus unsupportedStatus) {
         Skill skill = new Skill(1L, "demo", "owner", com.iflytek.skillhub.domain.skill.SkillVisibility.PUBLIC);
         setField(skill, "id", 1L);
-        SkillVersion version = new SkillVersion(2L, "1.0.0", "owner");
+        SkillVersion version = new SkillVersion(1L, "1.0.0", "owner");
         setField(version, "id", 2L);
-        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setStatus(unsupportedStatus);
+        SkillVersion otherVersion = new SkillVersion(1L, "2.0.0", "owner");
+        setField(otherVersion, "id", 3L);
+        otherVersion.setStatus(SkillVersionStatus.DRAFT);
+        lenient().when(skillVersionRepository.findBySkillId(1L))
+                .thenReturn(java.util.List.of(version, otherVersion));
 
-        assertThrows(DomainBadRequestException.class,
+        DomainBadRequestException ex = assertThrows(DomainBadRequestException.class,
                 () -> service.deleteVersion(skill, version, "owner", Map.of(), "127.0.0.1", "JUnit", "test-ns"));
 
+        assertThat(ex.messageCode()).isEqualTo("error.skill.version.delete.unsupported");
         verify(reviewTaskRepository, never()).deleteBySkillVersionIdIn(anyList());
-        verify(skillVersionRepository, never()).delete(any());
-        verify(objectStorageService, never()).deleteObject(any());
+        verify(skillVersionRepository, never()).deleteIfStatusIn(anyLong(), anyLong(), anyCollection());
+        verify(objectStorageService, never()).deleteObjects(anyList());
     }
 
     @Test
@@ -371,7 +400,7 @@ class SkillGovernanceServiceTest {
         );
 
         verify(reviewTaskRepository, never()).deleteBySkillVersionIdIn(anyList());
-        verify(skillVersionRepository, never()).delete(any());
+        verify(skillVersionRepository, never()).deleteIfStatusIn(anyLong(), anyLong(), anyCollection());
     }
 
     @Test
@@ -388,11 +417,47 @@ class SkillGovernanceServiceTest {
         assertThat(ex.messageCode()).isEqualTo("error.skill.version.delete.lastVersion");
 
         verify(reviewTaskRepository, never()).deleteBySkillVersionIdIn(anyList());
-        verify(skillVersionRepository, never()).delete(any());
+        verify(skillVersionRepository, never()).deleteIfStatusIn(anyLong(), anyLong(), anyCollection());
     }
 
     @Test
-    void deleteVersion_updatesLatestVersionPointerWhenDeletingArchivedSkillsLatestDraft() {
+    void deleteVersion_rejectsConcurrentStatusTransitionAtConditionalDelete() {
+        Skill skill = new Skill(1L, "demo", "owner", com.iflytek.skillhub.domain.skill.SkillVisibility.PRIVATE);
+        setField(skill, "id", 1L);
+        SkillVersion version = new SkillVersion(1L, "1.0.0", "owner");
+        setField(version, "id", 2L);
+        version.setStatus(SkillVersionStatus.UPLOADED);
+        SkillVersion retainedVersion = new SkillVersion(1L, "0.9.0", "owner");
+        setField(retainedVersion, "id", 3L);
+        retainedVersion.setStatus(SkillVersionStatus.PUBLISHED);
+
+        given(skillVersionRepository.findBySkillId(1L)).willReturn(java.util.List.of(version, retainedVersion));
+        given(skillFileRepository.findByVersionId(2L)).willReturn(java.util.List.of());
+        given(skillVersionRepository.deleteIfStatusIn(anyLong(), anyLong(), anyCollection())).willReturn(0);
+        TransactionSynchronizationManager.initSynchronization();
+
+        DomainBadRequestException ex = assertThrows(
+                DomainBadRequestException.class,
+                () -> service.deleteVersion(
+                        skill,
+                        version,
+                        "owner",
+                        Map.of(),
+                        "127.0.0.1",
+                        "JUnit",
+                        "test-ns"
+                )
+        );
+
+        assertThat(ex.messageCode()).isEqualTo("error.skill.version.delete.concurrent");
+        verify(auditLogService, never()).record(
+                any(), any(), any(), any(), any(), any(), any(), any()
+        );
+        verify(objectStorageService, never()).deleteObjects(anyList());
+    }
+
+    @Test
+    void deleteVersion_conditionallyUpdatesLatestVersionPointerWhenDeletingArchivedSkillsLatestDraft() {
         Skill skill = new Skill(1L, "demo", "owner", com.iflytek.skillhub.domain.skill.SkillVisibility.PUBLIC);
         setField(skill, "id", 1L);
         skill.setStatus(SkillStatus.ARCHIVED);
@@ -410,13 +475,25 @@ class SkillGovernanceServiceTest {
         given(skillVersionRepository.findBySkillId(1L)).willReturn(java.util.List.of(draftVersion, publishedVersion));
         given(skillVersionRepository.findBySkillIdAndStatus(1L, SkillVersionStatus.PUBLISHED))
                 .willReturn(java.util.List.of(publishedVersion));
-        given(skillRepository.save(skill)).willReturn(skill);
         given(skillFileRepository.findByVersionId(2L)).willReturn(java.util.List.of());
+        given(skillRepository.updateLatestVersionIdIfCurrent(
+                1L,
+                2L,
+                3L,
+                "owner",
+                Instant.now(CLOCK)
+        )).willReturn(1);
 
         service.deleteVersion(skill, draftVersion, "owner", Map.of(), "127.0.0.1", "JUnit", "test-ns");
 
-        assertThat(skill.getLatestVersionId()).isEqualTo(3L);
-        verify(skillRepository).save(skill);
+        verify(skillRepository).updateLatestVersionIdIfCurrent(
+                1L,
+                2L,
+                3L,
+                "owner",
+                Instant.now(CLOCK)
+        );
+        verify(skillRepository, never()).save(skill);
     }
 
     private void setField(Object target, String fieldName, Object value) {

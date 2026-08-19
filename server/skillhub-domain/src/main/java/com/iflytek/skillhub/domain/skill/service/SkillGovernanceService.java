@@ -20,8 +20,10 @@ import com.iflytek.skillhub.storage.ObjectStorageService;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,6 +40,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class SkillGovernanceService {
 
     private static final Logger log = LoggerFactory.getLogger(SkillGovernanceService.class);
+    private static final Set<SkillVersionStatus> DELETABLE_VERSION_STATUSES = EnumSet.of(
+            SkillVersionStatus.DRAFT,
+            SkillVersionStatus.REJECTED,
+            SkillVersionStatus.SCAN_FAILED,
+            SkillVersionStatus.UPLOADED
+    );
 
     private final SkillRepository skillRepository;
     private final SkillVersionRepository skillVersionRepository;
@@ -164,10 +172,7 @@ public class SkillGovernanceService {
                               String userAgent,
                               String namespaceSlug) {
         assertCanManageLifecycle(skill, actorUserId, userNamespaceRoles);
-        if (version.getStatus() != SkillVersionStatus.DRAFT
-                && version.getStatus() != SkillVersionStatus.REJECTED
-                && version.getStatus() != SkillVersionStatus.SCAN_FAILED
-                && version.getStatus() != SkillVersionStatus.UPLOADED) {
+        if (!DELETABLE_VERSION_STATUSES.contains(version.getStatus())) {
             throw new DomainBadRequestException("error.skill.version.delete.unsupported", version.getVersion());
         }
 
@@ -188,15 +193,26 @@ public class SkillGovernanceService {
         deleteStorageAfterCommit(skill, namespaceSlug, storageKeys);
         skillFileRepository.deleteByVersionId(version.getId());
         securityScanService.softDeleteByVersionId(version.getId());
-        // FK 约束 fk_skill_latest_version 阻止删除 skill_version 当 skill.latest_version_id 还指向它。
-        // 必须先解开引用并 flush，让 PG 在 delete 时看不到引用。
+        // Release the latest-version FK only while it still points at this version. A concurrent
+        // private publish may already have moved the pointer to a newer UPLOADED version; an
+        // unconditional entity save here would overwrite that newer pointer with stale state.
         if (version.getId().equals(skill.getLatestVersionId())) {
-            skill.setLatestVersionId(findLatestPublishedVersionId(skill.getId()));
-            skill.setUpdatedBy(actorUserId);
-            skillRepository.save(skill);
-            skillRepository.flush();
+            skillRepository.updateLatestVersionIdIfCurrent(
+                    skill.getId(),
+                    version.getId(),
+                    findLatestPublishedVersionId(skill.getId()),
+                    actorUserId,
+                    currentInstant()
+            );
         }
-        skillVersionRepository.delete(version);
+        int deleted = skillVersionRepository.deleteIfStatusIn(
+                version.getId(),
+                skill.getId(),
+                DELETABLE_VERSION_STATUSES
+        );
+        if (deleted != 1) {
+            throw new DomainBadRequestException("error.skill.version.delete.concurrent", version.getVersion());
+        }
         auditLogService.record(
                 actorUserId,
                 "DELETE_SKILL_VERSION",

@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.domain.skill;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -12,11 +13,11 @@ public interface SkillVersionRepository {
     List<SkillVersion> findBySkillIdIn(List<Long> skillIds);
     List<SkillVersion> findBySkillIdInAndStatus(List<Long> skillIds, SkillVersionStatus status);
     List<SkillVersion> findBySkillId(Long skillId);
-    List<SkillVersion> findBySkillIdForUpdate(Long skillId);
     Optional<SkillVersion> findBySkillIdAndVersion(Long skillId, String version);
     List<SkillVersion> findBySkillIdAndStatus(Long skillId, SkillVersionStatus status);
     SkillVersion save(SkillVersion version);
     void delete(SkillVersion version);
+    int deleteIfStatusIn(Long versionId, Long skillId, Collection<SkillVersionStatus> statuses);
     void flush();
     void deleteBySkillId(Long skillId);
 }

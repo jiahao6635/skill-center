@@ -8,6 +8,7 @@ import com.iflytek.skillhub.domain.review.ReviewService;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.service.SkillGovernanceService;
 import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
@@ -18,6 +19,7 @@ import com.iflytek.skillhub.dto.SkillLifecycleMutationResponse;
 import com.iflytek.skillhub.dto.SkillVersionRereleaseRequest;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SkillLifecycleAppService {
 
     private final NamespaceRepository namespaceRepository;
+    private final SkillVersionDeletionLock skillVersionDeletionLock;
     private final SkillVersionRepository skillVersionRepository;
     private final SkillGovernanceService skillGovernanceService;
     private final ReviewService reviewService;
@@ -37,6 +40,7 @@ public class SkillLifecycleAppService {
     private final SkillSlugResolutionService skillSlugResolutionService;
 
     public SkillLifecycleAppService(NamespaceRepository namespaceRepository,
+                                    SkillVersionDeletionLock skillVersionDeletionLock,
                                     SkillVersionRepository skillVersionRepository,
                                     SkillGovernanceService skillGovernanceService,
                                     ReviewService reviewService,
@@ -45,6 +49,7 @@ public class SkillLifecycleAppService {
                                     AuditLogService auditLogService,
                                     SkillSlugResolutionService skillSlugResolutionService) {
         this.namespaceRepository = namespaceRepository;
+        this.skillVersionDeletionLock = skillVersionDeletionLock;
         this.skillVersionRepository = skillVersionRepository;
         this.skillGovernanceService = skillGovernanceService;
         this.reviewService = reviewService;
@@ -90,15 +95,17 @@ public class SkillLifecycleAppService {
         return new SkillLifecycleMutationResponse(restored.getId(), null, "UNARCHIVE", restored.getStatus().name());
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public SkillLifecycleMutationResponse deleteVersion(String namespace,
                                                         String slug,
                                                         String version,
                                                         String userId,
                                                         Map<Long, NamespaceRole> userNamespaceRoles,
                                                         AuditRequestContext auditContext) {
-        Skill skill = findSkill(namespace, slug, userId);
-        SkillVersion skillVersion = findVersionForUpdate(skill.getId(), version);
+        Skill resolvedSkill = findSkill(namespace, slug, userId);
+        Skill skill = skillVersionDeletionLock.lockAndRefresh(resolvedSkill.getId())
+                .orElseThrow(() -> new DomainBadRequestException("error.skill.notFound", resolvedSkill.getId()));
+        SkillVersion skillVersion = findVersion(skill.getId(), version);
         skillGovernanceService.deleteVersion(
                 skill,
                 skillVersion,
@@ -258,13 +265,6 @@ public class SkillLifecycleAppService {
 
     private SkillVersion findVersion(Long skillId, String version) {
         return skillVersionRepository.findBySkillIdAndVersion(skillId, version)
-                .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", version));
-    }
-
-    private SkillVersion findVersionForUpdate(Long skillId, String version) {
-        return skillVersionRepository.findBySkillIdForUpdate(skillId).stream()
-                .filter(candidate -> candidate.getVersion().equals(version))
-                .findFirst()
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", version));
     }
 

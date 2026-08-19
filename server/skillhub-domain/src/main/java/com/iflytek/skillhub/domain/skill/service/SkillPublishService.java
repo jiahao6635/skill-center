@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -78,6 +79,7 @@ public class SkillPublishService {
     private final NamespaceRepository namespaceRepository;
     private final NamespaceMemberRepository namespaceMemberRepository;
     private final SkillRepository skillRepository;
+    private final SkillVersionDeletionLock skillVersionDeletionLock;
     private final SkillVersionRepository skillVersionRepository;
     private final SkillFileRepository skillFileRepository;
     private final ObjectStorageService objectStorageService;
@@ -95,6 +97,7 @@ public class SkillPublishService {
             NamespaceRepository namespaceRepository,
             NamespaceMemberRepository namespaceMemberRepository,
             SkillRepository skillRepository,
+            SkillVersionDeletionLock skillVersionDeletionLock,
             SkillVersionRepository skillVersionRepository,
             SkillFileRepository skillFileRepository,
             ObjectStorageService objectStorageService,
@@ -110,6 +113,7 @@ public class SkillPublishService {
         this.namespaceRepository = namespaceRepository;
         this.namespaceMemberRepository = namespaceMemberRepository;
         this.skillRepository = skillRepository;
+        this.skillVersionDeletionLock = skillVersionDeletionLock;
         this.skillVersionRepository = skillVersionRepository;
         this.skillFileRepository = skillFileRepository;
         this.objectStorageService = objectStorageService;
@@ -264,7 +268,7 @@ public class SkillPublishService {
      * <p>Super administrators may auto-publish, while regular publishers
      * usually create a pending-review version.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PublishResult publishFromEntries(
             String namespaceSlug,
             List<PackageEntry> entries,
@@ -274,7 +278,7 @@ public class SkillPublishService {
         return publishFromEntries(namespaceSlug, entries, publisherId, visibility, platformRoles, false);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PublishResult publishFromEntries(
             String namespaceSlug,
             List<PackageEntry> entries,
@@ -289,7 +293,7 @@ public class SkillPublishService {
      * Rebuilds a new version from an already published version by copying its
      * stored files and rewriting the embedded metadata version field.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PublishResult rereleasePublishedVersion(
             Long skillId,
             String sourceVersion,
@@ -413,8 +417,14 @@ public class SkillPublishService {
             }
         }
 
-        // Find or create skill for current user
-        Skill skill = skillRepository.findByNamespaceIdAndSlugAndOwnerId(namespace.getId(), skillSlug, publisherId)
+        // Existing skills share the same transaction-scoped coordination lock as version deletion
+        // and hard deletion. Acquire it before auto-withdraw or any other write so destructive
+        // child/skill lock sequences cannot interleave in opposite orders.
+        java.util.Optional<Skill> existingOwnedSkill = skillRepository
+                .findByNamespaceIdAndSlugAndOwnerId(namespace.getId(), skillSlug, publisherId);
+        Skill skill = existingOwnedSkill
+                .map(existing -> skillVersionDeletionLock.lockAndRefresh(existing)
+                        .orElseThrow(() -> new DomainBadRequestException("error.skill.notFound", existing.getId())))
                 .orElseGet(() -> {
                     Skill newSkill = new Skill(namespace.getId(), skillSlug, publisherId, visibility);
                     newSkill.setCreatedBy(publisherId);
