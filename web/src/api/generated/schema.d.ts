@@ -3384,6 +3384,7 @@ export interface components {
             slug?: string;
             type?: string;
             displayName?: string;
+            translations?: components["schemas"]["LabelTranslationResponse"][];
         };
         ApiResponseMapStringInteger: {
             /** Format: int32 */

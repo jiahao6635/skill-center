@@ -4,7 +4,7 @@ import * as mod from './skill-label-panel.tsx'
 /**
  * skill-label-panel.tsx exports the SkillLabelPanel React component.
  * It contains several module-private pure helpers (canManageLabelType,
- * resolveDisplayName, toCandidateLabel, sortByPresentation) that encode
+ * toCandidateLabel, sortByPresentation) that encode
  * real business logic but cannot be imported for direct testing.
  *
  * We verify the module shape so downstream consumers break fast

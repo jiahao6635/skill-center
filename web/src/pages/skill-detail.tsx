@@ -13,6 +13,7 @@ import { InstallCommand } from '@/features/skill/install-command.tsx'
 import { ShareButton } from '@/features/skill/share-button.tsx'
 import { DeepLinkButton } from '@/features/skill/deep-link-button.tsx'
 import { SkillLabelPanel } from '@/features/skill/skill-label-panel.tsx'
+import { resolveLabelDisplayName } from '@/shared/lib/label-display-name.ts'
 import {
   getOverviewCollapseMaxHeight,
   OVERVIEW_COLLAPSE_DESKTOP_MAX_HEIGHT,
@@ -840,7 +841,7 @@ export function SkillDetailPage() {
                       : 'border-slate-300 bg-slate-100 text-slate-800',
                   )}
                 >
-                  {label.displayName}
+                  {resolveLabelDisplayName(label.translations, i18n.resolvedLanguage || i18n.language || 'en', label.displayName || label.slug)}
                 </span>
               ))}
             </div>

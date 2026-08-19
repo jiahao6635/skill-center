@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Tag } from 'lucide-react'
-import type { LabelDefinition, LabelItem, LabelTranslation } from '@/api/types.ts'
+import type { LabelDefinition, LabelItem } from '@/api/types.ts'
+import { resolveLabelDisplayName } from '@/shared/lib/label-display-name.ts'
 import { Button } from '@/shared/ui/button.tsx'
 import { Card } from '@/shared/ui/card.tsx'
 import { toast } from '@/shared/lib/toast.ts'
@@ -25,27 +26,12 @@ function canManageLabelType(type: string, isSuperAdmin: boolean) {
   return isSuperAdmin || type !== 'PRIVILEGED'
 }
 
-function resolveDisplayName(translations: LabelTranslation[], locale: string, fallbackSlug: string) {
-  const normalizedLocale = locale.toLowerCase()
-  const exact = translations.find((item) => item.locale.toLowerCase() === normalizedLocale)
-  if (exact?.displayName) {
-    return exact.displayName
-  }
-
-  const language = normalizedLocale.split('-')[0]
-  const languageMatch = translations.find((item) => item.locale.toLowerCase().split('-')[0] === language)
-  if (languageMatch?.displayName) {
-    return languageMatch.displayName
-  }
-
-  return translations[0]?.displayName || fallbackSlug
-}
-
 function toCandidateLabel(definition: LabelDefinition, locale: string): LabelItem & { sortOrder: number } {
   return {
     slug: definition.slug,
     type: definition.type,
-    displayName: resolveDisplayName(definition.translations, locale, definition.slug),
+    displayName: resolveLabelDisplayName(definition.translations, locale, definition.slug),
+    translations: definition.translations,
     sortOrder: definition.sortOrder,
   }
 }
@@ -73,11 +59,21 @@ export function SkillLabelPanel({ namespace, slug, initialLabels, canManage, isS
     return null
   }
 
-  const currentLabels = (skillLabels ?? initialLabels).slice().sort(sortByPresentation)
+  const currentLabels = (skillLabels ?? initialLabels)
+    .map((label) => ({
+      ...label,
+      displayName: resolveLabelDisplayName(label.translations, locale, label.displayName || label.slug),
+    }))
+    .slice()
+    .sort(sortByPresentation)
   const currentLabelSlugs = new Set(currentLabels.map((label) => label.slug))
   const candidateLabels = isSuperAdmin
     ? (adminDefinitions ?? []).map((definition) => toCandidateLabel(definition, locale))
-    : (visibleLabels ?? []).map((label, index) => ({ ...label, sortOrder: index }))
+    : (visibleLabels ?? []).map((label, index) => ({
+      ...label,
+      displayName: resolveLabelDisplayName(label.translations, locale, label.displayName || label.slug),
+      sortOrder: index,
+    }))
   const availableLabels = candidateLabels
     .filter((label) => !currentLabelSlugs.has(label.slug))
     .filter((label) => canManageLabelType(label.type, isSuperAdmin))

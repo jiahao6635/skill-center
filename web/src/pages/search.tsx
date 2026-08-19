@@ -13,6 +13,7 @@ import { EmptyState } from '@/shared/components/empty-state.tsx'
 import { Pagination } from '@/shared/components/pagination.tsx'
 import { useSearchSkills } from '@/shared/hooks/use-skill-queries.ts'
 import { useVisibleLabels } from '@/shared/hooks/use-label-queries.ts'
+import { resolveLabelDisplayName } from '@/shared/lib/label-display-name.ts'
 import { useMyStars } from '@/shared/hooks/use-user-queries.ts'
 import { ApiError, handleApiError } from '@/shared/lib/api-error.ts'
 import { formatNamespaceSearchInput, normalizeSearchQuery, parseNamespaceSearchInput } from '@/shared/lib/search-query.ts'
@@ -88,7 +89,8 @@ function sortStarredSkills(skills: SkillSummary[], sort: string): SkillSummary[]
 }
 
 export function SearchPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const labelLocale = i18n.resolvedLanguage || i18n.language || 'en'
   const navigate = useNavigate()
   const searchParams = useSearch({ from: '/search' })
   const { isAuthenticated } = useAuth()
@@ -367,7 +369,7 @@ export function SearchPage() {
                       className="shrink-0"
                       onClick={() => handleLabelToggle(label.slug)}
                     >
-                      {label.displayName}
+                      {resolveLabelDisplayName(label.translations, labelLocale, label.displayName || label.slug)}
                     </Button>
                   ))}
                 </div>

@@ -16,6 +16,7 @@ import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.VisibilityChecker;
 import com.iflytek.skillhub.domain.skill.service.SkillSlugResolutionService;
+import com.iflytek.skillhub.dto.LabelTranslationResponse;
 import com.iflytek.skillhub.dto.MessageResponse;
 import com.iflytek.skillhub.dto.SkillLabelDto;
 import java.util.List;
@@ -132,12 +133,17 @@ public class SkillLabelAppService {
                 .filter(skillLabel -> definitionsById.containsKey(skillLabel.getLabelId()))
                 .map(skillLabel -> {
                     LabelDefinition definition = definitionsById.get(skillLabel.getLabelId());
+                    List<LabelTranslation> translations =
+                            translationsByLabelId.getOrDefault(definition.getId(), List.of());
                     return new SkillLabelDto(
                             definition.getSlug(),
                             definition.getType().name(),
-                            labelLocalizationService.resolveDisplayName(
-                                    definition.getSlug(),
-                                    translationsByLabelId.getOrDefault(definition.getId(), List.of()))
+                            labelLocalizationService.resolveDisplayName(definition.getSlug(), translations),
+                            translations.stream()
+                                    .map(translation -> new LabelTranslationResponse(
+                                            translation.getLocale(),
+                                            translation.getDisplayName()))
+                                    .toList()
                     );
                 })
                 .sorted(java.util.Comparator.comparing(SkillLabelDto::type).thenComparing(SkillLabelDto::slug))

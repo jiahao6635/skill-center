@@ -2,8 +2,11 @@ package com.iflytek.skillhub.service;
 
 import com.iflytek.skillhub.domain.label.LabelDefinition;
 import com.iflytek.skillhub.domain.label.LabelDefinitionService;
+import com.iflytek.skillhub.domain.label.LabelTranslation;
+import com.iflytek.skillhub.dto.LabelTranslationResponse;
 import com.iflytek.skillhub.dto.SkillLabelDto;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,7 +23,7 @@ public class PublicLabelAppService {
 
     public List<SkillLabelDto> listVisibleFilters() {
         List<LabelDefinition> definitions = labelDefinitionService.listVisibleFilters();
-        java.util.Map<Long, java.util.List<com.iflytek.skillhub.domain.label.LabelTranslation>> translationsByLabelId =
+        Map<Long, List<LabelTranslation>> translationsByLabelId =
                 labelDefinitionService.listTranslationsByLabelIds(definitions.stream().map(LabelDefinition::getId).toList());
         return definitions.stream()
                 .map(labelDefinition -> toDto(labelDefinition, translationsByLabelId))
@@ -28,13 +31,17 @@ public class PublicLabelAppService {
     }
 
     private SkillLabelDto toDto(LabelDefinition labelDefinition,
-                                java.util.Map<Long, java.util.List<com.iflytek.skillhub.domain.label.LabelTranslation>> translationsByLabelId) {
+                                Map<Long, List<LabelTranslation>> translationsByLabelId) {
+        List<LabelTranslation> translations = translationsByLabelId.getOrDefault(labelDefinition.getId(), List.of());
         return new SkillLabelDto(
                 labelDefinition.getSlug(),
                 labelDefinition.getType().name(),
-                labelLocalizationService.resolveDisplayName(
-                        labelDefinition.getSlug(),
-                        translationsByLabelId.getOrDefault(labelDefinition.getId(), List.of()))
+                labelLocalizationService.resolveDisplayName(labelDefinition.getSlug(), translations),
+                translations.stream()
+                        .map(translation -> new LabelTranslationResponse(
+                                translation.getLocale(),
+                                translation.getDisplayName()))
+                        .toList()
         );
     }
 }

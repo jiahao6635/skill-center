@@ -175,15 +175,16 @@ export interface SkillSummary {
   resolutionMode?: string
 }
 
-export type LabelItem = Omit<components['schemas']['SkillLabelDto'], 'slug' | 'type' | 'displayName'> & {
-  slug: string
-  type: 'RECOMMENDED' | 'PRIVILEGED' | string
-  displayName: string
-}
-
 export type LabelTranslation = Omit<components['schemas']['LabelTranslationResponse'], 'locale' | 'displayName'> & {
   locale: string
   displayName: string
+}
+
+export type LabelItem = Omit<components['schemas']['SkillLabelDto'], 'slug' | 'type' | 'displayName' | 'translations'> & {
+  slug: string
+  type: 'RECOMMENDED' | 'PRIVILEGED' | string
+  displayName: string
+  translations?: LabelTranslation[]
 }
 
 export type LabelDefinition = Omit<

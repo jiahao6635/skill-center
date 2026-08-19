@@ -41,6 +41,7 @@ vi.mock('react-i18next', async () => {
         }
         return key
       },
+      i18n: { language: 'zh', resolvedLanguage: 'zh' },
     }),
   }
 })
@@ -147,8 +148,24 @@ vi.mock('@/shared/lib/api-error', async (importOriginal) => {
 vi.mock('@/shared/hooks/use-label-queries', () => ({
   useVisibleLabels: () => ({
     data: [
-      { slug: 'code-generation', type: 'RECOMMENDED', displayName: 'Code Generation' },
-      { slug: 'official', type: 'RECOMMENDED', displayName: 'Official' },
+      {
+        slug: 'code-generation',
+        type: 'RECOMMENDED',
+        displayName: 'code-generation',
+        translations: [
+          { locale: 'en', displayName: 'Code Generation' },
+          { locale: 'zh-CN', displayName: '代码生成' },
+        ],
+      },
+      {
+        slug: 'official',
+        type: 'RECOMMENDED',
+        displayName: 'official',
+        translations: [
+          { locale: 'en', displayName: 'Official' },
+          { locale: 'zh-CN', displayName: '官方' },
+        ],
+      },
     ],
   }),
 }))
@@ -213,9 +230,9 @@ describe('SearchPage', () => {
   it('marks the selected label button as active on initial render', () => {
     const html = renderToStaticMarkup(<SearchPage />)
 
-    expect(html).toContain('Code Generation')
-    expect(findButton('Code Generation').variant).toBe('default')
-    expect(findButton('Official').variant).toBe('outline')
+    expect(html).toContain('代码生成')
+    expect(findButton('代码生成').variant).toBe('default')
+    expect(findButton('官方').variant).toBe('outline')
   })
 
   it('places the namespace filter before the starred toggle and keeps starred secondary', () => {
@@ -244,7 +261,7 @@ describe('SearchPage', () => {
   it('toggles the selected label off and resets paging', () => {
     renderToStaticMarkup(<SearchPage />)
 
-    findButton('Code Generation').onClick?.()
+    findButton('代码生成').onClick?.()
 
     expect(navigateMock).toHaveBeenCalledWith({
       to: '/search',
