@@ -102,14 +102,17 @@ vi.mock('@/shared/ui/button', () => ({
     children,
     onClick,
     variant,
+    className,
+    ...props
   }: {
     children?: ReactNode
     onClick?: () => void
     variant?: string
+    className?: string
   }) => {
     const label = Array.isArray(children) ? children.join('') : String(children ?? '')
     buttonRecords.push({ label, variant, onClick })
-    return <button data-variant={variant}>{children}</button>
+    return <button data-variant={variant} className={className} {...props}>{children}</button>
   },
 }))
 
@@ -213,6 +216,29 @@ describe('SearchPage', () => {
     expect(html).toContain('Code Generation')
     expect(findButton('Code Generation').variant).toBe('default')
     expect(findButton('Official').variant).toBe('outline')
+  })
+
+  it('places the namespace filter before the starred toggle and keeps starred secondary', () => {
+    const html = renderToStaticMarkup(<SearchPage />)
+
+    expect(html.indexOf('search-namespace-filter')).toBeGreaterThan(-1)
+    expect(html.indexOf('search-namespace-filter')).toBeLessThan(html.indexOf('search.filterStarred'))
+    expect(findButton('search.filterStarred').variant).toBe('outline')
+  })
+
+  it('keeps the starred toggle secondary when it is pressed', () => {
+    useSearchMock.mockReturnValue({
+      q: 'agent',
+      namespace: 'team-ai',
+      label: 'code-generation',
+      sort: 'downloads',
+      page: 1,
+      starredOnly: true,
+    })
+
+    renderToStaticMarkup(<SearchPage />)
+
+    expect(findButton('search.filterStarred').variant).toBe('outline')
   })
 
   it('toggles the selected label off and resets paging', () => {

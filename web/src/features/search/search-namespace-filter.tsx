@@ -26,7 +26,7 @@ export function SearchNamespaceFilter(props: {
     mine: isAuthenticated ? (mine ?? []) : [],
   })
   const triggerLabel = value === ''
-    ? t('search.namespaceFilterAll')
+    ? t('search.namespaceFilter', { namespace: 'global' })
     : t('search.namespaceFilter', { namespace: value })
 
   return (
@@ -38,7 +38,7 @@ export function SearchNamespaceFilter(props: {
     >
       <SelectTrigger
         aria-label={t('search.namespaceFilterLabel')}
-        className="h-8 w-[12rem] sm:w-[14rem] shrink-0 py-0"
+        className="h-8 w-[12rem] shrink-0 py-0"
       >
         <SelectValue>{triggerLabel}</SelectValue>
       </SelectTrigger>

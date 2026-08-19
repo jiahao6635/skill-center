@@ -3,6 +3,7 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import type { SkillSummary } from '@/api/types.ts'
+import { cn } from '@/shared/lib/utils.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
 import { SearchBar } from '@/features/search/search-bar.tsx'
 import { SearchNamespaceFilter } from '@/features/search/search-namespace-filter.tsx'
@@ -333,30 +334,46 @@ export function SearchPage() {
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">{t('search.filters.label')}</span>
-          <Button
-            variant={starredOnly ? 'default' : 'outline'}
-            size="sm"
-            onClick={handleStarredToggle}
-          >
-            {t('search.filterStarred')}
-          </Button>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="shrink-0 text-sm font-medium text-muted-foreground">{t('search.filters.label')}</span>
           <SearchNamespaceFilter
             value={namespace}
             onChange={handleNamespaceChange}
             isAuthenticated={isAuthenticated}
           />
-          {!starredOnly && labels?.map((label) => (
-            <Button
-              key={label.slug}
-              variant={selectedLabel === label.slug ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleLabelToggle(label.slug)}
-            >
-              {label.displayName}
-            </Button>
-          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-pressed={starredOnly}
+            className={cn(
+              'h-8 shrink-0 rounded-lg border-border/60 bg-secondary/50 px-3 text-sm font-medium shadow-none',
+              starredOnly && 'border-primary/40 bg-secondary text-foreground',
+            )}
+            onClick={handleStarredToggle}
+          >
+            {t('search.filterStarred')}
+          </Button>
+          {!starredOnly && labels && labels.length > 0 ? (
+            <>
+              <div className="mx-0.5 hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
+              <div className="min-w-0 w-full flex-1 basis-full overflow-x-auto overscroll-x-contain sm:w-auto sm:basis-0 [scrollbar-width:thin]">
+                <div className="flex w-max items-center gap-2 pr-1">
+                  {labels.map((label) => (
+                    <Button
+                      key={label.slug}
+                      variant={selectedLabel === label.slug ? 'default' : 'outline'}
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => handleLabelToggle(label.slug)}
+                    >
+                      {label.displayName}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
 
