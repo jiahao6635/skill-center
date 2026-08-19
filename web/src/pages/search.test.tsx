@@ -1,6 +1,9 @@
+/** @vitest-environment jsdom */
 import type { ReactNode } from 'react'
+import { act } from 'react'
+import { cleanup, render } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const navigateMock = vi.fn()
 const useSearchMock = vi.fn()
@@ -140,6 +143,11 @@ function findButton(label: string) {
 }
 
 describe('SearchPage', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     navigateMock.mockReset()
     buttonRecords.length = 0
@@ -283,6 +291,51 @@ describe('SearchPage', () => {
         starredOnly: false,
       },
     })
+  })
+
+  it('keeps a selected namespace when the empty discovery box syncs URL state', async () => {
+    vi.useFakeTimers()
+    useSearchMock.mockReturnValue({
+      q: '',
+      namespace: '',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: false,
+    })
+
+    const { rerender } = render(<SearchPage />)
+    namespaceFilterProps[namespaceFilterProps.length - 1]?.onChange?.('acme')
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: '',
+        namespace: 'acme',
+        label: '',
+        sort: 'newest',
+        page: 0,
+        starredOnly: false,
+      },
+    })
+
+    useSearchMock.mockReturnValue({
+      q: '',
+      namespace: 'acme',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: false,
+    })
+    rerender(<SearchPage />)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250)
+    })
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock.mock.calls.some((call) => call[0]?.search?.namespace === '')).toBe(false)
   })
 
   it('passes the namespace URL state into skill search', () => {

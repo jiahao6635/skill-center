@@ -135,22 +135,30 @@ export function SearchPage() {
   } = useMyStars(starredOnly && isAuthenticated)
   useEffect(() => {
     // Debounce URL updates while the user is typing so query state stays shareable without
-    // triggering a navigation on every keystroke.
+    // triggering a navigation on every keystroke. The empty-input path must share this
+    // timeout: a Select-driven namespace change leaves queryInput stale for one flush,
+    // and a synchronous empty navigate would undo the slug before the format effect
+    // rewrites the box to `@slug`.
     const parsedInput = parseNamespaceSearchInput(queryInput)
     if (parsedInput.query === q && parsedInput.namespace === namespace) {
       return
     }
 
-    if (!parsedInput.query && !parsedInput.namespace) {
-      startTransition(() => {
-        navigate({ to: '/search', search: { q: '', namespace: '', label: selectedLabel, sort, page: 0, starredOnly }, replace: page === 0 })
-      })
-      return
-    }
-
+    const isEmptyInput = !parsedInput.query && !parsedInput.namespace
     const timeoutId = window.setTimeout(() => {
       startTransition(() => {
-        navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+        navigate({
+          to: '/search',
+          search: {
+            q: parsedInput.query,
+            namespace: parsedInput.namespace,
+            label: selectedLabel,
+            sort,
+            page: 0,
+            starredOnly,
+          },
+          replace: isEmptyInput ? page === 0 : true,
+        })
       })
     }, 250)
 

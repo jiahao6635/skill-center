@@ -38,7 +38,7 @@ export function SearchNamespaceFilter(props: {
     >
       <SelectTrigger
         aria-label={t('search.namespaceFilterLabel')}
-        className="h-8 w-[12rem] sm:w-[14rem] shrink-0"
+        className="h-8 w-[12rem] sm:w-[14rem] shrink-0 py-0"
       >
         <SelectValue>{triggerLabel}</SelectValue>
       </SelectTrigger>
