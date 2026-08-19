@@ -1,3 +1,4 @@
+import type { KeyboardEvent, MouseEvent } from 'react'
 import type { SkillSummary } from '@/api/types.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
 import { useStar } from '@/features/social/use-star.ts'
@@ -12,47 +13,88 @@ import { useTranslation } from 'react-i18next'
 interface SkillCardProps {
   skill: SkillSummary
   onClick?: () => void
+  onNamespaceClick?: (namespace: string) => void
   highlightStarred?: boolean
 }
 
 /**
  * Reusable card for displaying one skill in lists such as landing, namespace, search, and stars.
+ * When onNamespaceClick is set, the card is not a link: the title is the only detail entry and
+ * the namespace badge is a sibling button so the two controls are not nested.
  */
-export function SkillCard({ skill, onClick, highlightStarred = true }: SkillCardProps) {
+export function SkillCard({ skill, onClick, onNamespaceClick, highlightStarred = true }: SkillCardProps) {
   const { t } = useTranslation()
   const { isAuthenticated } = useAuth()
   const { data: starStatus } = useStar(skill.id, highlightStarred && isAuthenticated)
   const showStarredHighlight = highlightStarred && isAuthenticated && starStatus?.starred
   const headlineVersion = getHeadlineVersion(skill)
-  const isInteractive = typeof onClick === 'function'
+  const hasNamespaceFilter = typeof onNamespaceClick === 'function'
+  const isCardLink = !hasNamespaceFilter && typeof onClick === 'function'
+  const namespaceType = skill.namespace === 'global' ? 'GLOBAL' : 'TEAM'
+  const skillHref = `/space/${skill.namespace}/${encodeURIComponent(skill.slug)}`
+
+  const handleNamespaceActivate = (event: MouseEvent<HTMLButtonElement> | KeyboardEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    onNamespaceClick?.(skill.namespace)
+  }
 
   return (
     <Card
       className="h-full p-5 cursor-pointer group relative overflow-hidden bg-white border shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
       style={{ borderColor: 'hsl(var(--border-card))' }}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (!isInteractive) {
-          return
-        }
-
+      onClick={isCardLink ? onClick : undefined}
+      onKeyDown={isCardLink ? (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          onClick()
+          onClick?.()
         }
-      }}
-      role={isInteractive ? 'link' : undefined}
-      tabIndex={isInteractive ? 0 : undefined}
+      } : undefined}
+      role={isCardLink ? 'link' : undefined}
+      tabIndex={isCardLink ? 0 : undefined}
     >
       <div className="flex h-full flex-col">
         <div className="flex items-start justify-between mb-3">
           <div className="space-y-2">
             <h3 className="font-semibold text-lg group-hover:text-primary transition-colors" style={{ color: 'hsl(var(--foreground))' }}>
-              {skill.displayName}
+              {hasNamespaceFilter ? (
+                <a
+                  href={skillHref}
+                  className="text-inherit no-underline after:absolute after:inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
+                  onClick={(event) => {
+                    if (!onClick) {
+                      return
+                    }
+                    event.preventDefault()
+                    onClick()
+                  }}
+                >
+                  {skill.displayName}
+                </a>
+              ) : (
+                skill.displayName
+              )}
             </h3>
           </div>
           <div className="flex items-center gap-2">
-            <NamespaceBadge type="TEAM" name={`@${skill.namespace}`} />
+            {hasNamespaceFilter ? (
+              <button
+                type="button"
+                className="relative z-10 inline-flex rounded-full border-0 bg-transparent p-0"
+                aria-label={t('search.filterByNamespace', { namespace: skill.namespace })}
+                onClick={handleNamespaceActivate}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') {
+                    return
+                  }
+                  handleNamespaceActivate(event)
+                }}
+              >
+                <NamespaceBadge type={namespaceType} name={`@${skill.namespace}`} />
+              </button>
+            ) : (
+              <NamespaceBadge type={namespaceType} name={`@${skill.namespace}`} />
+            )}
           </div>
         </div>
 

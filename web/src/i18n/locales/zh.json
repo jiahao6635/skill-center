@@ -199,6 +199,7 @@
     "namespaceFilterMine": "我的命名空间",
     "namespaceFilterCurrent": "当前筛选",
     "namespaceGlobalHint": "平台公开",
+    "filterByNamespace": "筛选命名空间 @{{namespace}}",
     "enterKeyword": "请输入搜索关键词",
     "results": "找到 {{count}} 个技能",
     "resultCount": "找到 <1>{{count}}</1> 个结果",

@@ -199,6 +199,7 @@
     "namespaceFilterMine": "My namespaces",
     "namespaceFilterCurrent": "Current filter",
     "namespaceGlobalHint": "Platform public",
+    "filterByNamespace": "Filter namespace @{{namespace}}",
     "enterKeyword": "Please enter a search keyword",
     "results": "{{count}} skills found",
     "resultCount": "Found <1>{{count}}</1> results",

@@ -343,6 +343,7 @@ export function SearchPage() {
                   skill={skill}
                   highlightStarred
                   onClick={() => handleSkillClick(skill.namespace, skill.slug)}
+                  onNamespaceClick={(slug) => handleNamespaceChange(slug === namespace ? '' : slug)}
                 />
               </div>
             ))}
