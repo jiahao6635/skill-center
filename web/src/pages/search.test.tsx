@@ -15,6 +15,9 @@ const namespaceFilterProps: Array<{
   onChange?: (slug: string) => void
   isAuthenticated?: boolean
 }> = []
+const skillCardProps: Array<{
+  onNamespaceClick?: (slug: string) => void
+}> = []
 const searchSkillParams: Array<Record<string, unknown>> = []
 
 vi.mock('@tanstack/react-router', () => ({
@@ -62,7 +65,10 @@ vi.mock('@/features/search/search-namespace-filter', () => ({
 }))
 
 vi.mock('@/features/skill/skill-card', () => ({
-  SkillCard: () => <div>skill-card</div>,
+  SkillCard: (props: { onNamespaceClick?: (slug: string) => void }) => {
+    skillCardProps.push(props)
+    return <div>skill-card</div>
+  },
 }))
 
 vi.mock('@/shared/components/skeleton-loader', () => ({
@@ -154,6 +160,7 @@ describe('SearchPage', () => {
     paginationProps.length = 0
     searchBarProps.length = 0
     namespaceFilterProps.length = 0
+    skillCardProps.length = 0
     searchSkillParams.length = 0
     useSearchMock.mockReturnValue({
       q: 'agent',
@@ -336,6 +343,44 @@ describe('SearchPage', () => {
 
     expect(navigateMock).toHaveBeenCalledTimes(1)
     expect(navigateMock.mock.calls.some((call) => call[0]?.search?.namespace === '')).toBe(false)
+  })
+
+  it('applies a skill-card namespace without rewriting q', () => {
+    renderToStaticMarkup(<SearchPage />)
+
+    skillCardProps[0]?.onNamespaceClick?.('global')
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: 'agent',
+        namespace: 'global',
+        label: 'code-generation',
+        sort: 'downloads',
+        page: 0,
+        starredOnly: false,
+      },
+    })
+  })
+
+  it('toggles the selected namespace off from the skill-card badge', () => {
+    renderToStaticMarkup(<SearchPage />)
+
+    skillCardProps[0]?.onNamespaceClick?.('team-ai')
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: 'agent',
+        namespace: '',
+        label: 'code-generation',
+        sort: 'downloads',
+        page: 0,
+        starredOnly: false,
+      },
+    })
   })
 
   it('passes the namespace URL state into skill search', () => {

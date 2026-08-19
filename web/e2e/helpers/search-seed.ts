@@ -258,6 +258,11 @@ export function getSearchCard(page: Page, skillName: string): Locator {
   }).first()
 }
 
+/**
+ * Search result cards are title-only links (`<a class="after:inset-0"><h3>`), not a
+ * whole-card `role="link"`. Click, focus, and Enter target that link; the namespace
+ * badge is a sibling button and is not inside it.
+ */
 export function getSearchCards(page: Page): Locator {
   return page.getByRole('link').filter({
     has: page.locator('h3'),
