@@ -23,6 +23,7 @@ import com.iflytek.skillhub.domain.review.ReviewService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
+import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
@@ -56,6 +57,9 @@ class SkillLifecycleControllerTest {
 
     @MockBean
     private SkillVersionRepository skillVersionRepository;
+
+    @MockBean
+    private SkillVersionDeletionLock skillVersionDeletionLock;
 
     @MockBean
     private SkillGovernanceService skillGovernanceService;
@@ -144,7 +148,9 @@ class SkillLifecycleControllerTest {
         given(namespaceRepository.findBySlug("global")).willReturn(java.util.Optional.of(namespace));
         given(skillSlugResolutionService.resolve(1L, "demo-skill", "usr_1", SkillSlugResolutionService.Preference.CURRENT_USER))
                 .willReturn(skill);
-        given(skillVersionRepository.findBySkillIdAndVersion(1L, "1.0.0")).willReturn(java.util.Optional.of(version));
+        given(skillVersionDeletionLock.lockAndRefresh(1L)).willReturn(java.util.Optional.of(skill));
+        given(skillVersionRepository.findBySkillIdAndVersion(1L, "1.0.0"))
+                .willReturn(java.util.Optional.of(version));
 
         mockMvc.perform(delete("/api/web/skills/global/demo-skill/versions/1.0.0")
                         .requestAttr("userId", "usr_1")

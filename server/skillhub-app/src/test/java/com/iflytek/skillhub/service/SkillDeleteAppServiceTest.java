@@ -7,6 +7,7 @@ import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillHardDeleteService;
 import com.iflytek.skillhub.search.SearchIndexService;
@@ -17,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,6 +36,8 @@ class SkillDeleteAppServiceTest {
     @Mock
     private SkillHardDeleteService skillHardDeleteService;
     @Mock
+    private SkillVersionDeletionLock skillVersionDeletionLock;
+    @Mock
     private SearchIndexService searchIndexService;
     @Mock
     private NamespaceRepository namespaceRepository;
@@ -42,7 +46,15 @@ class SkillDeleteAppServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SkillDeleteAppService(skillRepository, namespaceRepository, skillHardDeleteService, searchIndexService);
+        service = new SkillDeleteAppService(
+                skillRepository,
+                namespaceRepository,
+                skillVersionDeletionLock,
+                skillHardDeleteService,
+                searchIndexService
+        );
+        org.mockito.Mockito.lenient().when(skillVersionDeletionLock.lockAndRefresh(org.mockito.ArgumentMatchers.any(Skill.class)))
+                .thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
     }
 
     @Test
@@ -56,7 +68,8 @@ class SkillDeleteAppServiceTest {
 
         assertThat(result.deleted()).isTrue();
         assertThat(result.skillId()).isEqualTo(11L);
-        InOrder inOrder = inOrder(searchIndexService, skillHardDeleteService);
+        InOrder inOrder = inOrder(skillVersionDeletionLock, searchIndexService, skillHardDeleteService);
+        inOrder.verify(skillVersionDeletionLock).lockAndRefresh(skill);
         inOrder.verify(searchIndexService).remove(11L);
         inOrder.verify(skillHardDeleteService).hardDeleteSkill(skill, "global", "super-1", "127.0.0.1", "JUnit");
         verify(skillHardDeleteService).hardDeleteSkill(skill, "global", "super-1", "127.0.0.1", "JUnit");

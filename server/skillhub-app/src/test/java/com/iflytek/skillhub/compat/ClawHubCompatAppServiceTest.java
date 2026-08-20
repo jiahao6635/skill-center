@@ -16,6 +16,7 @@ import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.service.SkillQueryService;
 import com.iflytek.skillhub.domain.social.SkillStarService;
 import com.iflytek.skillhub.service.SkillSearchAppService;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,27 @@ class ClawHubCompatAppServiceTest {
     }
 
     @Test
+    void downloadLocationByQuery_percentEncodesNonAsciiSlug() {
+        Namespace namespace = new Namespace("global", "Global", "owner-1");
+        Skill publicSkill = new Skill(1L, "需求", "owner-1", SkillVisibility.PUBLIC);
+        CompatSkillLookupService.CompatSkillContext context = new CompatSkillLookupService.CompatSkillContext(
+                namespace,
+                publicSkill,
+                Optional.empty()
+        );
+
+        when(compatSkillLookupService.findByLegacySlug("需求")).thenReturn(context);
+        when(compatSkillLookupService.canAccess(publicSkill, null, Map.of())).thenReturn(true);
+
+        String location = service.downloadLocationByQuery("需求", "20260707.025847", null, null);
+
+        assertThat(location).isEqualTo(
+                "/api/v1/skills/global/%E9%9C%80%E6%B1%82/versions/20260707.025847/download"
+        );
+        assertThat(StandardCharsets.ISO_8859_1.newEncoder().canEncode(location)).isTrue();
+    }
+
+    @Test
     void downloadLocationByQuery_returnsCanonicalPath_whenLegacySkillIsVisible() {
         Namespace namespace = new Namespace("team-a", "Team A", "owner-1");
         Skill publicSkill = new Skill(1L, "my-skill", "owner-1", SkillVisibility.PUBLIC);
@@ -76,5 +98,23 @@ class ClawHubCompatAppServiceTest {
         String location = service.downloadLocationByQuery("my-skill", "latest", null, null);
 
         assertThat(location).isEqualTo("/api/v1/skills/team-a/my-skill/download");
+    }
+
+    @Test
+    void downloadLocationByQuery_includesVersionSegmentForAsciiSlug() {
+        Namespace namespace = new Namespace("team-a", "Team A", "owner-1");
+        Skill publicSkill = new Skill(1L, "my-skill", "owner-1", SkillVisibility.PUBLIC);
+        CompatSkillLookupService.CompatSkillContext context = new CompatSkillLookupService.CompatSkillContext(
+                namespace,
+                publicSkill,
+                Optional.empty()
+        );
+
+        when(compatSkillLookupService.findByLegacySlug("my-skill")).thenReturn(context);
+        when(compatSkillLookupService.canAccess(publicSkill, null, Map.of())).thenReturn(true);
+
+        String location = service.downloadLocationByQuery("my-skill", "20260707.025847", null, null);
+
+        assertThat(location).isEqualTo("/api/v1/skills/team-a/my-skill/versions/20260707.025847/download");
     }
 }

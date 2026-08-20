@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -61,6 +62,12 @@ import java.util.zip.ZipOutputStream;
 public class SkillPublishService {
 
     private static final String INITIAL_AUTO_VERSION = "0.1.0";
+    private static final Set<SkillVersionStatus> REPLACEABLE_VERSION_STATUSES = Set.of(
+            SkillVersionStatus.DRAFT,
+            SkillVersionStatus.SCAN_FAILED,
+            SkillVersionStatus.UPLOADED,
+            SkillVersionStatus.REJECTED
+    );
     private static final Logger log = LoggerFactory.getLogger(SkillPublishService.class);
 
     public record PublishResult(
@@ -72,6 +79,7 @@ public class SkillPublishService {
     private final NamespaceRepository namespaceRepository;
     private final NamespaceMemberRepository namespaceMemberRepository;
     private final SkillRepository skillRepository;
+    private final SkillVersionDeletionLock skillVersionDeletionLock;
     private final SkillVersionRepository skillVersionRepository;
     private final SkillFileRepository skillFileRepository;
     private final ObjectStorageService objectStorageService;
@@ -89,6 +97,7 @@ public class SkillPublishService {
             NamespaceRepository namespaceRepository,
             NamespaceMemberRepository namespaceMemberRepository,
             SkillRepository skillRepository,
+            SkillVersionDeletionLock skillVersionDeletionLock,
             SkillVersionRepository skillVersionRepository,
             SkillFileRepository skillFileRepository,
             ObjectStorageService objectStorageService,
@@ -104,6 +113,7 @@ public class SkillPublishService {
         this.namespaceRepository = namespaceRepository;
         this.namespaceMemberRepository = namespaceMemberRepository;
         this.skillRepository = skillRepository;
+        this.skillVersionDeletionLock = skillVersionDeletionLock;
         this.skillVersionRepository = skillVersionRepository;
         this.skillFileRepository = skillFileRepository;
         this.objectStorageService = objectStorageService;
@@ -258,7 +268,7 @@ public class SkillPublishService {
      * <p>Super administrators may auto-publish, while regular publishers
      * usually create a pending-review version.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PublishResult publishFromEntries(
             String namespaceSlug,
             List<PackageEntry> entries,
@@ -268,7 +278,7 @@ public class SkillPublishService {
         return publishFromEntries(namespaceSlug, entries, publisherId, visibility, platformRoles, false);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PublishResult publishFromEntries(
             String namespaceSlug,
             List<PackageEntry> entries,
@@ -283,7 +293,7 @@ public class SkillPublishService {
      * Rebuilds a new version from an already published version by copying its
      * stored files and rewriting the embedded metadata version field.
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PublishResult rereleasePublishedVersion(
             Long skillId,
             String sourceVersion,
@@ -407,8 +417,14 @@ public class SkillPublishService {
             }
         }
 
-        // Find or create skill for current user
-        Skill skill = skillRepository.findByNamespaceIdAndSlugAndOwnerId(namespace.getId(), skillSlug, publisherId)
+        // Existing skills share the same transaction-scoped coordination lock as version deletion
+        // and hard deletion. Acquire it before auto-withdraw or any other write so destructive
+        // child/skill lock sequences cannot interleave in opposite orders.
+        java.util.Optional<Skill> existingOwnedSkill = skillRepository
+                .findByNamespaceIdAndSlugAndOwnerId(namespace.getId(), skillSlug, publisherId);
+        Skill skill = existingOwnedSkill
+                .map(existing -> skillVersionDeletionLock.lockAndRefresh(existing)
+                        .orElseThrow(() -> new DomainBadRequestException("error.skill.notFound", existing.getId())))
                 .orElseGet(() -> {
                     Skill newSkill = new Skill(namespace.getId(), skillSlug, publisherId, visibility);
                     newSkill.setCreatedBy(publisherId);
@@ -665,7 +681,7 @@ public class SkillPublishService {
     }
 
     private void deleteReplaceableVersionArtifacts(Skill skill, SkillVersion version, String namespaceSlug) {
-        if (version.getStatus() == SkillVersionStatus.PUBLISHED) {
+        if (!REPLACEABLE_VERSION_STATUSES.contains(version.getStatus())) {
             throw new DomainBadRequestException("error.skill.version.exists", version.getVersion());
         }
 
@@ -676,8 +692,10 @@ public class SkillPublishService {
             skillRepository.flush();
         }
 
-        reviewTaskRepository.findBySkillVersionIdAndStatus(version.getId(), ReviewTaskStatus.PENDING)
-                .ifPresent(reviewTaskRepository::delete);
+        // Every review task referencing this version has to go, not just a PENDING one:
+        // a rejected version still owns a REJECTED task whose foreign key blocks the
+        // skill_version delete below, which surfaces to the caller as an HTTP 500.
+        reviewTaskRepository.deleteBySkillVersionIdIn(List.of(version.getId()));
 
         List<SkillFile> files = skillFileRepository.findByVersionId(version.getId());
         List<String> storageKeys = new ArrayList<>();

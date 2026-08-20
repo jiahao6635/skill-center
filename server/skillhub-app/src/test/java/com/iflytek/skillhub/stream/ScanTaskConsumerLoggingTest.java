@@ -26,6 +26,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -261,6 +262,13 @@ class ScanTaskConsumerLoggingTest {
 
         @Override
         public void delete(SkillVersion version) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int deleteIfStatusIn(Long versionId,
+                                    Long skillId,
+                                    Collection<SkillVersionStatus> statuses) {
             throw new UnsupportedOperationException();
         }
 

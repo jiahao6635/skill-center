@@ -3,6 +3,7 @@ package com.iflytek.skillhub.domain.skill;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,11 @@ public interface SkillRepository {
     void incrementDownloadCount(Long skillId);
     void incrementSubscriptionCount(Long skillId);
     void decrementSubscriptionCount(Long skillId);
+    int updateLatestVersionIdIfCurrent(Long skillId,
+                                       Long expectedVersionId,
+                                       Long replacementVersionId,
+                                       String updatedBy,
+                                       Instant updatedAt);
     List<Skill> findBySlug(String slug);
     List<Skill> findByNamespaceSlugAndSlug(String namespaceSlug, String slug);
 }

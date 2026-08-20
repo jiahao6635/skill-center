@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -54,6 +55,23 @@ public interface SkillJpaRepository extends JpaRepository<Skill, Long>, SkillRep
     @Transactional
     @Query("UPDATE Skill s SET s.subscriptionCount = CASE WHEN s.subscriptionCount > 0 THEN s.subscriptionCount - 1 ELSE 0 END WHERE s.id = :skillId")
     void decrementSubscriptionCount(@Param("skillId") Long skillId);
+
+    @Override
+    @Modifying(flushAutomatically = true)
+    @Transactional
+    @Query("""
+        UPDATE Skill skill
+        SET skill.latestVersionId = :replacementVersionId,
+            skill.updatedBy = :updatedBy,
+            skill.updatedAt = :updatedAt
+        WHERE skill.id = :skillId
+          AND skill.latestVersionId = :expectedVersionId
+    """)
+    int updateLatestVersionIdIfCurrent(@Param("skillId") Long skillId,
+                                       @Param("expectedVersionId") Long expectedVersionId,
+                                       @Param("replacementVersionId") Long replacementVersionId,
+                                       @Param("updatedBy") String updatedBy,
+                                       @Param("updatedAt") Instant updatedAt);
 
     List<Skill> findBySlug(String slug);
 

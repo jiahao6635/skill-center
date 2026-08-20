@@ -27,6 +27,9 @@ fail() {
   exit 1
 }
 
+grep -Fq '"litellm==1.90.2"' "$SCANNER_DIR/Dockerfile" \
+  || fail 'scanner Dockerfile must pin "litellm==1.90.2"'
+
 tmp="$(new_tmp)"
 skill_dir="$tmp/skill"
 mkdir -p "$skill_dir/demo-skill"
