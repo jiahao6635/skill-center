@@ -1,5 +1,5 @@
 # ---- Build Stage ----
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM sigmob-registry-vpc.cn-beijing.cr.aliyuncs.com/middleground/eclipse-temurin:21-jdk-alpine AS build
 WORKDIR /app
 
 # Cache dependencies
@@ -19,7 +19,7 @@ COPY . .
 RUN ./mvnw package -DskipTests -B
 
 # ---- Runtime Stage ----
-FROM eclipse-temurin:21-jre-alpine
+FROM sigmob-registry-vpc.cn-beijing.cr.aliyuncs.com/middleground/eclipse-temurin:21-jre-alpine
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 
