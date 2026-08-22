@@ -14,6 +14,7 @@ import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillPublicationService;
 import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,14 +22,17 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,6 +77,13 @@ class SecurityScanServiceTest {
                 "local",
                 true
         );
+    }
+
+    @AfterEach
+    void clearTransactionSynchronization() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test
@@ -153,6 +164,54 @@ class SecurityScanServiceTest {
         assertThat(task.versionId()).isEqualTo(42L);
         assertThat(task.skillPath()).isNull();
         assertThat(task.bundleKey()).isEqualTo("packages/8/42/bundle.zip");
+    }
+
+    @Test
+    void triggerScan_defersTaskPublishingUntilTransactionCommit() throws Exception {
+        SkillVersion version = new SkillVersion(8L, "1.0.0", "publisher-1");
+        setId(version, 42L);
+        PackageEntry entry = new PackageEntry(
+                "README.md",
+                "# demo".getBytes(),
+                6L,
+                "text/markdown"
+        );
+
+        given(skillVersionRepository.findById(42L)).willReturn(Optional.of(version));
+        TransactionSynchronizationManager.initSynchronization();
+
+        service.triggerScan(42L, List.of(entry), "publisher-1");
+
+        verify(auditRepository).save(any(SecurityAudit.class));
+        verify(skillVersionRepository).save(version);
+        verify(scanTaskProducer, never()).publishScanTask(any(ScanTask.class));
+        assertThat(version.getStatus()).isEqualTo(SkillVersionStatus.SCANNING);
+
+        commitRegisteredSynchronizations();
+
+        ArgumentCaptor<ScanTask> taskCaptor = ArgumentCaptor.forClass(ScanTask.class);
+        verify(scanTaskProducer).publishScanTask(taskCaptor.capture());
+        assertThat(taskCaptor.getValue().versionId()).isEqualTo(42L);
+    }
+
+    @Test
+    void triggerScan_doesNotPublishTaskWhenTransactionNeverCommits() throws Exception {
+        SkillVersion version = new SkillVersion(8L, "1.0.0", "publisher-1");
+        setId(version, 42L);
+        PackageEntry entry = new PackageEntry(
+                "README.md",
+                "# demo".getBytes(),
+                6L,
+                "text/markdown"
+        );
+
+        given(skillVersionRepository.findById(42L)).willReturn(Optional.of(version));
+        TransactionSynchronizationManager.initSynchronization();
+
+        service.triggerScan(42L, List.of(entry), "publisher-1");
+
+        verify(auditRepository).save(any(SecurityAudit.class));
+        verify(scanTaskProducer, never()).publishScanTask(any(ScanTask.class));
     }
 
     @Test
@@ -364,5 +423,11 @@ class SecurityScanServiceTest {
         Field field = target.getClass().getDeclaredField("id");
         field.setAccessible(true);
         field.set(target, id);
+    }
+
+    private void commitRegisteredSynchronizations() {
+        for (TransactionSynchronization synchronization : TransactionSynchronizationManager.getSynchronizations()) {
+            synchronization.afterCommit();
+        }
     }
 }
