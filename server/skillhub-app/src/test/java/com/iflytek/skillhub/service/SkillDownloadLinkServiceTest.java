@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,7 +50,7 @@ class SkillDownloadLinkServiceTest {
                         "https://oss/presigned", 1L, 10L, "slug-1.0.0.zip", true));
 
         SkillDownloadLinkService.IssueResult result =
-                service.issueDownloadLink("ns", "slug", "1.0.0", "user-1", roles);
+                service.issueDownloadLink("ns", "slug", "1.0.0", "user-1", roles, null);
 
         assertTrue(result.isRedirect());
         assertNotNull(result.token());
@@ -71,7 +72,7 @@ class SkillDownloadLinkServiceTest {
                 .thenReturn(new SkillDownloadService.PresignedDownload(null, 1L, 10L, "slug-1.0.0.zip", true));
 
         SkillDownloadLinkService.IssueResult result =
-                service.issueDownloadLink("ns", "slug", null, "user-1", Map.of());
+                service.issueDownloadLink("ns", "slug", null, "user-1", Map.of(), null);
 
         assertFalse(result.isRedirect());
         assertNull(result.token());
@@ -86,10 +87,10 @@ class SkillDownloadLinkServiceTest {
         when(downloadLinkStore.get("token-1")).thenReturn(data);
         when(downloadLinkStore.markCountedIfAbsent("token-1")).thenReturn(true);
 
-        String url = service.resolveForRedirect("token-1");
+        String url = service.resolveForRedirect("token-1", null);
 
         assertEquals("https://oss/presigned", url);
-        verify(skillDownloadService).recordDownloadById(5L, 50L);
+        verify(skillDownloadService).recordDownloadById(eq(5L), eq(50L), isNull(), isNull(), isNull(), eq("deeplink"), any());
     }
 
     @Test
@@ -99,10 +100,10 @@ class SkillDownloadLinkServiceTest {
         when(downloadLinkStore.get("token-1")).thenReturn(data);
         when(downloadLinkStore.markCountedIfAbsent("token-1")).thenReturn(false);
 
-        String url = service.resolveForRedirect("token-1");
+        String url = service.resolveForRedirect("token-1", null);
 
         assertEquals("https://oss/presigned", url);
-        verify(skillDownloadService, never()).recordDownloadById(anyLong(), anyLong());
+        verify(skillDownloadService, never()).recordDownloadById(anyLong(), anyLong(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -111,18 +112,18 @@ class SkillDownloadLinkServiceTest {
                 new DownloadLinkStore.DownloadLinkData("https://oss/presigned", 5L, 50L, "f.zip", false);
         when(downloadLinkStore.get("token-1")).thenReturn(data);
 
-        String url = service.resolveForRedirect("token-1");
+        String url = service.resolveForRedirect("token-1", null);
 
         assertEquals("https://oss/presigned", url);
         verify(downloadLinkStore, never()).markCountedIfAbsent(anyString());
-        verify(skillDownloadService, never()).recordDownloadById(anyLong(), anyLong());
+        verify(skillDownloadService, never()).recordDownloadById(anyLong(), anyLong(), any(), any(), any(), any(), any());
     }
 
     @Test
     void resolveForRedirect_UnknownToken_ThrowsNotFound() {
         when(downloadLinkStore.get("missing")).thenReturn(null);
 
-        assertThrows(DomainNotFoundException.class, () -> service.resolveForRedirect("missing"));
-        verify(skillDownloadService, never()).recordDownloadById(anyLong(), anyLong());
+        assertThrows(DomainNotFoundException.class, () -> service.resolveForRedirect("missing", null));
+        verify(skillDownloadService, never()).recordDownloadById(anyLong(), anyLong(), any(), any(), any(), any(), any());
     }
 }

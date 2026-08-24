@@ -6,6 +6,7 @@ import com.iflytek.skillhub.exception.GlobalExceptionHandler;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
 import com.iflytek.skillhub.security.SensitiveLogSanitizer;
 import com.iflytek.skillhub.service.SkillDownloadLinkService;
+import com.iflytek.skillhub.usage.UsageContextFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +19,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Clock;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -30,6 +33,8 @@ class CliDownloadLinkControllerTest {
     @Mock
     private SkillDownloadLinkService skillDownloadLinkService;
     @Mock
+    private UsageContextFactory usageContextFactory;
+    @Mock
     private SensitiveLogSanitizer sensitiveLogSanitizer;
     @Mock
     private SkillHubMetrics skillHubMetrics;
@@ -39,7 +44,7 @@ class CliDownloadLinkControllerTest {
     @BeforeEach
     void setUp() {
         ApiResponseFactory responseFactory = new ApiResponseFactory(new StaticMessageSource(), Clock.systemUTC());
-        CliDownloadLinkController controller = new CliDownloadLinkController(skillDownloadLinkService);
+        CliDownloadLinkController controller = new CliDownloadLinkController(skillDownloadLinkService, usageContextFactory);
         GlobalExceptionHandler advice = new GlobalExceptionHandler(responseFactory, sensitiveLogSanitizer, skillHubMetrics);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(advice)
@@ -48,18 +53,20 @@ class CliDownloadLinkControllerTest {
 
     @Test
     void redirect_ValidToken_Returns302WithPresignedLocation() throws Exception {
-        when(skillDownloadLinkService.resolveForRedirect("tok-1")).thenReturn("https://oss.example/presigned");
+        when(usageContextFactory.fromRequest(any(), any())).thenReturn(null);
+        when(skillDownloadLinkService.resolveForRedirect(eq("tok-1"), any())).thenReturn("https://oss.example/presigned");
 
         mockMvc.perform(get("/api/cli/v1/download-link/tok-1"))
                 .andExpect(status().isFound())
                 .andExpect(header().string(HttpHeaders.LOCATION, "https://oss.example/presigned"));
 
-        verify(skillDownloadLinkService).resolveForRedirect("tok-1");
+        verify(skillDownloadLinkService).resolveForRedirect(eq("tok-1"), any());
     }
 
     @Test
     void redirect_UnknownOrExpiredToken_Returns404() throws Exception {
-        when(skillDownloadLinkService.resolveForRedirect("bad"))
+        when(usageContextFactory.fromRequest(any(), any())).thenReturn(null);
+        when(skillDownloadLinkService.resolveForRedirect(eq("bad"), any()))
                 .thenThrow(new DomainNotFoundException("error.downloadLink.notFound"));
 
         mockMvc.perform(get("/api/cli/v1/download-link/bad"))

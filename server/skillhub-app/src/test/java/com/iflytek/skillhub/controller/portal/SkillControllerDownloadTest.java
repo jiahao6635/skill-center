@@ -25,8 +25,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -59,7 +62,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_redirectsToPresignedUrlWhenAvailable() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", "test-user", java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), eq("test-user"), eq(java.util.Map.of()), any()))
             .willReturn(new SkillDownloadService.DownloadResult(
                 () -> new ByteArrayInputStream("zip".getBytes()),
                 "demo-skill-1.0.0.zip",
@@ -80,7 +83,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_streamsWhenPresignedUrlIsInsecureForHttpsRequest() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", "test-user", java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), eq("test-user"), eq(java.util.Map.of()), any()))
             .willReturn(new SkillDownloadService.DownloadResult(
                 () -> new ByteArrayInputStream("zip".getBytes()),
                 "demo-skill-1.0.0.zip",
@@ -102,7 +105,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_streamsWhenPresignedUrlUnavailable() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", "test-user", java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), eq("test-user"), eq(java.util.Map.of()), any()))
             .willReturn(new SkillDownloadService.DownloadResult(
                 () -> new ByteArrayInputStream("zip".getBytes()),
                 "demo-skill-1.0.0.zip",
@@ -123,7 +126,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_allowsAnonymousForGlobalSkill() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", null, java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), isNull(), eq(java.util.Map.of()), any()))
             .willReturn(new SkillDownloadService.DownloadResult(
                 () -> new ByteArrayInputStream("zip".getBytes()),
                 "demo-skill-1.0.0.zip",
@@ -143,7 +146,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_forbidsAnonymousWhenServiceRejectsSkill() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("team-ai", "demo-skill", "1.0.0", null, java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("team-ai"), eq("demo-skill"), eq("1.0.0"), isNull(), eq(java.util.Map.of()), any()))
             .willThrow(new DomainForbiddenException("error.skill.access.denied", "demo-skill"));
 
         mockMvc.perform(get("/api/v1/skills/team-ai/demo-skill/versions/1.0.0/download")
@@ -155,7 +158,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_redirectDoesNotOpenContentStream() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", "test-user", java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), eq("test-user"), eq(java.util.Map.of()), any()))
             .willReturn(new SkillDownloadService.DownloadResult(
                 () -> {
                     throw new AssertionError("content stream should not be opened for redirects");
@@ -178,7 +181,7 @@ class SkillControllerDownloadTest {
     @Test
     void downloadVersion_usesPerVersionRateLimitKey() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", "test-user", java.util.Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), eq("test-user"), eq(java.util.Map.of()), any()))
             .willReturn(new SkillDownloadService.DownloadResult(
                 () -> new ByteArrayInputStream("zip".getBytes()),
                 "demo-skill-1.0.0.zip",

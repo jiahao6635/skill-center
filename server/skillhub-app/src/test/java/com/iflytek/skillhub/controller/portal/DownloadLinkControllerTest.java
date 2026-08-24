@@ -3,6 +3,7 @@ package com.iflytek.skillhub.controller.portal;
 import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.service.SkillDownloadLinkService;
+import com.iflytek.skillhub.usage.UsageContextFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,9 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -33,6 +37,8 @@ class DownloadLinkControllerTest {
 
     @Mock
     private SkillDownloadLinkService skillDownloadLinkService;
+    @Mock
+    private UsageContextFactory usageContextFactory;
 
     private MockMvc mockMvc;
 
@@ -44,7 +50,7 @@ class DownloadLinkControllerTest {
     private MockMvc buildMockMvc(String publicBaseUrl) {
         ApiResponseFactory responseFactory = new ApiResponseFactory(new StaticMessageSource(), Clock.systemUTC());
         DownloadLinkController controller =
-                new DownloadLinkController(responseFactory, skillDownloadLinkService, publicBaseUrl);
+                new DownloadLinkController(responseFactory, skillDownloadLinkService, usageContextFactory, publicBaseUrl);
         return MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
@@ -65,7 +71,8 @@ class DownloadLinkControllerTest {
 
     @Test
     void createDownloadLink_RedirectMode_ReturnsRedirectUrl() throws Exception {
-        when(skillDownloadLinkService.issueDownloadLink("global", "demo-skill", null, "user-1", Map.of()))
+        when(usageContextFactory.fromRequest(any(), eq("user-1"))).thenReturn(null);
+        when(skillDownloadLinkService.issueDownloadLink(eq("global"), eq("demo-skill"), isNull(), eq("user-1"), eq(Map.of()), any()))
                 .thenReturn(SkillDownloadLinkService.IssueResult.redirect("tok-123", Instant.parse("2026-01-01T00:10:00Z")));
 
         mockMvc.perform(post("/api/web/skills/global/demo-skill/download-link")
@@ -78,7 +85,8 @@ class DownloadLinkControllerTest {
 
     @Test
     void createDownloadLink_FallbackMode_ReturnsFallbackUrl() throws Exception {
-        when(skillDownloadLinkService.issueDownloadLink("global", "demo-skill", "1.0.0", "user-1", Map.of()))
+        when(usageContextFactory.fromRequest(any(), eq("user-1"))).thenReturn(null);
+        when(skillDownloadLinkService.issueDownloadLink(eq("global"), eq("demo-skill"), eq("1.0.0"), eq("user-1"), eq(Map.of()), any()))
                 .thenReturn(SkillDownloadLinkService.IssueResult.fallback(
                         "/api/cli/v1/skills/global/demo-skill/download", Instant.parse("2026-01-01T00:10:00Z")));
 
@@ -94,7 +102,8 @@ class DownloadLinkControllerTest {
         // Mirrors production: SSL terminates at the ALB, so the public base URL
         // (https) must win over the plain-http request headers.
         MockMvc secureMockMvc = buildMockMvc("https://skill-center.sigmob.com");
-        when(skillDownloadLinkService.issueDownloadLink("global", "demo-skill", null, "user-1", Map.of()))
+        when(usageContextFactory.fromRequest(any(), eq("user-1"))).thenReturn(null);
+        when(skillDownloadLinkService.issueDownloadLink(eq("global"), eq("demo-skill"), isNull(), eq("user-1"), eq(Map.of()), any()))
                 .thenReturn(SkillDownloadLinkService.IssueResult.redirect("tok-123", Instant.parse("2026-01-01T00:10:00Z")));
 
         secureMockMvc.perform(post("/api/web/skills/global/demo-skill/download-link")

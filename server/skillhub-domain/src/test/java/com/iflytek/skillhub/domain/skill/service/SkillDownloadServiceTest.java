@@ -8,11 +8,17 @@ import com.iflytek.skillhub.domain.namespace.NamespaceType;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.skill.*;
+import com.iflytek.skillhub.domain.usage.SkillUsageActorKind;
+import com.iflytek.skillhub.domain.usage.SkillUsageAuthMethod;
+import com.iflytek.skillhub.domain.usage.SkillUsageClient;
+import com.iflytek.skillhub.domain.usage.SkillUsageRequestContext;
+import com.iflytek.skillhub.domain.usage.UsageAttribution;
 import com.iflytek.skillhub.storage.ObjectMetadata;
 import com.iflytek.skillhub.storage.ObjectStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
@@ -80,6 +86,19 @@ class SkillDownloadServiceTest {
         String skillSlug = "test-skill";
         String userId = "user-100";
         Map<Long, NamespaceRole> userNsRoles = Map.of(1L, NamespaceRole.MEMBER);
+        SkillUsageRequestContext requestContext = new SkillUsageRequestContext(
+                SkillUsageClient.WEB,
+                SkillUsageAuthMethod.SESSION,
+                "request-123",
+                "192.0.2.10",
+                "SkillHub test agent"
+        );
+        UsageAttribution attribution = new UsageAttribution(
+                userId,
+                "user:" + userId,
+                SkillUsageActorKind.USER,
+                requestContext
+        );
 
         Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
         setId(namespace, 1L);
@@ -107,16 +126,82 @@ class SkillDownloadServiceTest {
         when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Test Skill-1.0.0.zip"))).thenReturn(null);
 
         // Act
-        SkillDownloadService.DownloadResult result = service.downloadLatest(namespaceSlug, skillSlug, userId, userNsRoles);
+        SkillDownloadService.DownloadResult result = service.downloadLatest(
+                namespaceSlug, skillSlug, userId, userNsRoles, attribution);
 
         // Assert
         assertNotNull(result);
         assertEquals("Test Skill-1.0.0.zip", result.filename());
         assertEquals(1000L, result.contentLength());
+        assertNull(result.presignedUrl());
+        assertFalse(result.fallbackBundle());
         assertNotNull(result.openContent());
         verify(skillRepository).incrementDownloadCount(1L);
         verify(skillVersionStatsRepository).incrementDownloadCount(10L, 1L);
-        verify(eventPublisher).publishEvent(any(SkillDownloadedEvent.class));
+        ArgumentCaptor<SkillDownloadedEvent> eventCaptor = ArgumentCaptor.forClass(SkillDownloadedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        SkillDownloadedEvent event = eventCaptor.getValue();
+        assertEquals(1L, event.skillId());
+        assertEquals(10L, event.versionId());
+        assertEquals("1.0.0", event.version());
+        assertEquals(userId, event.actorUserId());
+        assertEquals("user:" + userId, event.actorKey());
+        assertEquals(SkillUsageActorKind.USER, event.actorKind());
+        assertEquals(namespaceSlug, event.namespaceSlug());
+        assertEquals(skillSlug, event.skillSlug());
+        assertEquals("bundle", event.delivery());
+        assertEquals(requestContext, event.requestContext());
+    }
+
+    @Test
+    void testDownloadLatest_NullAttributionStillIncrementsAndPublishesNonRecordableEvent() throws Exception {
+        String namespaceSlug = "test-ns";
+        String skillSlug = "test-skill";
+        String userId = "user-100";
+        Map<Long, NamespaceRole> userNsRoles = Map.of(1L, NamespaceRole.MEMBER);
+
+        Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
+        setId(namespace, 1L);
+        Skill skill = new Skill(1L, skillSlug, userId, SkillVisibility.PUBLIC);
+        setId(skill, 1L);
+        skill.setDisplayName("Test Skill");
+        skill.setStatus(SkillStatus.ACTIVE);
+        skill.setLatestVersionId(10L);
+
+        SkillVersion version = new SkillVersion(1L, "1.0.0", userId);
+        setId(version, 10L);
+        version.setStatus(SkillVersionStatus.PUBLISHED);
+        version.setDownloadReady(true);
+        String storageKey = "packages/1/10/bundle.zip";
+        ObjectMetadata metadata = new ObjectMetadata(1000L, "application/zip", Instant.now());
+
+        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
+        when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
+        when(visibilityChecker.canAccess(skill, userId, userNsRoles)).thenReturn(true);
+        when(skillVersionRepository.findById(10L)).thenReturn(Optional.of(version));
+        when(objectStorageService.exists(storageKey)).thenReturn(true);
+        when(objectStorageService.getMetadata(storageKey)).thenReturn(metadata);
+        when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Test Skill-1.0.0.zip")))
+                .thenReturn("https://storage.example.test/presigned");
+
+        SkillDownloadService.DownloadResult result = service.downloadLatest(
+                namespaceSlug, skillSlug, userId, userNsRoles, null);
+
+        assertEquals("https://storage.example.test/presigned", result.presignedUrl());
+        assertFalse(result.fallbackBundle());
+        verify(skillRepository).incrementDownloadCount(1L);
+        verify(skillVersionStatsRepository).incrementDownloadCount(10L, 1L);
+        ArgumentCaptor<SkillDownloadedEvent> eventCaptor = ArgumentCaptor.forClass(SkillDownloadedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        SkillDownloadedEvent event = eventCaptor.getValue();
+        assertEquals("1.0.0", event.version());
+        assertEquals(namespaceSlug, event.namespaceSlug());
+        assertEquals(skillSlug, event.skillSlug());
+        assertEquals("presigned", event.delivery());
+        assertNull(event.actorUserId());
+        assertNull(event.actorKey());
+        assertNull(event.actorKind());
+        assertNull(event.requestContext());
     }
 
     @Test
@@ -134,7 +219,7 @@ class SkillDownloadServiceTest {
         when(skillRepository.findByNamespaceIdAndSlug(1L, skillSlug)).thenReturn(List.of(skill));
 
         DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
-                service.downloadLatest(namespaceSlug, skillSlug, null, Map.of()));
+                service.downloadLatest(namespaceSlug, skillSlug, null, Map.of(), null));
 
         assertEquals("error.skill.notFound", ex.messageCode());
         assertArrayEquals(new Object[]{skillSlug}, ex.messageArgs());
@@ -167,7 +252,7 @@ class SkillDownloadServiceTest {
         when(skillVersionRepository.findById(10L)).thenReturn(Optional.of(version));
 
         DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
-                service.downloadLatest(namespaceSlug, skillSlug, null, Map.of()));
+                service.downloadLatest(namespaceSlug, skillSlug, null, Map.of(), null));
 
         assertEquals("error.skill.version.notDownloadable", ex.messageCode());
         assertArrayEquals(new Object[]{"1.0.0"}, ex.messageArgs());
@@ -208,7 +293,7 @@ class SkillDownloadServiceTest {
                 .thenReturn(null);
 
         assertThrows(com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException.class, () ->
-                service.downloadLatest(namespaceSlug, skillSlug, null, Map.of()));
+                service.downloadLatest(namespaceSlug, skillSlug, null, Map.of(), null));
         verify(skillRepository, never()).incrementDownloadCount(anyLong());
         verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
         verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
@@ -240,11 +325,11 @@ class SkillDownloadServiceTest {
         when(skillRepository.findByNamespaceIdAndSlug(1L, "unpublished")).thenReturn(List.of(unpublishedSkill));
 
         assertThrows(DomainBadRequestException.class, () ->
-                service.downloadLatest("global", "hidden", null, Map.of()));
+                service.downloadLatest("global", "hidden", null, Map.of(), null));
         assertThrows(com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException.class, () ->
-                service.downloadLatest("global", "private", null, Map.of()));
+                service.downloadLatest("global", "private", null, Map.of(), null));
         assertThrows(DomainBadRequestException.class, () ->
-                service.downloadLatest("global", "unpublished", null, Map.of()));
+                service.downloadLatest("global", "unpublished", null, Map.of(), null));
         verify(skillRepository, never()).incrementDownloadCount(anyLong());
         verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
         verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
@@ -285,7 +370,8 @@ class SkillDownloadServiceTest {
         when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Test Skill-1.0.0.zip"))).thenReturn(null);
 
         // Act
-        SkillDownloadService.DownloadResult result = service.downloadByTag(namespaceSlug, skillSlug, tagName, userId, userNsRoles);
+        SkillDownloadService.DownloadResult result = service.downloadByTag(
+                namespaceSlug, skillSlug, tagName, userId, userNsRoles, null);
 
         // Assert
         assertNotNull(result);
@@ -328,7 +414,8 @@ class SkillDownloadServiceTest {
         when(objectStorageService.generatePresignedUrl(eq(storageKey), any(), eq("Generate Commit Message-1.0.0.zip")))
                 .thenReturn("http://minio.local/presigned");
 
-        SkillDownloadService.DownloadResult result = service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles);
+        SkillDownloadService.DownloadResult result = service.downloadVersion(
+                namespaceSlug, skillSlug, versionStr, userId, userNsRoles, null);
 
         assertEquals("http://minio.local/presigned", result.presignedUrl());
         assertNotNull(result.openContent());
@@ -360,7 +447,7 @@ class SkillDownloadServiceTest {
         when(skillVersionRepository.findBySkillIdAndVersion(1L, versionStr)).thenReturn(Optional.of(version));
 
         assertThrows(DomainBadRequestException.class, () ->
-                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles));
+                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles, null));
         verify(skillRepository, never()).incrementDownloadCount(anyLong());
         verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
         verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));
@@ -390,7 +477,7 @@ class SkillDownloadServiceTest {
         when(skillVersionRepository.findBySkillIdAndVersion(1L, versionStr)).thenReturn(Optional.of(version));
 
         DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
-                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles));
+                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles, null));
 
         assertEquals("error.skill.version.notDownloadable", ex.messageCode());
         assertArrayEquals(new Object[]{versionStr}, ex.messageArgs());
@@ -424,7 +511,7 @@ class SkillDownloadServiceTest {
         when(skillVersionRepository.findBySkillIdAndVersion(1L, versionStr)).thenReturn(Optional.of(version));
 
         DomainBadRequestException ex = assertThrows(DomainBadRequestException.class, () ->
-                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles));
+                service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles, null));
 
         assertEquals("error.skill.version.notDownloadable", ex.messageCode());
         assertArrayEquals(new Object[]{versionStr}, ex.messageArgs());
@@ -462,7 +549,8 @@ class SkillDownloadServiceTest {
         when(objectStorageService.exists("skills/1/10/SKILL.md")).thenReturn(true);
         when(objectStorageService.getObject("skills/1/10/SKILL.md")).thenReturn(new ByteArrayInputStream("test".getBytes()));
 
-        SkillDownloadService.DownloadResult result = service.downloadVersion(namespaceSlug, skillSlug, versionStr, userId, userNsRoles);
+        SkillDownloadService.DownloadResult result = service.downloadVersion(
+                namespaceSlug, skillSlug, versionStr, userId, userNsRoles, null);
 
         assertNull(result.presignedUrl());
         assertTrue(result.fallbackBundle());
@@ -511,7 +599,8 @@ class SkillDownloadServiceTest {
         when(objectStorageService.exists("skills/1/10/SKILL.md")).thenReturn(true);
         when(objectStorageService.getObject("skills/1/10/SKILL.md")).thenReturn(new ByteArrayInputStream("test".getBytes()));
 
-        SkillDownloadService.DownloadResult result = service.downloadVersion("global", "demo-skill", "1.0.0", null, Map.of());
+        SkillDownloadService.DownloadResult result = service.downloadVersion(
+                "global", "demo-skill", "1.0.0", null, Map.of(), null);
 
         assertNotNull(result);
         assertEquals("Demo Skill-1.0.0.zip", result.filename());
@@ -547,7 +636,8 @@ class SkillDownloadServiceTest {
         when(objectStorageService.exists("skills/1/10/SKILL.md")).thenReturn(true);
         when(objectStorageService.getObject("skills/1/10/SKILL.md")).thenReturn(new ByteArrayInputStream("test".getBytes()));
 
-        SkillDownloadService.DownloadResult result = service.downloadVersion("team-ai", "demo-skill", "1.0.0", null, Map.of());
+        SkillDownloadService.DownloadResult result = service.downloadVersion(
+                "team-ai", "demo-skill", "1.0.0", null, Map.of(), null);
 
         assertNotNull(result);
         assertEquals("Demo Skill-1.0.0.zip", result.filename());
@@ -577,7 +667,7 @@ class SkillDownloadServiceTest {
         when(skillVersionRepository.findBySkillIdAndVersion(1L, "1.1.0")).thenReturn(Optional.of(version));
 
         assertThrows(DomainForbiddenException.class, () ->
-                service.downloadVersion("global", "demo-skill", "1.1.0", null, Map.of()));
+                service.downloadVersion("global", "demo-skill", "1.1.0", null, Map.of(), null));
         verify(skillRepository, never()).incrementDownloadCount(anyLong());
         verify(skillVersionStatsRepository, never()).incrementDownloadCount(anyLong(), anyLong());
         verify(eventPublisher, never()).publishEvent(any(SkillDownloadedEvent.class));

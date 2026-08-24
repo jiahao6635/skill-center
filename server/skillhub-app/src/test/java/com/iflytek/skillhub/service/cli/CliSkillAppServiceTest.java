@@ -24,6 +24,7 @@ import com.iflytek.skillhub.dto.cli.CliResolveResponse;
 import com.iflytek.skillhub.service.AuditRequestContext;
 import com.iflytek.skillhub.service.SkillDeleteAppService;
 import com.iflytek.skillhub.service.SkillSearchAppService;
+import com.iflytek.skillhub.usage.UsageContextFactory;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
 import com.iflytek.skillhub.search.SearchResult;
@@ -51,6 +52,7 @@ class CliSkillAppServiceTest {
     @Mock SkillDownloadService skillDownloadService;
     @Mock SkillDeleteAppService skillDeleteAppService;
     @Mock SkillPublishService skillPublishService;
+    @Mock UsageContextFactory usageContextFactory;
     @Mock SkillRepository skillRepository;
     @Mock NamespaceRepository namespaceRepository;
     @Mock SkillVersionRepository skillVersionRepository;
@@ -63,7 +65,7 @@ class CliSkillAppServiceTest {
     void setUp() {
         service = new CliSkillAppService(
                 skillSearchAppService, skillQueryService,
-                skillDownloadService, skillDeleteAppService, skillPublishService);
+                skillDownloadService, skillDeleteAppService, skillPublishService, usageContextFactory);
     }
 
     @Test
@@ -166,7 +168,8 @@ class CliSkillAppServiceTest {
                 skillQueryService,
                 skillDownloadService,
                 skillDeleteAppService,
-                skillPublishService
+                skillPublishService,
+                usageContextFactory
         );
 
         Skill installableSecondMatch = new Skill(1L, "ready-second", "owner-1", SkillVisibility.PUBLIC);

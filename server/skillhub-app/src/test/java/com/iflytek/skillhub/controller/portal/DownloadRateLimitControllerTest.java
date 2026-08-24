@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
@@ -59,7 +61,7 @@ class DownloadRateLimitControllerTest {
     @Test
     void anonymousDownloadUsesIpAndSignedCookieBuckets() throws Exception {
         given(rateLimiter.tryAcquire(anyString(), anyInt(), anyInt())).willReturn(true);
-        given(skillDownloadService.downloadVersion("global", "demo-skill", "1.0.0", null, Map.of()))
+        given(skillDownloadService.downloadVersion(eq("global"), eq("demo-skill"), eq("1.0.0"), isNull(), eq(Map.of()), any()))
                 .willReturn(new SkillDownloadService.DownloadResult(
                         () -> new ByteArrayInputStream("zip".getBytes()),
                         "demo-skill-1.0.0.zip",
@@ -101,6 +103,6 @@ class DownloadRateLimitControllerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value(429));
 
-        verify(skillDownloadService, never()).downloadVersion(anyString(), anyString(), anyString(), anyString(), any());
+        verify(skillDownloadService, never()).downloadVersion(any(), any(), any(), any(), any(), any());
     }
 }
