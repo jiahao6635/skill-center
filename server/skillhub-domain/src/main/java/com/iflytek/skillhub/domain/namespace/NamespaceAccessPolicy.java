@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 public class NamespaceAccessPolicy {
 
     public boolean isImmutable(Namespace namespace) {
-        return namespace.getType() == NamespaceType.GLOBAL;
+        return namespace.getType() == NamespaceType.GLOBAL || namespace.getType() == NamespaceType.SYSTEM;
     }
 
     public boolean canMutateSettings(Namespace namespace) {

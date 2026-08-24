@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 import { UploadZone } from '@/features/publish/upload-zone.tsx'
@@ -29,6 +29,7 @@ import { toast } from '@/shared/lib/toast.ts'
 import { ApiError } from '@/api/client.ts'
 
 const EMPTY_NAMESPACE_VALUE = '__select_namespace__'
+const PRIVATE_NAMESPACE_SLUG = 'private'
 
 export function PublishPage() {
   const { t } = useTranslation()
@@ -36,22 +37,42 @@ export function PublishPage() {
   const search = useSearch({ from: '/dashboard/publish' })
   const prefill = normalizePublishPrefill(search)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [namespaceSlug, setNamespaceSlug] = useState<string>(prefill.namespace)
+  const [namespaceSlug, setNamespaceSlug] = useState<string>(
+    prefill.visibility === 'PRIVATE' ? PRIVATE_NAMESPACE_SLUG : prefill.namespace
+  )
   const [visibility, setVisibility] = useState<string>(prefill.visibility)
   const [warningDialogOpen, setWarningDialogOpen] = useState(false)
   const [precheckWarnings, setPrecheckWarnings] = useState<string[]>([])
+  const previousNamespaceRef = useRef<string>(prefill.namespace)
 
   const { data: namespaces, isLoading: isLoadingNamespaces } = useMyNamespaces()
   const publishMutation = usePublishSkill()
+  const isPrivate = visibility === 'PRIVATE'
   const selectedNamespace = namespaces?.find((ns) => ns.slug === namespaceSlug)
   const namespaceOnlyLabel = selectedNamespace?.type === 'GLOBAL'
     ? t('publish.visibilityOptions.loggedInUsersOnly')
     : t('publish.visibilityOptions.namespaceOnly')
 
   useEffect(() => {
-    setNamespaceSlug(prefill.namespace)
+    const resolvedNamespace = prefill.visibility === 'PRIVATE'
+      ? PRIVATE_NAMESPACE_SLUG
+      : prefill.namespace
+    setNamespaceSlug(resolvedNamespace)
     setVisibility(prefill.visibility)
+    if (prefill.visibility !== 'PRIVATE') {
+      previousNamespaceRef.current = prefill.namespace
+    }
   }, [prefill.namespace, prefill.visibility])
+
+  const handleVisibilityChange = useCallback((value: string) => {
+    setVisibility(value)
+    if (value === 'PRIVATE') {
+      previousNamespaceRef.current = namespaceSlug
+      setNamespaceSlug(PRIVATE_NAMESPACE_SLUG)
+    } else if (namespaceSlug === PRIVATE_NAMESPACE_SLUG) {
+      setNamespaceSlug(previousNamespaceRef.current)
+    }
+  }, [namespaceSlug])
 
   const handleRemoveSelectedFile = () => {
     setSelectedFile(null)
@@ -160,17 +181,24 @@ export function PublishPage() {
             <div className="h-11 animate-shimmer rounded-lg" />
           ) : (
             <Select
-              value={normalizeSelectValue(namespaceSlug) ?? EMPTY_NAMESPACE_VALUE}
+              value={normalizeSelectValue(namespaceSlug) ?? (isPrivate ? PRIVATE_NAMESPACE_SLUG : EMPTY_NAMESPACE_VALUE)}
               onValueChange={(value) => {
+                if (isPrivate) return
                 setNamespaceSlug(value === EMPTY_NAMESPACE_VALUE ? '' : value)
               }}
+              disabled={isPrivate}
             >
               <SelectTrigger id="namespace">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={EMPTY_NAMESPACE_VALUE}>{t('publish.selectNamespace')}</SelectItem>
-                {namespaces?.map((ns) => (
+                {!isPrivate && (
+                  <SelectItem value={EMPTY_NAMESPACE_VALUE}>{t('publish.selectNamespace')}</SelectItem>
+                )}
+                {isPrivate && (
+                  <SelectItem value={PRIVATE_NAMESPACE_SLUG}>Private (@{PRIVATE_NAMESPACE_SLUG})</SelectItem>
+                )}
+                {!isPrivate && namespaces?.map((ns) => (
                   <SelectItem key={ns.id} value={ns.slug}>
                     {ns.displayName} (@{ns.slug})
                   </SelectItem>
@@ -182,14 +210,29 @@ export function PublishPage() {
 
         <div className="space-y-3">
           <Label htmlFor="visibility" className="text-sm font-semibold font-heading">{t('publish.visibility')}</Label>
-          <Select value={visibility} onValueChange={setVisibility}>
+          <Select value={visibility} onValueChange={handleVisibilityChange}>
             <SelectTrigger id="visibility">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="PUBLIC">{t('publish.visibilityOptions.public')}</SelectItem>
-              <SelectItem value="NAMESPACE_ONLY">{namespaceOnlyLabel}</SelectItem>
-              <SelectItem value="PRIVATE">{t('publish.visibilityOptions.private')}</SelectItem>
+              <SelectItem value="PUBLIC">
+                <div>
+                  <span className="text-sm">{t('publish.visibilityOptions.public')}</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('publish.visibilityDescriptions.public')}</p>
+                </div>
+              </SelectItem>
+              <SelectItem value="NAMESPACE_ONLY">
+                <div>
+                  <span className="text-sm">{namespaceOnlyLabel}</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('publish.visibilityDescriptions.namespaceOnly')}</p>
+                </div>
+              </SelectItem>
+              <SelectItem value="PRIVATE">
+                <div>
+                  <span className="text-sm">{t('publish.visibilityOptions.private')}</span>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('publish.visibilityDescriptions.private')}</p>
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

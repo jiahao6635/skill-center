@@ -95,7 +95,7 @@ public class SecurityScanService {
         }
         // Always create a new audit record — supports multiple rounds per version
         auditRepository.save(new SecurityAudit(versionId, ScannerType.SKILL_SCANNER));
-        scanTaskProducer.publishScanTask(new ScanTask(
+        final ScanTask scanTask = new ScanTask(
                 UUID.randomUUID().toString(),
                 versionId,
                 packagePath,
@@ -103,7 +103,10 @@ public class SecurityScanService {
                 publisherId,
                 System.currentTimeMillis(),
                 Map.of("scannerType", ScannerType.SKILL_SCANNER.getValue())
-        ));
+        );
+        // The stream consumer must not observe this task before skill_version /
+        // security_audit rows are committed and visible.
+        TransactionCommitCallbacks.afterCommitOrNow(() -> scanTaskProducer.publishScanTask(scanTask));
         // Only transition to SCANNING if the version is not already published (auto-publish flow)
         if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
             version.setStatus(SkillVersionStatus.SCANNING);

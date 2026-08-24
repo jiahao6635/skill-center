@@ -14,6 +14,7 @@ import com.iflytek.skillhub.dto.cli.CliResolveResponse;
 import com.iflytek.skillhub.service.AuditRequestContext;
 import com.iflytek.skillhub.service.SkillDeleteAppService;
 import com.iflytek.skillhub.service.SkillSearchAppService;
+import com.iflytek.skillhub.usage.UsageContextFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -33,18 +34,21 @@ public class CliSkillAppService {
     private final SkillDownloadService skillDownloadService;
     private final SkillDeleteAppService skillDeleteAppService;
     private final SkillPublishService skillPublishService;
+    private final UsageContextFactory usageContextFactory;
 
     public CliSkillAppService(
             SkillSearchAppService skillSearchAppService,
             SkillQueryService skillQueryService,
             SkillDownloadService skillDownloadService,
             SkillDeleteAppService skillDeleteAppService,
-            SkillPublishService skillPublishService) {
+            SkillPublishService skillPublishService,
+            UsageContextFactory usageContextFactory) {
         this.skillSearchAppService = skillSearchAppService;
         this.skillQueryService = skillQueryService;
         this.skillDownloadService = skillDownloadService;
         this.skillDeleteAppService = skillDeleteAppService;
         this.skillPublishService = skillPublishService;
+        this.usageContextFactory = usageContextFactory;
     }
 
     public record CliSearchItem(String namespace, String slug, String latestVersion, String summary) {}
@@ -88,7 +92,8 @@ public class CliSkillAppService {
         Map<Long, NamespaceRole> userNsRoles = (Map<Long, NamespaceRole>) request.getAttribute("userNsRoles");
 
         SkillDownloadService.DownloadResult result = skillDownloadService.downloadLatest(
-                namespace, slug, userId, userNsRoles != null ? userNsRoles : Map.of()
+                namespace, slug, userId, userNsRoles != null ? userNsRoles : Map.of(),
+                usageContextFactory.fromRequest(request, userId)
         );
 
         return buildDownloadResponse(result);
@@ -100,7 +105,8 @@ public class CliSkillAppService {
         Map<Long, NamespaceRole> userNsRoles = (Map<Long, NamespaceRole>) request.getAttribute("userNsRoles");
 
         SkillDownloadService.DownloadResult result = skillDownloadService.downloadVersion(
-                namespace, slug, version, userId, userNsRoles != null ? userNsRoles : Map.of()
+                namespace, slug, version, userId, userNsRoles != null ? userNsRoles : Map.of(),
+                usageContextFactory.fromRequest(request, userId)
         );
 
         return buildDownloadResponse(result);

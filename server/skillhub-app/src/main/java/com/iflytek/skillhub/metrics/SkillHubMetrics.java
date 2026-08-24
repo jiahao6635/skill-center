@@ -60,4 +60,38 @@ public class SkillHubMetrics {
             "operation", operation
         ).increment();
     }
+
+    public void incrementUsageRecorded(String action, String client) {
+        meterRegistry.counter(
+            "skillhub.usage.recorded",
+            "action", action,
+            "client", client
+        ).increment();
+    }
+
+    public void incrementUsageDedupHit(String action) {
+        meterRegistry.counter(
+            "skillhub.usage.dedup_hit",
+            "action", action
+        ).increment();
+    }
+
+    public void incrementUsageRecordFailure(String action) {
+        meterRegistry.counter(
+            "skillhub.usage.record.failure",
+            "action", action
+        ).increment();
+    }
+
+    public void incrementUsageExecutorRejected() {
+        meterRegistry.counter("skillhub.usage.executor.rejected").increment();
+    }
+
+    public void incrementUsageRetentionPiiCleared(long rows) {
+        meterRegistry.counter("skillhub.usage.retention.pii_cleared").increment(rows);
+    }
+
+    public void incrementUsageRetentionDeleted(long rows) {
+        meterRegistry.counter("skillhub.usage.retention.deleted").increment(rows);
+    }
 }

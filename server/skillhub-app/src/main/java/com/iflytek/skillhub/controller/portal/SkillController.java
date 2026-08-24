@@ -23,6 +23,7 @@ import com.iflytek.skillhub.dto.SkillVersionResponse;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
 import com.iflytek.skillhub.ratelimit.RateLimit;
 import com.iflytek.skillhub.service.SkillLabelAppService;
+import com.iflytek.skillhub.usage.UsageContextFactory;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -51,18 +52,21 @@ public class SkillController extends BaseApiController {
     private final SkillDownloadService skillDownloadService;
     private final SkillLabelAppService skillLabelAppService;
     private final SkillHubMetrics metrics;
+    private final UsageContextFactory usageContextFactory;
 
     public SkillController(
             SkillQueryService skillQueryService,
             SkillDownloadService skillDownloadService,
             SkillLabelAppService skillLabelAppService,
             SkillHubMetrics metrics,
+            UsageContextFactory usageContextFactory,
             ApiResponseFactory responseFactory) {
         super(responseFactory);
         this.skillQueryService = skillQueryService;
         this.skillDownloadService = skillDownloadService;
         this.skillLabelAppService = skillLabelAppService;
         this.metrics = metrics;
+        this.usageContextFactory = usageContextFactory;
     }
 
     /**
@@ -359,7 +363,8 @@ public class SkillController extends BaseApiController {
             @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
 
         SkillDownloadService.DownloadResult result = skillDownloadService.downloadLatest(
-                namespace, slug, userId, userNsRoles != null ? userNsRoles : Map.of());
+                namespace, slug, userId, userNsRoles != null ? userNsRoles : Map.of(),
+                usageContextFactory.fromRequest(request, userId));
 
         return buildDownloadResponse(request, result);
     }
@@ -375,7 +380,8 @@ public class SkillController extends BaseApiController {
             @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
 
         SkillDownloadService.DownloadResult result = skillDownloadService.downloadVersion(
-                namespace, slug, version, userId, userNsRoles != null ? userNsRoles : Map.of());
+                namespace, slug, version, userId, userNsRoles != null ? userNsRoles : Map.of(),
+                usageContextFactory.fromRequest(request, userId));
 
         return buildDownloadResponse(request, result);
     }
@@ -391,7 +397,8 @@ public class SkillController extends BaseApiController {
             @RequestAttribute(value = "userNsRoles", required = false) Map<Long, NamespaceRole> userNsRoles) {
 
         SkillDownloadService.DownloadResult result = skillDownloadService.downloadByTag(
-                namespace, slug, tagName, userId, userNsRoles != null ? userNsRoles : Map.of());
+                namespace, slug, tagName, userId, userNsRoles != null ? userNsRoles : Map.of(),
+                usageContextFactory.fromRequest(request, userId));
 
         return buildDownloadResponse(request, result);
     }

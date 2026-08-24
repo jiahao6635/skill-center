@@ -64,7 +64,7 @@ Enum `SkillVisibility` (used in `SkillPublishService`):
 |-------|-------------|
 | `PUBLIC` | Creates `PENDING_REVIEW` version, review task, security scan |
 | `NAMESPACE_ONLY` | Same as PUBLIC but limited visibility scope |
-| `PRIVATE` | Goes directly to `UPLOADED` status, no review task |
+| `PRIVATE` | Goes directly to `UPLOADED` status, no review task. Automatically routed to the `@private` namespace. |
 
 `SUPER_ADMIN` role bypasses review — versions go directly to `PUBLISHED`.
 

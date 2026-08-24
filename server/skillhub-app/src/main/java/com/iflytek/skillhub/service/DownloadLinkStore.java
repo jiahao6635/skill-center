@@ -68,6 +68,14 @@ public class DownloadLinkStore {
         private Long versionId;
         private String filename;
         private boolean published;
+        // Issuer attribution: the user who created the deep link, not the
+        // client that later fetches it. Nullable for tokens minted before the
+        // fields existed (10-minute TTL window during rollout).
+        private String issuerUserId;
+        private String issuerActorKey;
+        private String issuerActorKind;
+        private String issuerClient;
+        private String issuerAuthMethod;
 
         public DownloadLinkData() {}
 
@@ -79,10 +87,26 @@ public class DownloadLinkStore {
             this.published = published;
         }
 
+        public DownloadLinkData(String presignedUrl, Long skillId, Long versionId, String filename, boolean published,
+                                String issuerUserId, String issuerActorKey, String issuerActorKind,
+                                String issuerClient, String issuerAuthMethod) {
+            this(presignedUrl, skillId, versionId, filename, published);
+            this.issuerUserId = issuerUserId;
+            this.issuerActorKey = issuerActorKey;
+            this.issuerActorKind = issuerActorKind;
+            this.issuerClient = issuerClient;
+            this.issuerAuthMethod = issuerAuthMethod;
+        }
+
         public String getPresignedUrl() { return presignedUrl; }
         public Long getSkillId() { return skillId; }
         public Long getVersionId() { return versionId; }
         public String getFilename() { return filename; }
         public boolean isPublished() { return published; }
+        public String getIssuerUserId() { return issuerUserId; }
+        public String getIssuerActorKey() { return issuerActorKey; }
+        public String getIssuerActorKind() { return issuerActorKind; }
+        public String getIssuerClient() { return issuerClient; }
+        public String getIssuerAuthMethod() { return issuerAuthMethod; }
     }
 }

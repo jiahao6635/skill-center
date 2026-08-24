@@ -77,6 +77,7 @@ public class NamespacePortalQueryAppService {
 
         List<Namespace> scopedNamespaces = loadNamespaces(namespaceRoles, isSuperAdmin).stream()
                 .filter(namespace -> namespace.getStatus() == NamespaceStatus.ACTIVE)
+                .filter(namespace -> namespace.getType() != NamespaceType.SYSTEM)
                 .sorted(Comparator.comparing(Namespace::getSlug))
                 .toList();
         int fromIndex = Math.min((int) pageable.getOffset(), scopedNamespaces.size());
@@ -107,6 +108,7 @@ public class NamespacePortalQueryAppService {
         }
 
         return loadNamespaces(namespaceRoles, isSuperAdmin).stream()
+                .filter(namespace -> namespace.getType() != NamespaceType.SYSTEM)
                 .sorted(Comparator.comparing(Namespace::getSlug))
                 .map(namespace -> {
                     NamespaceRole currentRole = namespaceRoles.get(namespace.getId());

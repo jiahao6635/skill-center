@@ -68,6 +68,8 @@ class BootstrapAdminInitializerTest {
         bootstrapAdminProperties.setEnabled(true);
         Namespace global = new Namespace("global", "Global", "system");
         setField(global, "id", 1L);
+        Namespace privateNs = new Namespace("private", "Private", "system");
+        setField(privateNs, "id", 2L);
 
         Role superAdminRole = new Role();
         setField(superAdminRole, "id", 1L);
@@ -79,7 +81,9 @@ class BootstrapAdminInitializerTest {
         when(roleRepository.findByCode("SUPER_ADMIN")).thenReturn(Optional.of(superAdminRole));
         when(userRoleBindingRepository.findByUserId("docker-admin")).thenReturn(List.of());
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(global));
+        when(namespaceRepository.findBySlug("private")).thenReturn(Optional.of(privateNs));
         when(namespaceMemberRepository.findByNamespaceIdAndUserId(1L, "docker-admin")).thenReturn(Optional.empty());
+        when(namespaceMemberRepository.findByNamespaceIdAndUserId(2L, "docker-admin")).thenReturn(Optional.empty());
 
         initializer.run(new DefaultApplicationArguments(new String[0]));
 
@@ -102,9 +106,10 @@ class BootstrapAdminInitializerTest {
         assertEquals("SUPER_ADMIN", roleBindingCaptor.getValue().getRole().getCode());
 
         ArgumentCaptor<NamespaceMember> memberCaptor = ArgumentCaptor.forClass(NamespaceMember.class);
-        verify(namespaceMemberRepository).save(memberCaptor.capture());
-        assertEquals("docker-admin", memberCaptor.getValue().getUserId());
-        assertEquals(NamespaceRole.OWNER, memberCaptor.getValue().getRole());
+        verify(namespaceMemberRepository, atLeast(2)).save(memberCaptor.capture());
+        List<NamespaceMember> savedMembers = memberCaptor.getAllValues();
+        assertTrue(savedMembers.stream().anyMatch(m -> m.getUserId().equals("docker-admin") && m.getRole() == NamespaceRole.OWNER));
+        assertTrue(savedMembers.stream().anyMatch(m -> m.getUserId().equals("docker-admin") && m.getRole() == NamespaceRole.MEMBER));
     }
 
     @Test
@@ -126,6 +131,8 @@ class BootstrapAdminInitializerTest {
         bootstrapAdminProperties.setEnabled(true);
         Namespace global = new Namespace("global", "Global", "system");
         setField(global, "id", 1L);
+        Namespace privateNs = new Namespace("private", "Private", "system");
+        setField(privateNs, "id", 2L);
 
         Role superAdminRole = new Role();
         setField(superAdminRole, "id", 1L);
@@ -139,13 +146,15 @@ class BootstrapAdminInitializerTest {
         when(roleRepository.findByCode("SUPER_ADMIN")).thenReturn(Optional.of(superAdminRole));
         when(userRoleBindingRepository.findByUserId("docker-admin")).thenReturn(List.of());
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(global));
+        when(namespaceRepository.findBySlug("private")).thenReturn(Optional.of(privateNs));
         when(namespaceMemberRepository.findByNamespaceIdAndUserId(1L, "docker-admin")).thenReturn(Optional.empty());
+        when(namespaceMemberRepository.findByNamespaceIdAndUserId(2L, "docker-admin")).thenReturn(Optional.empty());
 
         initializer.run(new DefaultApplicationArguments(new String[0]));
 
         verify(localCredentialRepository, never()).save(any(LocalCredential.class));
         verify(userRoleBindingRepository).save(any(UserRoleBinding.class));
-        verify(namespaceMemberRepository).save(any(NamespaceMember.class));
+        verify(namespaceMemberRepository, atLeast(2)).save(any(NamespaceMember.class));
     }
 
     @Test
@@ -153,6 +162,8 @@ class BootstrapAdminInitializerTest {
         bootstrapAdminProperties.setEnabled(true);
         Namespace global = new Namespace("global", "Global", "system");
         setField(global, "id", 1L);
+        Namespace privateNs = new Namespace("private", "Private", "system");
+        setField(privateNs, "id", 2L);
 
         Role superAdminRole = new Role();
         setField(superAdminRole, "id", 1L);
@@ -166,7 +177,9 @@ class BootstrapAdminInitializerTest {
         when(roleRepository.findByCode("SUPER_ADMIN")).thenReturn(Optional.of(superAdminRole));
         when(userRoleBindingRepository.findByUserId("docker-admin")).thenReturn(List.of());
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(global));
+        when(namespaceRepository.findBySlug("private")).thenReturn(Optional.of(privateNs));
         when(namespaceMemberRepository.findByNamespaceIdAndUserId(1L, "docker-admin")).thenReturn(Optional.empty());
+        when(namespaceMemberRepository.findByNamespaceIdAndUserId(2L, "docker-admin")).thenReturn(Optional.empty());
 
         initializer.run(new DefaultApplicationArguments(new String[0]));
 
@@ -175,7 +188,7 @@ class BootstrapAdminInitializerTest {
         verify(userAccountRepository, never()).save(any(UserAccount.class));
         verify(localCredentialRepository, never()).save(any(LocalCredential.class));
         verify(userRoleBindingRepository).save(any(UserRoleBinding.class));
-        verify(namespaceMemberRepository).save(any(NamespaceMember.class));
+        verify(namespaceMemberRepository, atLeast(2)).save(any(NamespaceMember.class));
     }
 
     @Test

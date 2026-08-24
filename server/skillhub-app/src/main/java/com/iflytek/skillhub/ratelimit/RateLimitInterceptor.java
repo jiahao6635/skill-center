@@ -98,6 +98,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
         AnonymousDownloadIdentityService.AnonymousDownloadIdentity identity =
                 anonymousDownloadIdentityService.resolve(request, response);
+        // A freshly minted cookie only reaches the response, not request.getCookies();
+        // expose the identity so usage attribution sees the same cookieHash in-request.
+        request.setAttribute("anonymousDownloadIdentity", identity);
         boolean ipAllowed = rateLimiter.tryAcquire(
                 "ratelimit:download:ip:" + identity.ipHash() + resourceSuffix,
                 limit,

@@ -1404,6 +1404,11 @@
       "loggedInUsersOnly": "Logged-in Users Only",
       "private": "Private"
     },
+    "visibilityDescriptions": {
+      "public": "After review approval, the skill is visible to all platform users. Anyone can search, view, and download.",
+      "namespaceOnly": "Only visible to members of this namespace. Published after review approval.",
+      "private": "Only visible to you. Published immediately without review. For personal tools and experiments."
+    },
     "file": "Skill Package File",
     "removeSelectedFile": "Remove selected file",
     "publishing": "Publishing...",

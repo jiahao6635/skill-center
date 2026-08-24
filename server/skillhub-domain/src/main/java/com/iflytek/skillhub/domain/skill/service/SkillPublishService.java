@@ -321,6 +321,8 @@ public class SkillPublishService {
         );
     }
 
+    private static final String PRIVATE_NAMESPACE_SLUG = "private";
+
     private PublishResult publishFromEntriesInternal(
             String namespaceSlug,
             List<PackageEntry> entries,
@@ -331,9 +333,14 @@ public class SkillPublishService {
             boolean forceAutoPublish,
             boolean bypassMembershipCheck) {
 
+        // Route PRIVATE skills to the built-in @private namespace
+        final String resolvedNamespaceSlug = (visibility == SkillVisibility.PRIVATE)
+                ? PRIVATE_NAMESPACE_SLUG
+                : namespaceSlug;
+
         // 1. Find namespace by slug
-        Namespace namespace = namespaceRepository.findBySlug(namespaceSlug)
-                .orElseThrow(() -> new DomainBadRequestException("error.namespace.slug.notFound", namespaceSlug));
+        Namespace namespace = namespaceRepository.findBySlug(resolvedNamespaceSlug)
+                .orElseThrow(() -> new DomainBadRequestException("error.namespace.slug.notFound", resolvedNamespaceSlug));
         assertNamespaceWritable(namespace);
 
         boolean isSuperAdmin = platformRoles.contains("SUPER_ADMIN");
@@ -341,7 +348,7 @@ public class SkillPublishService {
         // 2. Check publisher is member unless SUPER_ADMIN short-circuits permission checks
         if (!isSuperAdmin && !bypassMembershipCheck) {
             namespaceMemberRepository.findByNamespaceIdAndUserId(namespace.getId(), publisherId)
-                    .orElseThrow(() -> new DomainBadRequestException("error.skill.publish.publisher.notMember", namespaceSlug));
+                    .orElseThrow(() -> new DomainBadRequestException("error.skill.publish.publisher.notMember", resolvedNamespaceSlug));
         }
 
         // 3. Validate package

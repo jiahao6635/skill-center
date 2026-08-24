@@ -23,7 +23,8 @@ SkillHub uses a two-axis coordinate model:
 @{namespace_slug}/{skill_slug}
 ```
 
-- `@global/my-skill` — Global namespace skill
+- `@global/my-skill` — Global namespace skill (platform-level public namespace)
+- `@private/my-skill` — Private namespace skill (system namespace for private skills, all users auto-joined)
 - `@my-team/my-skill` — Team namespace skill (namespace slug is any valid slug)
 - `@department-ops/my-skill` — Department namespace skill
 
@@ -31,9 +32,11 @@ SkillHub uses a two-axis coordinate model:
 
 Namespaces (`domain/namespace/`):
 - **Slug**: unique identifier, validated by `SlugValidator`
+- **Type**: `GLOBAL` (platform public), `TEAM` (user-created), `SYSTEM` (built-in, e.g. `@private`)
 - **Status**: `ACTIVE`, `FROZEN`, `ARCHIVED`
 - **Roles**: `OWNER`, `ADMIN`, `MEMBER`
 - Frozen or archived namespaces cannot publish skills
+- `SYSTEM` type namespaces are immutable, not shown in namespace lists, and cannot be deleted
 
 ### RBAC Roles
 
@@ -52,6 +55,7 @@ ClawHub CLI uses a single-slug model (no `/` allowed in slugs). Mapping:
 | SkillHub Coordinate | Canonical Slug | Notes |
 |---------------------|----------------|-------|
 | `@global/my-skill` | `my-skill` | Global namespace omits prefix |
+| `@private/my-skill` | `private--my-skill` | Double-dash separator |
 | `@team-name/my-skill` | `team-name--my-skill` | Double-dash separator |
 
 **Conflict resolution**: `--` split takes priority. `@global/team-name--my-skill` would conflict

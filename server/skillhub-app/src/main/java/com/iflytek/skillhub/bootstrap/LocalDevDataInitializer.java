@@ -71,6 +71,11 @@ public class LocalDevDataInitializer implements ApplicationRunner {
         ensureMembership(globalNamespace.getId(), localAdmin.getId(), NamespaceRole.OWNER);
         ensureRole(localAdmin.getId(), "SUPER_ADMIN");
 
+        Namespace privateNamespace = namespaceRepository.findBySlug("private")
+                .orElseThrow(() -> new IllegalStateException("Missing built-in private namespace"));
+        ensureMembership(privateNamespace.getId(), localUser.getId(), NamespaceRole.MEMBER);
+        ensureMembership(privateNamespace.getId(), localAdmin.getId(), NamespaceRole.MEMBER);
+
         log.info("Local dev accounts ready: {} / {}", LOCAL_USER_ID, LOCAL_ADMIN_ID);
     }
 

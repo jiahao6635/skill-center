@@ -6,6 +6,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.service.SkillDownloadLinkService;
+import com.iflytek.skillhub.usage.UsageContextFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,13 +27,16 @@ import java.util.Map;
 public class DownloadLinkController extends BaseApiController {
 
     private final SkillDownloadLinkService skillDownloadLinkService;
+    private final UsageContextFactory usageContextFactory;
     private final String publicBaseUrl;
 
     public DownloadLinkController(ApiResponseFactory responseFactory,
                                   SkillDownloadLinkService skillDownloadLinkService,
+                                  UsageContextFactory usageContextFactory,
                                   @Value("${skillhub.public.base-url:}") String publicBaseUrl) {
         super(responseFactory);
         this.skillDownloadLinkService = skillDownloadLinkService;
+        this.usageContextFactory = usageContextFactory;
         this.publicBaseUrl = publicBaseUrl;
     }
 
@@ -47,7 +51,8 @@ public class DownloadLinkController extends BaseApiController {
 
         SkillDownloadLinkService.IssueResult result = skillDownloadLinkService.issueDownloadLink(
                 namespace, slug, version, principal.userId(),
-                userNsRoles != null ? userNsRoles : Map.of());
+                userNsRoles != null ? userNsRoles : Map.of(),
+                usageContextFactory.fromRequest(request, principal.userId()));
 
         String baseUrl = buildBaseUrl(request);
         String downloadUrl = result.isRedirect()

@@ -68,6 +68,36 @@ public class AnonymousDownloadIdentityService {
         return new AnonymousDownloadIdentity(hash(ip), hash(cookieId));
     }
 
+    /**
+     * Verify skillhub_anon_dl without ever minting: never writes Set-Cookie.
+     * Empty when the cookie is missing or invalid. Returned hash is the SHA-256
+     * hex of the cookie id (64 chars), identical to {@code resolve().cookieHash}.
+     * Usage attribution for SEARCH / VIEW must use this instead of resolve().
+     */
+    public java.util.Optional<String> peekCookieHash(HttpServletRequest request) {
+        String cookieId = extractValidCookieId(request);
+        return cookieId == null ? java.util.Optional.empty() : java.util.Optional.of(hash(cookieId));
+    }
+
+    /**
+     * Cookieless anonymous fingerprint (CLI / compat): 32 hex chars from the
+     * first 16 bytes of HMAC-SHA256(downloadCookieSecret, ip + "\n" + ua).
+     * Distinct in shape from the 64-hex cookie hash by design.
+     */
+    public String fallbackIdentityHash(String clientIp, String userAgent) {
+        String normalizedUserAgent = userAgent == null ? "" : userAgent.trim();
+        if (normalizedUserAgent.length() > 512) {
+            normalizedUserAgent = normalizedUserAgent.substring(0, 512);
+        }
+        String ip = clientIp == null ? "" : clientIp;
+        byte[] mac = sign(ip + "\n" + normalizedUserAgent);
+        StringBuilder builder = new StringBuilder(32);
+        for (int i = 0; i < 16; i++) {
+            builder.append(String.format("%02x", mac[i]));
+        }
+        return builder.toString();
+    }
+
     private String extractValidCookieId(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {

@@ -84,7 +84,7 @@ describe('PublishPage', () => {
   it('prefills namespace and visibility from route search params', () => {
     renderToStaticMarkup(createElement(PublishPage))
 
-    expect(selectRecords[0]?.value).toBe('team-ai')
+    expect(selectRecords[0]?.value).toBe('private')
     expect(selectRecords[1]?.value).toBe('PRIVATE')
   })
 

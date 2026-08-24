@@ -8,6 +8,7 @@ import com.iflytek.skillhub.domain.namespace.NamespaceStatus;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.skill.*;
+import com.iflytek.skillhub.domain.usage.UsageAttribution;
 import com.iflytek.skillhub.storage.ObjectStorageService;
 import com.iflytek.skillhub.storage.ObjectMetadata;
 import org.slf4j.Logger;
@@ -105,7 +106,8 @@ public class SkillDownloadService {
             String namespaceSlug,
             String skillSlug,
             String currentUserId,
-            Map<Long, NamespaceRole> userNsRoles) {
+            Map<Long, NamespaceRole> userNsRoles,
+            UsageAttribution attribution) {
 
         Namespace namespace = findNamespace(namespaceSlug);
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
@@ -118,7 +120,7 @@ public class SkillDownloadService {
         SkillVersion version = skillVersionRepository.findById(skill.getLatestVersionId())
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.latest.notFound"));
 
-        return downloadVersion(skill, version, currentUserId, userNsRoles);
+        return downloadVersion(skill, version, currentUserId, userNsRoles, namespaceSlug, attribution);
     }
 
     /**
@@ -130,7 +132,8 @@ public class SkillDownloadService {
             String skillSlug,
             String versionStr,
             String currentUserId,
-            Map<Long, NamespaceRole> userNsRoles) {
+            Map<Long, NamespaceRole> userNsRoles,
+            UsageAttribution attribution) {
 
         Namespace namespace = findNamespace(namespaceSlug);
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
@@ -139,7 +142,7 @@ public class SkillDownloadService {
         SkillVersion version = skillVersionRepository.findBySkillIdAndVersion(skill.getId(), versionStr)
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", versionStr));
 
-        return downloadVersion(skill, version, currentUserId, userNsRoles);
+        return downloadVersion(skill, version, currentUserId, userNsRoles, namespaceSlug, attribution);
     }
 
     /**
@@ -150,7 +153,8 @@ public class SkillDownloadService {
             String skillSlug,
             String tagName,
             String currentUserId,
-            Map<Long, NamespaceRole> userNsRoles) {
+            Map<Long, NamespaceRole> userNsRoles,
+            UsageAttribution attribution) {
 
         Namespace namespace = findNamespace(namespaceSlug);
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
@@ -166,7 +170,7 @@ public class SkillDownloadService {
         SkillVersion version = skillVersionRepository.findById(tag.getVersionId())
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.tag.version.notFound", tagName));
 
-        return downloadVersion(skill, version, currentUserId, userNsRoles);
+        return downloadVersion(skill, version, currentUserId, userNsRoles, namespaceSlug, attribution);
     }
 
     /**
@@ -208,15 +212,38 @@ public class SkillDownloadService {
     }
 
     /**
-     * Records a published download by identifiers only.
+     * Records a published download by identifiers only, without attribution.
      *
-     * <p>Extracted so the deep-link redirect endpoint can count a download at
-     * fetch time without holding the full aggregate in memory.
+     * <p>Tests and internal package pulls only; the usage listener skips the
+     * resulting event because it is not recordable. Production paths A–E must
+     * use the attributed overload.
      */
     public void recordDownloadById(Long skillId, Long versionId) {
         skillRepository.incrementDownloadCount(skillId);
         skillVersionStatsRepository.incrementDownloadCount(versionId, skillId);
         eventPublisher.publishEvent(new SkillDownloadedEvent(skillId, versionId));
+    }
+
+    /**
+     * Production overload: records a published download with attribution.
+     *
+     * <p>{@code delivery} (presigned | bundle | deeplink) must already be
+     * decided before the counters are incremented; the HTTP layer's later
+     * 302-vs-stream choice never rewrites it. {@code attribution} may be null
+     * (tests) — counters still increment, the usage listener just skips.
+     */
+    public void recordDownloadById(Long skillId, Long versionId, String version,
+            String namespaceSlug, String skillSlug, String delivery,
+            UsageAttribution attribution) {
+        skillRepository.incrementDownloadCount(skillId);
+        skillVersionStatsRepository.incrementDownloadCount(versionId, skillId);
+        eventPublisher.publishEvent(new SkillDownloadedEvent(
+                skillId, versionId, version,
+                attribution == null ? null : attribution.actorUserId(),
+                attribution == null ? null : attribution.actorKey(),
+                attribution == null ? null : attribution.actorKind(),
+                namespaceSlug, skillSlug, delivery,
+                attribution == null ? null : attribution.requestContext()));
     }
 
     private SkillVersion resolveDownloadableVersion(Skill skill, String versionStr) {
@@ -234,20 +261,27 @@ public class SkillDownloadService {
     private DownloadResult downloadVersion(Skill skill,
                                            SkillVersion version,
                                            String currentUserId,
-                                           Map<Long, NamespaceRole> userNsRoles) {
+                                           Map<Long, NamespaceRole> userNsRoles,
+                                           String namespaceSlug,
+                                           UsageAttribution attribution) {
         assertPublishedAccessible(skill);
         assertDownloadableVersion(skill, version, currentUserId, userNsRoles);
         DownloadResult result = buildDownloadResult(skill, version);
 
         // Only increment download count for PUBLISHED versions
         if (version.getStatus() == SkillVersionStatus.PUBLISHED) {
-            recordPublishedDownload(skill, version);
+            String delivery = (result.fallbackBundle() || result.presignedUrl() == null)
+                    ? "bundle" : "presigned";
+            recordPublishedDownload(skill, version, namespaceSlug, attribution, delivery);
         }
         return result;
     }
 
-    private void recordPublishedDownload(Skill skill, SkillVersion version) {
-        recordDownloadById(skill.getId(), version.getId());
+    private void recordPublishedDownload(Skill skill, SkillVersion version,
+                                         String namespaceSlug, UsageAttribution attribution,
+                                         String delivery) {
+        recordDownloadById(skill.getId(), version.getId(), version.getVersion(),
+                namespaceSlug, skill.getSlug(), delivery, attribution);
     }
 
     private DownloadResult buildDownloadResult(Skill skill, SkillVersion version) {

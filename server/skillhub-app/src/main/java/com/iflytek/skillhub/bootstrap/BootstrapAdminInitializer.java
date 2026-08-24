@@ -111,11 +111,17 @@ public class BootstrapAdminInitializer implements ApplicationRunner {
             userRoleBindingRepository.save(new UserRoleBinding(admin.getId(), superAdmin));
         }
 
-        // 4. Ensure global namespace + membership
+        // 4. Ensure global and private namespace membership
         Namespace globalNs = namespaceRepository.findBySlug("global")
                 .orElseThrow(() -> new IllegalStateException("Missing built-in global namespace"));
         if (namespaceMemberRepository.findByNamespaceIdAndUserId(globalNs.getId(), admin.getId()).isEmpty()) {
             namespaceMemberRepository.save(new NamespaceMember(globalNs.getId(), admin.getId(), NamespaceRole.OWNER));
+        }
+
+        Namespace privateNs = namespaceRepository.findBySlug("private")
+                .orElseThrow(() -> new IllegalStateException("Missing built-in private namespace"));
+        if (namespaceMemberRepository.findByNamespaceIdAndUserId(privateNs.getId(), admin.getId()).isEmpty()) {
+            namespaceMemberRepository.save(new NamespaceMember(privateNs.getId(), admin.getId(), NamespaceRole.MEMBER));
         }
 
         log.info("Bootstrap admin initialized for account: {}", bootstrapAdminProperties.getUsername());

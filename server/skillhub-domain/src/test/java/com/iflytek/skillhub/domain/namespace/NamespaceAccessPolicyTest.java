@@ -20,6 +20,18 @@ class NamespaceAccessPolicyTest {
     }
 
     @Test
+    void systemNamespaceIsImmutable() {
+        Namespace namespace = new Namespace("private", "Private", "system");
+        namespace.setType(NamespaceType.SYSTEM);
+
+        assertThat(policy.isImmutable(namespace)).isTrue();
+        assertThat(policy.canMutateSettings(namespace)).isFalse();
+        assertThat(policy.canManageMembers(namespace)).isFalse();
+        assertThat(policy.canTransferOwnership(namespace)).isFalse();
+        assertThat(policy.canDelete(namespace, NamespaceRole.OWNER)).isFalse();
+    }
+
+    @Test
     void activeTeamNamespaceAllowsAdminAndOwnerToFreezeButNotMember() {
         Namespace namespace = new Namespace("team-a", "Team A", "owner");
         namespace.setType(NamespaceType.TEAM);
