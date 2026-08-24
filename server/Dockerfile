@@ -13,7 +13,6 @@ COPY skillhub-notification/pom.xml skillhub-notification/
 COPY skillhub-app/pom.xml skillhub-app/
 COPY mvnw .
 COPY .mvn .mvn
-RUN mkdir -p /root/.m2 && cp .mvn/settings.xml /root/.m2/settings.xml
 RUN ./mvnw dependency:go-offline -B
 
 COPY . .
