@@ -7,9 +7,11 @@ import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
 import com.iflytek.skillhub.domain.skill.service.SkillHardDeleteService;
 import com.iflytek.skillhub.search.SearchIndexService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,20 +28,23 @@ public class SkillDeleteAppService {
 
     private final SkillRepository skillRepository;
     private final NamespaceRepository namespaceRepository;
+    private final SkillVersionDeletionLock skillVersionDeletionLock;
     private final SkillHardDeleteService skillHardDeleteService;
     private final SearchIndexService searchIndexService;
 
     public SkillDeleteAppService(SkillRepository skillRepository,
                                  NamespaceRepository namespaceRepository,
+                                 SkillVersionDeletionLock skillVersionDeletionLock,
                                  SkillHardDeleteService skillHardDeleteService,
                                  SearchIndexService searchIndexService) {
         this.skillRepository = skillRepository;
         this.namespaceRepository = namespaceRepository;
+        this.skillVersionDeletionLock = skillVersionDeletionLock;
         this.skillHardDeleteService = skillHardDeleteService;
         this.searchIndexService = searchIndexService;
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DeleteResult deleteSkill(String namespace,
                                     String slug,
                                     String targetOwnerId,
@@ -48,7 +53,7 @@ public class SkillDeleteAppService {
         return deleteSkillForActor(namespace, slug, targetOwnerId, actorUserId, auditRequestContext);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DeleteResult deleteSkillById(Long skillId,
                                         String actorUserId,
                                         AuditRequestContext auditRequestContext) {
@@ -59,7 +64,7 @@ public class SkillDeleteAppService {
         return deleteExistingSkill(skill, namespace.getSlug(), skill.getSlug(), actorUserId, auditRequestContext, false, null);
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DeleteResult deleteSkillByIdFromPortal(Long skillId,
                                                   PlatformPrincipal principal,
                                                   AuditRequestContext auditRequestContext) {
@@ -78,7 +83,7 @@ public class SkillDeleteAppService {
         );
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public DeleteResult deleteSkillFromPortal(String namespace,
                                               String slug,
                                               String targetOwnerId,
@@ -115,15 +120,17 @@ public class SkillDeleteAppService {
         if (enforcePortalOwnership && !canDeleteFromPortal(skill, principal)) {
             throw new DomainForbiddenException("error.forbidden");
         }
-        searchIndexService.remove(skill.getId());
+        Skill lockedSkill = skillVersionDeletionLock.lockAndRefresh(skill)
+                .orElseThrow(() -> new DomainNotFoundException("error.skill.notFound", skill.getId()));
+        searchIndexService.remove(lockedSkill.getId());
         skillHardDeleteService.hardDeleteSkill(
-                skill,
+                lockedSkill,
                 namespace,
                 actorUserId,
                 auditRequestContext != null ? auditRequestContext.clientIp() : null,
                 auditRequestContext != null ? auditRequestContext.userAgent() : null
         );
-        return new DeleteResult(skill.getId(), namespace, slug, true);
+        return new DeleteResult(lockedSkill.getId(), namespace, slug, true);
     }
 
     private String normalizeNamespace(String namespace) {

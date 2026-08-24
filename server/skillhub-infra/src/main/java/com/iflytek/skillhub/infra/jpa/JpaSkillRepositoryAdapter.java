@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -100,6 +101,21 @@ public class JpaSkillRepositoryAdapter implements SkillRepository {
     @Override
     public void decrementSubscriptionCount(Long skillId) {
         delegate.decrementSubscriptionCount(skillId);
+    }
+
+    @Override
+    public int updateLatestVersionIdIfCurrent(Long skillId,
+                                              Long expectedVersionId,
+                                              Long replacementVersionId,
+                                              String updatedBy,
+                                              Instant updatedAt) {
+        return delegate.updateLatestVersionIdIfCurrent(
+                skillId,
+                expectedVersionId,
+                replacementVersionId,
+                updatedBy,
+                updatedAt
+        );
     }
 
     @Override

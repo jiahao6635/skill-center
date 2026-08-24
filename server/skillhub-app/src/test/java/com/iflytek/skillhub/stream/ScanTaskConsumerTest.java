@@ -472,6 +472,13 @@ class ScanTaskConsumerTest {
         }
 
         @Override
+        public int deleteIfStatusIn(Long versionId,
+                                    Long skillId,
+                                    Collection<SkillVersionStatus> statuses) {
+            throw unsupported();
+        }
+
+        @Override
         public void flush() {
         }
 

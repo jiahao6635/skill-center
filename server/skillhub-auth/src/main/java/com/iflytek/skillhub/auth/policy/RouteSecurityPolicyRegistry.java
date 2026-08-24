@@ -141,15 +141,50 @@ public class RouteSecurityPolicyRegistry {
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/*/*/resolve"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/*/*/download"),
             ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/skills/*/*/versions/*/download"),
+            ApiTokenPolicy.allow(HttpMethod.GET, "/api/cli/v1/download-link/*"),
             ApiTokenPolicy.require(HttpMethod.DELETE, "/api/cli/v1/skills/*/*", "skill:delete"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/skills/*/publish", "skill:publish"),
             ApiTokenPolicy.require(HttpMethod.POST, "/api/cli/v1/skills/*/publish/validate", "skill:publish")
+    );
+
+    /**
+     * Authorization routes that intentionally have no API-token counterpart, keyed as
+     * {@code "<METHOD|ANY> <pattern>"} to match {@link #routeKey(HttpMethod, String)}.
+     *
+     * <p>These are browser-session surfaces: interactive login flows, the admin console,
+     * browser download-link issuance, and browser hard deletion. Bearer tokens are deliberately
+     * rejected on exactly these routes; every other API route opened by the authorization list
+     * must also be reachable by an API token holding the required scope.</p>
+     */
+    private static final Set<String> SESSION_ONLY_ROUTES = Set.of(
+            "ANY /api/v1/auth/session/bootstrap",
+            "ANY /api/v1/auth/direct/login",
+            "ANY /api/v1/auth/local/**",
+            "ANY /api/v1/admin/**",
+            "POST /api/web/skills/*/*/download-link",
+            "DELETE /api/web/skills/id/*",
+            "DELETE /api/web/skills/*/*"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public List<RouteAuthorizationPolicy> authorizationPolicies() {
         return AUTHORIZATION_POLICIES;
+    }
+
+    /**
+     * Authorization routes that are deliberately unreachable with an API token.
+     */
+    public Set<String> sessionOnlyRoutes() {
+        return SESSION_ONLY_ROUTES;
+    }
+
+    /**
+     * Stable key for a route in the authorization list, used to pair it with
+     * {@link #sessionOnlyRoutes()}.
+     */
+    public static String routeKey(HttpMethod method, String pattern) {
+        return (method == null ? "ANY" : method.name()) + " " + pattern;
     }
 
     public ApiTokenAuthorizationDecision authorizeApiToken(String method, String path, Set<String> tokenScopes) {
