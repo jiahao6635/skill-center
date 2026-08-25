@@ -215,23 +215,23 @@ export function PublishPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="PUBLIC">
-                <div>
-                  <span className="text-sm">{t('publish.visibilityOptions.public')}</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t('publish.visibilityDescriptions.public')}</p>
-                </div>
+              <SelectItem
+                value="PUBLIC"
+                description={t('publish.visibilityDescriptions.public')}
+              >
+                {t('publish.visibilityOptions.public')}
               </SelectItem>
-              <SelectItem value="NAMESPACE_ONLY">
-                <div>
-                  <span className="text-sm">{namespaceOnlyLabel}</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t('publish.visibilityDescriptions.namespaceOnly')}</p>
-                </div>
+              <SelectItem
+                value="NAMESPACE_ONLY"
+                description={t('publish.visibilityDescriptions.namespaceOnly')}
+              >
+                {namespaceOnlyLabel}
               </SelectItem>
-              <SelectItem value="PRIVATE">
-                <div>
-                  <span className="text-sm">{t('publish.visibilityOptions.private')}</span>
-                  <p className="text-xs text-muted-foreground mt-0.5">{t('publish.visibilityDescriptions.private')}</p>
-                </div>
+              <SelectItem
+                value="PRIVATE"
+                description={t('publish.visibilityDescriptions.private')}
+              >
+                {t('publish.visibilityOptions.private')}
               </SelectItem>
             </SelectContent>
           </Select>

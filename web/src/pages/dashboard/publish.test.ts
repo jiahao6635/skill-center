@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const useSearchMock = vi.fn()
 const selectRecords: Array<{ value?: string }> = []
+const selectItemRecords: Array<{ value?: string; description?: unknown; children?: unknown }> = []
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
@@ -34,7 +35,10 @@ vi.mock('@/shared/ui/select', () => ({
     return children
   },
   SelectContent: ({ children }: { children: unknown }) => children,
-  SelectItem: ({ children }: { children: unknown }) => children,
+  SelectItem: ({ children, value, description }: { children: unknown; value?: string; description?: unknown }) => {
+    selectItemRecords.push({ value, description, children })
+    return children
+  },
   SelectTrigger: ({ children }: { children: unknown }) => children,
   SelectValue: () => null,
   normalizeSelectValue: (v: string) => v || null,
@@ -75,6 +79,7 @@ import { PublishPage } from './publish.tsx'
 describe('PublishPage', () => {
   beforeEach(() => {
     selectRecords.length = 0
+    selectItemRecords.length = 0
     useSearchMock.mockReturnValue({
       namespace: '  team-ai  ',
       visibility: 'private',
@@ -99,5 +104,31 @@ describe('PublishPage', () => {
 
   it('exports a named component function', () => {
     expect(typeof PublishPage).toBe('function')
+  })
+
+  it('keeps visibility descriptions on the option instead of the trigger label', () => {
+    renderToStaticMarkup(createElement(PublishPage))
+
+    const visibilityItems = selectItemRecords.filter((item) =>
+      item.value === 'PUBLIC' || item.value === 'NAMESPACE_ONLY' || item.value === 'PRIVATE'
+    )
+
+    expect(visibilityItems).toEqual([
+      {
+        value: 'PUBLIC',
+        description: 'publish.visibilityDescriptions.public',
+        children: 'publish.visibilityOptions.public',
+      },
+      {
+        value: 'NAMESPACE_ONLY',
+        description: 'publish.visibilityDescriptions.namespaceOnly',
+        children: 'publish.visibilityOptions.namespaceOnly',
+      },
+      {
+        value: 'PRIVATE',
+        description: 'publish.visibilityDescriptions.private',
+        children: 'publish.visibilityOptions.private',
+      },
+    ])
   })
 })

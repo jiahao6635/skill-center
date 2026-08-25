@@ -4,11 +4,11 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/shared/lib/utils.ts'
 
 export const SELECT_TRIGGER_CLASS_NAME = cn(
-  'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/50 px-4 py-2 text-sm text-foreground',
+  'flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border/60 bg-secondary/50 px-4 py-2 text-left text-sm text-foreground',
   'ring-offset-background transition-all duration-200',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/50',
   'disabled:cursor-not-allowed disabled:opacity-50',
-  'data-[placeholder]:text-muted-foreground [&>span]:line-clamp-1'
+  'data-[placeholder]:text-muted-foreground [&>span]:line-clamp-1 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:text-left'
 )
 
 export const SELECT_CONTENT_CLASS_NAME = cn(
@@ -27,6 +27,10 @@ export const SELECT_ITEM_CLASS_NAME = cn(
 
 export const SELECT_SCROLL_BUTTON_CLASS_NAME = cn(
   'flex cursor-pointer items-center justify-center py-1 text-muted-foreground'
+)
+
+export const SELECT_VIEWPORT_POPPER_CLASS_NAME = cn(
+  'min-h-[var(--radix-select-trigger-height)] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)]'
 )
 
 export function normalizeSelectValue(value?: string | null) {
@@ -105,8 +109,7 @@ const SelectContent = React.forwardRef<
       <SelectPrimitive.Viewport
         className={cn(
           'p-1',
-          position === 'popper'
-            && 'h-[var(--radix-select-trigger-height)] min-w-[var(--radix-select-trigger-width)]'
+          position === 'popper' && SELECT_VIEWPORT_POPPER_CLASS_NAME
         )}
       >
         {children}
@@ -133,19 +136,39 @@ SelectLabel.displayName = SelectPrimitive.Label.displayName
 
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+    description?: React.ReactNode
+  }
+>(({ className, children, description, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
-    className={cn(SELECT_ITEM_CLASS_NAME, className)}
+    className={cn(
+      SELECT_ITEM_CLASS_NAME,
+      description && 'group items-start',
+      className
+    )}
     {...props}
   >
-    <span className="absolute left-3 flex h-4 w-4 items-center justify-center">
+    <span
+      className={cn(
+        'absolute left-3 flex h-4 w-4 items-center justify-center',
+        description && 'top-2.5'
+      )}
+    >
       <SelectPrimitive.ItemIndicator>
         <Check className="h-4 w-4" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    {description ? (
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+        <span className="whitespace-normal text-xs font-normal leading-snug text-muted-foreground group-focus:text-inherit group-data-[highlighted]:text-inherit">
+          {description}
+        </span>
+      </span>
+    ) : (
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    )}
   </SelectPrimitive.Item>
 ))
 
