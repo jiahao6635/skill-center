@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   extractPrecheckWarnings,
   isFrontmatterFailureMessage,
+  isPackageTooLargeError,
   isPrecheckConfirmationMessage,
   isPrecheckFailureMessage,
   isVersionExistsMessage,
@@ -32,5 +33,12 @@ describe('publish-error-utils', () => {
   it('keeps version and frontmatter detection helpers', () => {
     expect(isVersionExistsMessage('Version already exists')).toBe(true)
     expect(isFrontmatterFailureMessage('Invalid SKILL.md frontmatter')).toBe(true)
+  })
+
+  it('detects oversized package errors from status or message', () => {
+    expect(isPackageTooLargeError(413)).toBe(true)
+    expect(isPackageTooLargeError(400, 'Package too large: 184191181 bytes (max: 104857600)')).toBe(true)
+    expect(isPackageTooLargeError(400, '技能包超过 100MB 大小限制，请缩小后再上传。')).toBe(true)
+    expect(isPackageTooLargeError(400, 'Invalid request')).toBe(false)
   })
 })

@@ -1,19 +1,26 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useDropzone } from 'react-dropzone'
+import { useDropzone, type FileRejection } from 'react-dropzone'
 import { cn } from '@/shared/lib/utils.ts'
+import { formatFileSize } from '@/shared/lib/file-size.ts'
+import {
+  MAX_FILE_COUNT,
+  MAX_PACKAGE_BYTES,
+  MAX_SINGLE_FILE_BYTES,
+} from './package-limits.ts'
 
 interface UploadZoneProps {
   onFileSelect: (file: File) => void
+  onFileRejected?: (reason: 'too-large' | 'invalid-type', file?: File) => void
   disabled?: boolean
 }
 
 /**
  * Provides the publish page dropzone for uploading one zip package at a time.
- * The component is intentionally stateless so packaging validation can remain in
- * the publish flow that knows the surrounding form and backend constraints.
+ * Size-limit UX lives in the publish page so the surrounding form can show a
+ * persistent message; this zone only reports accepted and rejected files.
  */
-export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
+export function UploadZone({ onFileSelect, onFileRejected, disabled }: UploadZoneProps) {
   const { t } = useTranslation()
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -23,13 +30,33 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
     },
     [onFileSelect]
   )
+  const onDropRejected = useCallback(
+    (rejections: FileRejection[]) => {
+      const tooLarge = rejections.find((rejection) =>
+        rejection.errors.some((error) => error.code === 'file-too-large')
+      )
+      if (tooLarge) {
+        onFileRejected?.('too-large', tooLarge.file)
+        return
+      }
+      const invalidType = rejections.find((rejection) =>
+        rejection.errors.some((error) => error.code === 'file-invalid-type')
+      )
+      if (invalidType) {
+        onFileRejected?.('invalid-type', invalidType.file)
+      }
+    },
+    [onFileRejected]
+  )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    onDropRejected,
     accept: {
       'application/zip': ['.zip'],
     },
     maxFiles: 1,
+    maxSize: MAX_PACKAGE_BYTES,
     disabled,
   })
 
@@ -68,6 +95,13 @@ export function UploadZone({ onFileSelect, disabled }: UploadZoneProps) {
           <>
             <p className="text-sm font-medium text-foreground">{t('upload.dragHint')}</p>
             <p className="text-xs text-muted-foreground">{t('upload.formatHint')}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('upload.limitsHint', {
+                packageSize: formatFileSize(MAX_PACKAGE_BYTES),
+                fileSize: formatFileSize(MAX_SINGLE_FILE_BYTES),
+                fileCount: MAX_FILE_COUNT,
+              })}
+            </p>
           </>
         )}
       </div>

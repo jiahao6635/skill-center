@@ -21,6 +21,15 @@ const FRONTMATTER_FAILURE_MARKERS = [
   '技能包校验失败：Invalid SKILL.md frontmatter',
 ]
 
+const PACKAGE_TOO_LARGE_MARKERS = [
+  'error.skill.publish.packageTooLarge',
+  'Package too large',
+  'File too large',
+  'payload too large',
+  'exceeds the 100MB size limit',
+  '超过 100MB',
+]
+
 function includesAnyMarker(message: string | undefined, markers: string[]): boolean {
   if (!message) {
     return false
@@ -43,6 +52,10 @@ export function isPrecheckConfirmationMessage(message?: string): boolean {
 
 export function isFrontmatterFailureMessage(message?: string): boolean {
   return includesAnyMarker(message, FRONTMATTER_FAILURE_MARKERS)
+}
+
+export function isPackageTooLargeError(status?: number, message?: string): boolean {
+  return status === 413 || includesAnyMarker(message, PACKAGE_TOO_LARGE_MARKERS)
 }
 
 export function extractPrecheckWarnings(message?: string): string[] {

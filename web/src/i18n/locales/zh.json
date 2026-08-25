@@ -1263,7 +1263,8 @@
   "upload": {
     "dropHint": "放开以上传文件...",
     "dragHint": "拖拽 ZIP 文件到此处，或点击选择",
-    "formatHint": "仅支持 .zip 格式"
+    "formatHint": "仅支持 .zip 格式",
+    "limitsHint": "总包不超过 {{packageSize}}，包内单文件不超过 {{fileSize}}，文件数不超过 {{fileCount}}"
   },
   "layout": {
     "footerDescription": "技能注册中心，为开发者提供高效的技能管理和分发平台。"
@@ -1445,7 +1446,12 @@
     "warningConfirmCancel": "返回修改",
     "frontmatterFailedTitle": "SKILL.md 格式有误",
     "frontmatterFailedDescription": "请检查 SKILL.md 顶部 frontmatter 的 YAML 格式。若字段值中包含冒号，请用引号包裹。",
-    "selectRequired": "请选择命名空间和文件"
+    "selectRequired": "请选择命名空间和文件",
+    "invalidFileType": "仅支持 .zip 格式的技能包",
+    "packageTooLargeTitle": "技能包超过大小限制",
+    "packageTooLargeDescription": "{{name}} 当前 {{size}}，上限 {{limit}}。请删减过大的文件、模型或依赖后重新打包。",
+    "packageTooLargeUnknownSize": "已超过上限",
+    "packageTooLargeServerDescription": "技能包超过 {{limit}} 上限。请缩小 ZIP 后再上传。"
   },
   "toast": {
     "success": "成功",

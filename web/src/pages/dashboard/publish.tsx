@@ -5,11 +5,14 @@ import { UploadZone } from '@/features/publish/upload-zone.tsx'
 import {
   extractPrecheckWarnings,
   isFrontmatterFailureMessage,
+  isPackageTooLargeError,
   isPrecheckConfirmationMessage,
   isPrecheckFailureMessage,
   isVersionExistsMessage,
 } from '@/features/publish/publish-error-utils.ts'
+import { isPackageOverSizeLimit, MAX_PACKAGE_BYTES } from '@/features/publish/package-limits.ts'
 import { normalizePublishPrefill } from '@/features/publish/publish-prefill.ts'
+import { formatFileSize } from '@/shared/lib/file-size.ts'
 import { Button } from '@/shared/ui/button.tsx'
 import {
   Select,
@@ -31,12 +34,19 @@ import { ApiError } from '@/api/client.ts'
 const EMPTY_NAMESPACE_VALUE = '__select_namespace__'
 const PRIVATE_NAMESPACE_SLUG = 'private'
 
+type FileErrorState = {
+  title: string
+  description: string
+}
+
 export function PublishPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const search = useSearch({ from: '/dashboard/publish' })
   const prefill = normalizePublishPrefill(search)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [fileError, setFileError] = useState<FileErrorState | null>(null)
+  const [uploadZoneNonce, setUploadZoneNonce] = useState(0)
   const [namespaceSlug, setNamespaceSlug] = useState<string>(
     prefill.visibility === 'PRIVATE' ? PRIVATE_NAMESPACE_SLUG : prefill.namespace
   )
@@ -74,21 +84,63 @@ export function PublishPage() {
     }
   }, [namespaceSlug])
 
+  const resetUploadZone = () => {
+    setUploadZoneNonce((value) => value + 1)
+  }
+
   const handleRemoveSelectedFile = () => {
     setSelectedFile(null)
+    setFileError(null)
+    setPrecheckWarnings([])
+    setWarningDialogOpen(false)
+    resetUploadZone()
+  }
+
+  const showPackageTooLarge = (file?: File) => {
+    const title = t('publish.packageTooLargeTitle')
+    const description = t('publish.packageTooLargeDescription', {
+      name: file?.name ?? t('publish.packageTooLargeUnknownSize'),
+      size: file ? formatFileSize(file.size) : t('publish.packageTooLargeUnknownSize'),
+      limit: formatFileSize(MAX_PACKAGE_BYTES),
+    })
+    setSelectedFile(null)
+    setFileError({ title, description })
+    setPrecheckWarnings([])
+    setWarningDialogOpen(false)
+    resetUploadZone()
+    toast.error(title, description)
+  }
+
+  const handleFileSelect = (file: File) => {
+    if (isPackageOverSizeLimit(file.size)) {
+      showPackageTooLarge(file)
+      return
+    }
+    setSelectedFile(file)
+    setFileError(null)
     setPrecheckWarnings([])
     setWarningDialogOpen(false)
   }
 
-  const handleFileSelect = (file: File | null) => {
-    setSelectedFile(file)
-    setPrecheckWarnings([])
-    setWarningDialogOpen(false)
+  const handleFileRejected = (reason: 'too-large' | 'invalid-type', file?: File) => {
+    if (reason === 'too-large' || (file != null && isPackageOverSizeLimit(file.size))) {
+      showPackageTooLarge(file)
+      return
+    }
+    const title = t('publish.invalidFileType')
+    setSelectedFile(null)
+    setFileError({ title, description: t('upload.formatHint') })
+    resetUploadZone()
+    toast.error(title)
   }
 
   const publishSkill = async (confirmWarnings = false) => {
     if (!selectedFile || !namespaceSlug) {
       toast.error(t('publish.selectRequired'))
+      return
+    }
+    if (isPackageOverSizeLimit(selectedFile.size)) {
+      showPackageTooLarge(selectedFile)
       return
     }
 
@@ -147,6 +199,16 @@ export function PublishPage() {
           t('publish.frontmatterFailedTitle'),
           error.serverMessage || t('publish.frontmatterFailedDescription'),
         )
+        return
+      }
+
+      if (error instanceof ApiError && isPackageTooLargeError(error.status, error.serverMessage || error.message)) {
+        const title = t('publish.packageTooLargeTitle')
+        const description = t('publish.packageTooLargeServerDescription', {
+          limit: formatFileSize(MAX_PACKAGE_BYTES),
+        })
+        setFileError({ title, description })
+        toast.error(title, description)
         return
       }
 
@@ -240,10 +302,20 @@ export function PublishPage() {
         <div className="space-y-3">
           <Label className="text-sm font-semibold font-heading">{t('publish.file')}</Label>
           <UploadZone
-            key={selectedFile ? `${selectedFile.name}-${selectedFile.lastModified}` : 'empty'}
+            key={`upload-${uploadZoneNonce}-${selectedFile ? `${selectedFile.name}-${selectedFile.lastModified}` : 'empty'}`}
             onFileSelect={handleFileSelect}
+            onFileRejected={handleFileRejected}
             disabled={publishMutation.isPending}
           />
+          {fileError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm"
+            >
+              <p className="font-medium text-destructive">{fileError.title}</p>
+              <p className="mt-1 text-muted-foreground">{fileError.description}</p>
+            </div>
+          )}
           {selectedFile && (
             <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 px-4 py-3">
               <div className="min-w-0 text-sm text-muted-foreground flex items-center gap-2">
@@ -251,7 +323,7 @@ export function PublishPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
                 <span className="truncate">
-                  {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                  {selectedFile.name} ({formatFileSize(selectedFile.size)})
                 </span>
               </div>
               <Button

@@ -22,6 +22,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * Translates application, domain, auth, and infrastructure exceptions into the platform's JSON API
@@ -74,8 +75,21 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(apiResponseFactory.errorMessage(400, msg));
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(
+            MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        logHandledException(HttpStatus.PAYLOAD_TOO_LARGE, "error.skill.publish.packageTooLarge", request);
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(
+                apiResponseFactory.error(413, "error.skill.publish.packageTooLarge"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(IllegalArgumentException ex, HttpServletRequest request) {
+        if (isPackageSizeLimitMessage(ex.getMessage())) {
+            logHandledException(HttpStatus.PAYLOAD_TOO_LARGE, "error.skill.publish.packageTooLarge", request);
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(
+                    apiResponseFactory.error(413, "error.skill.publish.packageTooLarge"));
+        }
         logHandledException(HttpStatus.BAD_REQUEST, "error.badRequest", request);
         return ResponseEntity.badRequest().body(
                 apiResponseFactory.error(400, "error.badRequest"));
@@ -168,6 +182,13 @@ public class GlobalExceptionHandler {
         logHandledException(status, error.messageCode(), request);
         return ResponseEntity.status(status).body(
                 apiResponseFactory.error(status.value(), error.messageCode(), error.messageArgs()));
+    }
+
+    private static boolean isPackageSizeLimitMessage(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        return message.contains("Package too large") || message.contains("File too large");
     }
 
     private String resolveUserId(HttpServletRequest request) {

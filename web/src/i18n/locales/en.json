@@ -1262,7 +1262,8 @@
   "upload": {
     "dropHint": "Drop to upload...",
     "dragHint": "Drag a ZIP file here, or click to select",
-    "formatHint": "Only .zip format supported"
+    "formatHint": "Only .zip format supported",
+    "limitsHint": "Package ≤ {{packageSize}}, each file ≤ {{fileSize}}, up to {{fileCount}} files"
   },
   "layout": {
     "footerDescription": "Skill registry, providing efficient skill management and distribution for developers."
@@ -1444,7 +1445,12 @@
     "warningConfirmCancel": "Go back and fix",
     "frontmatterFailedTitle": "SKILL.md format is invalid",
     "frontmatterFailedDescription": "Please check the YAML frontmatter at the top of SKILL.md. If a field value contains a colon, wrap it in quotes.",
-    "selectRequired": "Please select namespace and file"
+    "selectRequired": "Please select namespace and file",
+    "invalidFileType": "Only .zip skill packages are supported",
+    "packageTooLargeTitle": "Skill package is too large",
+    "packageTooLargeDescription": "{{name}} is {{size}}. The limit is {{limit}}. Remove large assets, models, or dependencies and pack again.",
+    "packageTooLargeUnknownSize": "over the limit",
+    "packageTooLargeServerDescription": "The skill package exceeds the {{limit}} limit. Reduce the ZIP and upload again."
   },
   "toast": {
     "success": "Success",
