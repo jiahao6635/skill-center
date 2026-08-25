@@ -16,6 +16,7 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -721,5 +722,91 @@ class PostgresFullTextQueryServiceTest {
         verify(entityManager, org.mockito.Mockito.times(2)).createNativeQuery(sqlCaptor.capture());
         assertThat(sqlCaptor.getAllValues().getFirst()).contains("JOIN label_definition ld ON ld.id = sl.label_id");
         assertThat(sqlCaptor.getAllValues().getFirst()).contains("WHERE LOWER(ld.slug) IN :labelSlugs");
+    }
+
+    @Test
+    void nullOwnerIdsShouldNotAddOwnerPredicate() {
+        EntityManager entityManager = mock(EntityManager.class);
+        Query nativeQuery = mock(Query.class);
+        Query countQuery = mock(Query.class);
+        when(entityManager.createNativeQuery(anyString()))
+                .thenReturn(nativeQuery)
+                .thenReturn(countQuery);
+        when(nativeQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(nativeQuery);
+        when(countQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(countQuery);
+        when(nativeQuery.getResultList()).thenReturn(List.of());
+        when(countQuery.getSingleResult()).thenReturn(0L);
+
+        PostgresFullTextQueryService service = new PostgresFullTextQueryService(entityManager);
+        service.search(new SearchQuery(
+                "agent",
+                null,
+                new SearchVisibilityScope(null, Set.of(), Set.of()),
+                "newest",
+                0,
+                20
+        ));
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(entityManager, org.mockito.Mockito.times(2)).createNativeQuery(sqlCaptor.capture());
+        assertThat(sqlCaptor.getAllValues().getFirst()).doesNotContain("d.owner_id IN");
+        verify(nativeQuery, never()).setParameter(eq("ownerIds"), org.mockito.ArgumentMatchers.any());
+        verify(countQuery, never()).setParameter(eq("ownerIds"), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void emptyOwnerIdsShouldReturnEmptyPageWithoutSql() {
+        EntityManager entityManager = mock(EntityManager.class);
+        PostgresFullTextQueryService service = new PostgresFullTextQueryService(entityManager);
+
+        var result = service.search(new SearchQuery(
+                "agent",
+                null,
+                new SearchVisibilityScope(null, Set.of(), Set.of()),
+                "newest",
+                0,
+                20,
+                List.of(),
+                false,
+                List.of()
+        ));
+
+        assertThat(result.skillIds()).isEmpty();
+        assertThat(result.total()).isZero();
+        verify(entityManager, never()).createNativeQuery(anyString());
+    }
+
+    @Test
+    void ownerIdsShouldBindOnDataAndCountQueries() {
+        EntityManager entityManager = mock(EntityManager.class);
+        Query nativeQuery = mock(Query.class);
+        Query countQuery = mock(Query.class);
+        when(entityManager.createNativeQuery(anyString()))
+                .thenReturn(nativeQuery)
+                .thenReturn(countQuery);
+        when(nativeQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(nativeQuery);
+        when(countQuery.setParameter(anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(countQuery);
+        when(nativeQuery.getResultList()).thenReturn(List.of(1L));
+        when(countQuery.getSingleResult()).thenReturn(1L);
+
+        PostgresFullTextQueryService service = new PostgresFullTextQueryService(entityManager);
+        service.search(new SearchQuery(
+                null,
+                null,
+                new SearchVisibilityScope(null, Set.of(), Set.of()),
+                "newest",
+                0,
+                20,
+                List.of(),
+                false,
+                List.of("owner-1", "owner-2")
+        ));
+
+        verify(nativeQuery).setParameter("ownerIds", List.of("owner-1", "owner-2"));
+        verify(countQuery).setParameter("ownerIds", List.of("owner-1", "owner-2"));
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(entityManager, org.mockito.Mockito.times(2)).createNativeQuery(sqlCaptor.capture());
+        assertThat(sqlCaptor.getAllValues().getFirst()).contains("AND d.owner_id IN :ownerIds");
+        assertThat(sqlCaptor.getAllValues().get(1)).contains("AND d.owner_id IN :ownerIds");
     }
 }

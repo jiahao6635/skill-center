@@ -5,7 +5,11 @@ import { Loader2 } from 'lucide-react'
 import type { SkillSummary } from '@/api/types.ts'
 import { cn } from '@/shared/lib/utils.ts'
 import { useAuth } from '@/features/auth/use-auth.ts'
+import { SearchAuthorFilter } from '@/features/search/search-author-filter.tsx'
 import { SearchBar } from '@/features/search/search-bar.tsx'
+import { filterStarredSkills } from '@/features/search/filter-starred-skills.ts'
+import { MAX_AUTHOR_NAME_LENGTH } from '@/features/search/parse-search-page-search.ts'
+import { searchEmptyCopy } from '@/features/search/search-empty-copy.ts'
 import { SearchNamespaceFilter } from '@/features/search/search-namespace-filter.tsx'
 import { SkillCard } from '@/features/skill/skill-card.tsx'
 import { SkeletonList } from '@/shared/components/skeleton-loader.tsx'
@@ -59,24 +63,6 @@ function scrollToTopOnPageChange() {
  * Search text, sorting, pagination, and the starred-only filter are mirrored into router search
  * params so the page can be shared, restored, and revisited without losing state.
  */
-function filterStarredSkills(skills: SkillSummary[], query: string, namespace: string): SkillSummary[] {
-  const normalizedQuery = query.trim().toLowerCase()
-  const normalizedNamespace = namespace.trim().toLowerCase()
-
-  return skills.filter((skill) => {
-    const matchesNamespace = !normalizedNamespace || skill.namespace.toLowerCase() === normalizedNamespace
-    if (!matchesNamespace) {
-      return false
-    }
-    if (!normalizedQuery) {
-      return true
-    }
-    return [skill.displayName, skill.summary, skill.namespace, skill.slug]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(normalizedQuery))
-  })
-}
-
 function sortStarredSkills(skills: SkillSummary[], sort: string): SkillSummary[] {
   const sorted = [...skills]
   if (sort === 'downloads') {
@@ -97,16 +83,68 @@ export function SearchPage() {
 
   const q = normalizeSearchQuery(searchParams.q || '')
   const namespace = (searchParams.namespace || '').replace(/^@/, '')
+  const author = searchParams.author || ''
   const selectedLabel = searchParams.label || ''
   const sort = searchParams.sort || 'newest'
   const page = searchParams.page ?? 0
   const starredOnly = searchParams.starredOnly ?? false
   const [queryInput, setQueryInput] = useState(formatNamespaceSearchInput(namespace, q))
+  const [authorInput, setAuthorInput] = useState(author)
   const previousPageRef = useRef(page)
 
   useEffect(() => {
     setQueryInput(formatNamespaceSearchInput(namespace, q))
   }, [namespace, q])
+
+  useEffect(() => {
+    setAuthorInput(author)
+  }, [author])
+
+  function nextAuthorParam(): string {
+    return authorInput.trim().slice(0, MAX_AUTHOR_NAME_LENGTH)
+  }
+
+  function searchNavigation(overrides: {
+    q?: string
+    namespace?: string
+    author?: string
+    label?: string
+    sort?: string
+    page?: number
+    starredOnly?: boolean
+  } = {}) {
+    return {
+      q,
+      namespace,
+      author: nextAuthorParam(),
+      label: selectedLabel,
+      sort,
+      page: 0,
+      starredOnly,
+      ...overrides,
+    }
+  }
+
+  function buildSearchReturnTo(overrides: { page?: number } = {}): string {
+    const nextAuthor = nextAuthorParam()
+    const authorDirty = nextAuthor !== author
+    const pageValue = authorDirty ? 0 : (overrides.page ?? page)
+    const qs = new URLSearchParams()
+    qs.set('q', q)
+    qs.set('sort', sort)
+    qs.set('page', String(pageValue))
+    qs.set('starredOnly', String(starredOnly))
+    if (namespace) {
+      qs.set('namespace', namespace)
+    }
+    if (selectedLabel) {
+      qs.set('label', selectedLabel)
+    }
+    if (nextAuthor) {
+      qs.set('author', nextAuthor)
+    }
+    return `/search?${qs.toString()}`
+  }
 
   useEffect(() => {
     if (previousPageRef.current !== page) {
@@ -127,6 +165,7 @@ export function SearchPage() {
     {
       q,
       namespace: namespace || undefined,
+      author: author || undefined,
       label: selectedLabel || undefined,
       sort,
       page,
@@ -182,55 +221,68 @@ export function SearchPage() {
       startTransition(() => {
         navigate({
           to: '/search',
-          search: {
+          search: searchNavigation({
             q: parsedInput.query,
             namespace: parsedInput.namespace,
-            label: selectedLabel,
-            sort,
-            page: 0,
-            starredOnly,
-          },
+          }),
           replace: isEmptyInput ? page === 0 : true,
         })
       })
     }, 250)
 
     return () => window.clearTimeout(timeoutId)
-  }, [navigate, namespace, page, q, queryInput, selectedLabel, sort, starredOnly])
+  }, [author, authorInput, navigate, namespace, page, q, queryInput, selectedLabel, sort, starredOnly])
 
   const handleSearch = (query: string) => {
     const parsedInput = parseNamespaceSearchInput(query)
     setQueryInput(query)
     startTransition(() => {
-      navigate({ to: '/search', search: { q: parsedInput.query, namespace: parsedInput.namespace, label: selectedLabel, sort, page: 0, starredOnly }, replace: true })
+      navigate({
+        to: '/search',
+        search: searchNavigation({
+          q: parsedInput.query,
+          namespace: parsedInput.namespace,
+        }),
+        replace: true,
+      })
     })
   }
 
   const handleSortChange = (newSort: string) => {
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort: newSort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: searchNavigation({ sort: newSort }) })
   }
 
   const handlePageChange = (newPage: number) => {
     blurActiveElement()
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: newPage, starredOnly } })
+    const nextAuthor = nextAuthorParam()
+    const authorDirty = nextAuthor !== author
+    navigate({
+      to: '/search',
+      search: searchNavigation({
+        author: nextAuthor,
+        page: authorDirty ? 0 : newPage,
+      }),
+    })
   }
 
   const handleLabelToggle = (label: string) => {
     const nextLabel = selectedLabel === label ? '' : label
-    navigate({ to: '/search', search: { q, namespace, label: nextLabel, sort, page: 0, starredOnly } })
+    navigate({ to: '/search', search: searchNavigation({ label: nextLabel }) })
   }
 
   const handleNamespaceChange = (slug: string) => {
     navigate({
       to: '/search',
-      search: {
-        q,
-        namespace: slug || '',
-        label: selectedLabel,
-        sort,
-        page: 0,
-        starredOnly,
-      },
+      search: searchNavigation({ namespace: slug || '' }),
+    })
+  }
+
+  const handleAuthorChange = (name: string) => {
+    const next = name.trim().slice(0, MAX_AUTHOR_NAME_LENGTH)
+    setAuthorInput(next)
+    navigate({
+      to: '/search',
+      search: searchNavigation({ author: next }),
     })
   }
 
@@ -239,21 +291,24 @@ export function SearchPage() {
       navigate({
         to: '/login',
         search: {
-          returnTo: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+          returnTo: buildSearchReturnTo(),
         },
       })
       return
     }
 
-    navigate({ to: '/search', search: { q, namespace, label: selectedLabel, sort, page: 0, starredOnly: !starredOnly } })
+    navigate({ to: '/search', search: searchNavigation({ starredOnly: !starredOnly }) })
   }
 
-  const handleSkillClick = (namespace: string, slug: string) => {
-    navigate({ to: `/space/${namespace}/${encodeURIComponent(slug)}`, search: { returnTo: `${window.location.pathname}${window.location.search}` } })
+  const handleSkillClick = (skillNamespace: string, slug: string) => {
+    navigate({
+      to: `/space/${skillNamespace}/${encodeURIComponent(slug)}`,
+      search: { returnTo: buildSearchReturnTo() },
+    })
   }
 
   const filteredStarredSkills = starredOnly
-    ? sortStarredSkills(filterStarredSkills(starredSkills ?? [], q, namespace), sort)
+    ? sortStarredSkills(filterStarredSkills(starredSkills ?? [], q, namespace, author), sort)
     : []
   const starredPageItems = starredOnly
     ? filteredStarredSkills.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -267,18 +322,14 @@ export function SearchPage() {
   const isPageLoading = starredOnly ? isLoadingStarred : isLoading
   const isUpdatingResults = starredOnly ? isFetchingStarred && !isLoadingStarred : isFetching && !isLoading
   const resultCount = starredOnly ? filteredStarredSkills.length : (data?.total ?? 0)
-  const emptyTitle = namespaceUnavailable
-    ? t('search.namespaceUnavailable')
-    : starredOnly
-      ? t('search.noStarredResults')
-      : t(namespace && !q ? 'search.noResultsInNamespace' : 'search.noResults', { namespace })
-  const emptyDescription = namespaceUnavailable
-    ? t('search.namespaceUnavailableHint')
-    : starredOnly
-      ? (q ? t('search.noStarredResultsFor', { q }) : t('search.noStarredSkills'))
-      : namespace
-        ? (q ? t('search.noResultsForInNamespace', { q, namespace }) : t('search.noResultsInNamespaceHint'))
-        : (q ? t('search.noResultsFor', { q }) : undefined)
+  const emptyCopy = searchEmptyCopy({
+    namespaceUnavailable,
+    starredOnly,
+    author,
+    namespace,
+    q,
+    t,
+  })
 
   return (
     <div className={APP_SHELL_PAGE_CLASS_NAME}>
@@ -293,7 +344,7 @@ export function SearchPage() {
       </div>
 
       {/* Sort And Filters */}
-      <div className="space-y-4">
+      <div className="space-y-4" data-search-toolbar>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium text-muted-foreground">{t('search.sort.label')}</span>
@@ -342,6 +393,12 @@ export function SearchPage() {
             value={namespace}
             onChange={handleNamespaceChange}
             isAuthenticated={isAuthenticated}
+          />
+          <SearchAuthorFilter
+            value={author}
+            draft={authorInput}
+            onDraftChange={setAuthorInput}
+            onCommit={handleAuthorChange}
           />
           <Button
             type="button"
@@ -406,8 +463,8 @@ export function SearchPage() {
         </>
       ) : (
         <EmptyState
-          title={emptyTitle}
-          description={emptyDescription}
+          title={emptyCopy.title}
+          description={emptyCopy.description}
         />
       )}
     </div>

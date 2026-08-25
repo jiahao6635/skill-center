@@ -13,6 +13,8 @@ import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
+import com.iflytek.skillhub.domain.user.UserAccount;
+import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +37,9 @@ class JpaMySkillQueryRepositoryTest {
     @Mock
     private SkillVersionRepository skillVersionRepository;
 
+    @Mock
+    private UserAccountRepository userAccountRepository;
+
     private JpaMySkillQueryRepository repository;
 
     @BeforeEach
@@ -42,7 +47,8 @@ class JpaMySkillQueryRepositoryTest {
         repository = new JpaMySkillQueryRepository(
                 namespaceRepository,
                 promotionRequestRepository,
-                new SkillLifecycleProjectionService(skillVersionRepository)
+                new SkillLifecycleProjectionService(skillVersionRepository),
+                userAccountRepository
         );
     }
 
@@ -72,11 +78,14 @@ class JpaMySkillQueryRepositoryTest {
         given(skillVersionRepository.findBySkillId(2L)).willReturn(List.of(publishedVersion, rejectedVersion));
         given(promotionRequestRepository.findBySourceSkillIdAndStatus(2L, ReviewTaskStatus.PENDING)).willReturn(Optional.empty());
         given(promotionRequestRepository.findBySourceSkillIdAndStatus(2L, ReviewTaskStatus.APPROVED)).willReturn(Optional.empty());
+        given(userAccountRepository.findByIdIn(List.of("user-1")))
+                .willReturn(List.of(new UserAccount("user-1", "张三", null, null)));
 
         var responses = repository.getSkillSummaries(List.of(skill), "user-1");
 
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).namespace()).isEqualTo("team-ai");
+        assertThat(responses.get(0).ownerDisplayName()).isEqualTo("张三");
         assertThat(responses.get(0).publishedVersion()).isNotNull();
         assertThat(responses.get(0).ownerPreviewVersion()).isNotNull();
         assertThat(responses.get(0).ownerPreviewVersion().status()).isEqualTo("REJECTED");

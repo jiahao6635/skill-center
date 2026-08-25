@@ -8,6 +8,8 @@ import com.iflytek.skillhub.domain.namespace.NamespaceService;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
+import com.iflytek.skillhub.domain.user.UserAccount;
+import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.dto.SkillSummaryResponse;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
@@ -37,6 +39,7 @@ public class SkillSearchAppService {
     private final NamespaceService namespaceService;
     private final SkillLifecycleProjectionService skillLifecycleProjectionService;
     private final RbacService rbacService;
+    private final UserAccountRepository userAccountRepository;
 
     public SkillSearchAppService(
             SearchQueryService searchQueryService,
@@ -44,13 +47,15 @@ public class SkillSearchAppService {
             NamespaceRepository namespaceRepository,
             NamespaceService namespaceService,
             SkillLifecycleProjectionService skillLifecycleProjectionService,
-            RbacService rbacService) {
+            RbacService rbacService,
+            UserAccountRepository userAccountRepository) {
         this.searchQueryService = searchQueryService;
         this.skillRepository = skillRepository;
         this.namespaceRepository = namespaceRepository;
         this.namespaceService = namespaceService;
         this.skillLifecycleProjectionService = skillLifecycleProjectionService;
         this.rbacService = rbacService;
+        this.userAccountRepository = userAccountRepository;
     }
 
     public record SearchResponse(
@@ -80,12 +85,36 @@ public class SkillSearchAppService {
             List<String> labelSlugs,
             String userId,
             Map<Long, NamespaceRole> userNsRoles) {
+        return search(keyword, namespaceSlug, sortBy, page, size, labelSlugs, null, userId, userNsRoles);
+    }
+
+    public SearchResponse search(
+            String keyword,
+            String namespaceSlug,
+            String sortBy,
+            int page,
+            int size,
+            List<String> labelSlugs,
+            String author,
+            String userId,
+            Map<Long, NamespaceRole> userNsRoles) {
 
         Long namespaceId = resolveNamespaceId(namespaceSlug, userId, userNsRoles);
-
         SearchVisibilityScope scope = buildVisibilityScope(userId, userNsRoles);
-
-        return searchVisibleSkills(keyword, namespaceId, sortBy != null ? sortBy : "newest", page, size, labelSlugs, scope, false);
+        List<String> ownerIds = resolveOwnerIds(author);
+        if (ownerIds != null && ownerIds.isEmpty()) {
+            return new SearchResponse(List.of(), 0, page, size);
+        }
+        return searchVisibleSkills(
+                keyword,
+                namespaceId,
+                sortBy != null ? sortBy : "newest",
+                page,
+                size,
+                labelSlugs,
+                scope,
+                false,
+                ownerIds);
     }
 
     public SearchResponse searchInstallableLatest(
@@ -98,7 +127,16 @@ public class SkillSearchAppService {
             Map<Long, NamespaceRole> userNsRoles) {
         Long namespaceId = resolveNamespaceId(namespaceSlug, userId, userNsRoles);
         SearchVisibilityScope scope = buildVisibilityScope(userId, userNsRoles);
-        return searchVisibleSkills(keyword, namespaceId, sortBy != null ? sortBy : "newest", page, size, List.of(), scope, true);
+        return searchVisibleSkills(
+                keyword,
+                namespaceId,
+                sortBy != null ? sortBy : "newest",
+                page,
+                size,
+                List.of(),
+                scope,
+                true,
+                null);
     }
 
     private Long resolveNamespaceId(String namespaceSlug, String userId, Map<Long, NamespaceRole> userNsRoles) {
@@ -147,7 +185,8 @@ public class SkillSearchAppService {
             int size,
             List<String> labelSlugs,
             SearchVisibilityScope scope,
-            boolean requireInstallableLatest) {
+            boolean requireInstallableLatest,
+            List<String> ownerIds) {
         SearchResult result = searchQueryService.search(new SearchQuery(
                 keyword,
                 namespaceId,
@@ -156,10 +195,30 @@ public class SkillSearchAppService {
                 page,
                 size,
                 normalizeLabelSlugs(labelSlugs),
-                requireInstallableLatest
+                requireInstallableLatest,
+                ownerIds
         ));
         List<SkillSummaryResponse> pageItems = mapVisibleSkillSummaries(result.skillIds());
         return new SearchResponse(pageItems, result.total(), page, size);
+    }
+
+    private String normalizeAuthorName(String author) {
+        if (author == null || author.isBlank()) {
+            return null;
+        }
+        String trimmed = author.trim();
+        return trimmed.length() <= 128 ? trimmed : trimmed.substring(0, 128);
+    }
+
+    private List<String> resolveOwnerIds(String author) {
+        String normalized = normalizeAuthorName(author);
+        if (normalized == null) {
+            return null;
+        }
+        return userAccountRepository.findByTrimmedDisplayNameIgnoreCase(normalized).stream()
+                .map(UserAccount::getId)
+                .distinct()
+                .toList();
     }
 
     private List<String> normalizeLabelSlugs(List<String> labelSlugs) {
@@ -195,17 +254,32 @@ public class SkillSearchAppService {
         Map<Long, SkillLifecycleProjectionService.Projection> projectionsBySkillId =
                 skillLifecycleProjectionService.projectPublishedSummaries(matchedSkills);
 
+        List<String> ownerIds = matchedSkills.stream()
+                .map(Skill::getOwnerId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<String, String> ownerDisplayNamesById = ownerIds.isEmpty()
+                ? Map.of()
+                : userAccountRepository.findByIdIn(ownerIds).stream()
+                .collect(Collectors.toMap(UserAccount::getId, UserAccount::getDisplayName, (left, right) -> left));
+
         return skillIds.stream()
                 .map(skillsById::get)
                 .filter(java.util.Objects::nonNull)
-                .map(skill -> toSummaryResponse(skill, namespaceSlugsById, projectionsBySkillId.get(skill.getId())))
+                .map(skill -> toSummaryResponse(
+                        skill,
+                        namespaceSlugsById,
+                        projectionsBySkillId.get(skill.getId()),
+                        ownerDisplayNamesById.get(skill.getOwnerId())))
                 .toList();
     }
 
     private SkillSummaryResponse toSummaryResponse(
             Skill skill,
             Map<Long, String> namespaceSlugsById,
-            SkillLifecycleProjectionService.Projection projection) {
+            SkillLifecycleProjectionService.Projection projection,
+            String ownerDisplayName) {
         String namespaceSlug = namespaceSlugsById.get(skill.getNamespaceId());
 
         return new SkillSummaryResponse(
@@ -225,7 +299,8 @@ public class SkillSearchAppService {
                 toLifecycleVersion(projection.headlineVersion()),
                 toLifecycleVersion(projection.publishedVersion()),
                 toLifecycleVersion(projection.ownerPreviewVersion()),
-                projection.resolutionMode().name()
+                projection.resolutionMode().name(),
+                ownerDisplayName
         );
     }
 

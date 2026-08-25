@@ -75,7 +75,8 @@ class MeControllerTest {
                                 new SkillLifecycleVersionResponse(11L, "1.0.0", "PUBLISHED"),
                                 new SkillLifecycleVersionResponse(11L, "1.0.0", "PUBLISHED"),
                                 null,
-                                "PUBLISHED"
+                                "PUBLISHED",
+                                null
                         )),
                         9,
                         1,

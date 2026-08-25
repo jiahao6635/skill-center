@@ -10,6 +10,7 @@ export interface SearchSeedContext {
   namespace: SeededNamespace
   skills: SeededSkill[]
   skillNames: string[]
+  publisherDisplayName: string
 }
 
 export interface PreparedSearchSeed extends SearchSeedContext {
@@ -52,6 +53,19 @@ function adminCredentials() {
 
 function hasPublisherCredentials() {
   return Boolean(getOptionalEnv('E2E_PUBLISH_USERNAME') && getOptionalEnv('E2E_PUBLISH_PASSWORD'))
+}
+
+export async function readPublisherDisplayName(page: Page): Promise<string> {
+  const response = await page.context().request.get('/api/v1/auth/me')
+  if (!response.ok()) {
+    throw new Error(`Failed to read current display name: ${response.status()}`)
+  }
+  const body = await response.json() as { data?: { displayName?: string } }
+  const displayName = body.data?.displayName?.trim()
+  if (!displayName) {
+    throw new Error('Current session has no displayName')
+  }
+  return displayName
 }
 
 async function openProvidedPublisherSession(browser: Browser, testInfo: TestInfo): Promise<PublisherSession> {
@@ -159,6 +173,7 @@ export async function seedPublicSearchSkills(
     namespace,
     skills,
     skillNames,
+    publisherDisplayName: await readPublisherDisplayName(page),
   }
 }
 
@@ -218,6 +233,7 @@ export async function prepareSearchSeed(
     namespace: publisherSessions[0].namespace,
     skills,
     skillNames,
+    publisherDisplayName: await readPublisherDisplayName(publisherSessions[0].page),
   }
 
   const adminContext = await browser.newContext()
@@ -245,6 +261,7 @@ export async function prepareSearchSeed(
           namespace: publisherSessions[index].namespace,
           skills: [],
           skillNames: [],
+          publisherDisplayName: seed.publisherDisplayName,
         })
         await publisherSessions[index].context.close()
       }

@@ -78,6 +78,10 @@ public class PostgresFullTextQueryService implements SearchQueryService {
      */
     @Override
     public SearchResult search(SearchQuery query) {
+        if (query.ownerIds() != null && query.ownerIds().isEmpty()) {
+            return new SearchResult(List.of(), 0, query.page(), query.size());
+        }
+
         String normalizedKeyword = normalizeKeyword(query.keyword());
         String tsQuery = buildPrefixTsQuery(normalizedKeyword);
         boolean hasKeyword = normalizedKeyword != null;
@@ -147,6 +151,10 @@ public class PostgresFullTextQueryService implements SearchQueryService {
             sql.append(") ");
         }
 
+        if (query.ownerIds() != null) {
+            sql.append("AND d.owner_id IN :ownerIds ");
+        }
+
         // Full-text search
         if (hasKeyword) {
             sql.append("AND (");
@@ -204,6 +212,10 @@ public class PostgresFullTextQueryService implements SearchQueryService {
             nativeQuery.setParameter("labelSlugs", query.labelSlugs());
         }
 
+        if (query.ownerIds() != null) {
+            nativeQuery.setParameter("ownerIds", query.ownerIds());
+        }
+
         if (hasKeyword) {
             if (hasTsQuery) {
                 nativeQuery.setParameter("tsQuery", tsQuery);
@@ -246,6 +258,10 @@ public class PostgresFullTextQueryService implements SearchQueryService {
 
         if (query.labelSlugs() != null && !query.labelSlugs().isEmpty()) {
             countQuery.setParameter("labelSlugs", query.labelSlugs());
+        }
+
+        if (query.ownerIds() != null) {
+            countQuery.setParameter("ownerIds", query.ownerIds());
         }
 
         if (hasKeyword) {

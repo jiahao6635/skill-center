@@ -4097,6 +4097,7 @@ export interface components {
             publishedVersion?: components["schemas"]["SkillLifecycleVersionResponse"];
             ownerPreviewVersion?: components["schemas"]["SkillLifecycleVersionResponse"];
             resolutionMode?: string;
+            ownerDisplayName?: string;
         };
         ApiResponseBoolean: {
             /** Format: int32 */
@@ -8509,6 +8510,8 @@ export interface operations {
                 q?: string;
                 namespace?: string;
                 label?: string[];
+                /** @description Exact match on the skill owner's approved display name (case-insensitive) */
+                author?: string;
                 sort?: string;
                 page?: number;
                 size?: number;

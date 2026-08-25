@@ -173,6 +173,7 @@ export interface SkillSummary {
   publishedVersion?: SkillLifecycleVersion
   ownerPreviewVersion?: SkillLifecycleVersion
   resolutionMode?: string
+  ownerDisplayName?: string
 }
 
 export type LabelTranslation = Omit<components['schemas']['LabelTranslationResponse'], 'locale' | 'displayName'> & {
@@ -328,6 +329,7 @@ export interface SkillTag {
 export interface SearchParams {
   q?: string
   namespace?: string
+  author?: string
   label?: string
   sort?: string
   page?: number

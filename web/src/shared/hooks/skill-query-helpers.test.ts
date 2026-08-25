@@ -7,10 +7,18 @@ describe('buildSkillSearchUrl', () => {
       q: '  hello world  ',
       namespace: '@team-ai',
       label: 'code-generation',
+      author: '  张三  ',
       sort: 'relevance',
       page: 2,
       size: 12,
-    })).toBe('/api/web/skills?q=hello+world&namespace=team-ai&label=code-generation&sort=relevance&page=2&size=12')
+    })).toBe('/api/web/skills?q=hello+world&namespace=team-ai&label=code-generation&author=%E5%BC%A0%E4%B8%89&sort=relevance&page=2&size=12')
+  })
+
+  it('omits blank author values from the query string', () => {
+    expect(buildSkillSearchUrl({
+      q: 'agent',
+      author: '   ',
+    })).toBe('/api/web/skills?q=agent')
   })
 
   it('returns the base skills endpoint when no search params are provided', () => {

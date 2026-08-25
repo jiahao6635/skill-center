@@ -17,6 +17,7 @@ const namespaceFilterProps: Array<{
 }> = []
 const skillCardProps: Array<{
   onNamespaceClick?: (slug: string) => void
+  onClick?: () => void
 }> = []
 const searchSkillParams: Array<Record<string, unknown>> = []
 const searchSkillOptions: Array<{
@@ -70,8 +71,27 @@ vi.mock('@/features/search/search-namespace-filter', () => ({
   },
 }))
 
+const authorFilterProps: Array<{
+  value?: string
+  draft?: string
+  onDraftChange?: (name: string) => void
+  onCommit?: (name: string) => void
+}> = []
+
+vi.mock('@/features/search/search-author-filter', () => ({
+  SearchAuthorFilter: (props: {
+    value?: string
+    draft?: string
+    onDraftChange?: (name: string) => void
+    onCommit?: (name: string) => void
+  }) => {
+    authorFilterProps.push(props)
+    return <div>search-author-filter</div>
+  },
+}))
+
 vi.mock('@/features/skill/skill-card', () => ({
-  SkillCard: (props: { onNamespaceClick?: (slug: string) => void }) => {
+  SkillCard: (props: { onNamespaceClick?: (slug: string) => void; onClick?: () => void }) => {
     skillCardProps.push(props)
     return <div>skill-card</div>
   },
@@ -201,6 +221,7 @@ describe('SearchPage', () => {
     paginationProps.length = 0
     searchBarProps.length = 0
     namespaceFilterProps.length = 0
+    authorFilterProps.length = 0
     skillCardProps.length = 0
     searchSkillParams.length = 0
     searchSkillOptions.length = 0
@@ -212,6 +233,7 @@ describe('SearchPage', () => {
       sort: 'downloads',
       page: 1,
       starredOnly: false,
+      author: '',
     })
     useSearchSkillsMock.mockReturnValue({
       data: {
@@ -239,7 +261,8 @@ describe('SearchPage', () => {
     const html = renderToStaticMarkup(<SearchPage />)
 
     expect(html.indexOf('search-namespace-filter')).toBeGreaterThan(-1)
-    expect(html.indexOf('search-namespace-filter')).toBeLessThan(html.indexOf('search.filterStarred'))
+    expect(html.indexOf('search-namespace-filter')).toBeLessThan(html.indexOf('search-author-filter'))
+    expect(html.indexOf('search-author-filter')).toBeLessThan(html.indexOf('search.filterStarred'))
     expect(findButton('search.filterStarred').variant).toBe('outline')
   })
 
@@ -251,6 +274,7 @@ describe('SearchPage', () => {
       sort: 'downloads',
       page: 1,
       starredOnly: true,
+        author: '',
     })
 
     renderToStaticMarkup(<SearchPage />)
@@ -272,6 +296,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
   })
@@ -290,6 +315,7 @@ describe('SearchPage', () => {
         sort: 'newest',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
   })
@@ -309,6 +335,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 2,
         starredOnly: false,
+        author: '',
       },
     })
     expect(navigateMock).toHaveBeenNthCalledWith(2, {
@@ -320,6 +347,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: true,
+        author: '',
       },
     })
   })
@@ -345,6 +373,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
   })
@@ -364,6 +393,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
   })
@@ -377,6 +407,7 @@ describe('SearchPage', () => {
       sort: 'newest',
       page: 0,
       starredOnly: false,
+        author: '',
     })
 
     const { rerender } = render(<SearchPage />)
@@ -392,6 +423,7 @@ describe('SearchPage', () => {
         sort: 'newest',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
 
@@ -402,6 +434,7 @@ describe('SearchPage', () => {
       sort: 'newest',
       page: 0,
       starredOnly: false,
+        author: '',
     })
     rerender(<SearchPage />)
 
@@ -428,6 +461,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
   })
@@ -447,6 +481,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        author: '',
       },
     })
   })
@@ -457,6 +492,7 @@ describe('SearchPage', () => {
     expect(searchSkillParams[0]).toMatchObject({
       q: 'agent',
       namespace: 'team-ai',
+      author: undefined,
       label: 'code-generation',
       sort: 'downloads',
       page: 1,
@@ -497,6 +533,7 @@ describe('SearchPage', () => {
         sort: 'downloads',
         page: 0,
         starredOnly: false,
+        author: '',
       },
       replace: true,
     })
@@ -509,6 +546,7 @@ describe('SearchPage', () => {
       sort: 'newest',
       page: 0,
       starredOnly: false,
+        author: '',
     })
     useSearchSkillsMock.mockReturnValue({
       data: {
@@ -534,6 +572,7 @@ describe('SearchPage', () => {
       sort: 'newest',
       page: 0,
       starredOnly: false,
+        author: '',
     })
     useSearchSkillsMock.mockReturnValue({
       data: {
@@ -582,6 +621,7 @@ describe('SearchPage', () => {
       sort: 'newest',
       page: 0,
       starredOnly: false,
+        author: '',
     })
     useSearchSkillsMock.mockReturnValue({
       data: {
@@ -642,6 +682,7 @@ describe('SearchPage', () => {
       sort: 'newest',
       page: 0,
       starredOnly: true,
+        author: '',
     })
     useSearchSkillsMock.mockReturnValue({
       data: undefined,
@@ -659,5 +700,71 @@ describe('SearchPage', () => {
     expect(html).toContain('search.noStarredResults')
     expect(html).toContain('search.noStarredResultsFor')
     expect(html).not.toContain('search.namespaceUnavailable')
+  })
+
+  it('includes a draft author in skill-card returnTo', () => {
+    const { rerender } = render(<SearchPage />)
+    authorFilterProps[authorFilterProps.length - 1]?.onDraftChange?.('张三')
+    rerender(<SearchPage />)
+    navigateMock.mockClear()
+
+    skillCardProps[skillCardProps.length - 1]?.onClick?.()
+
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/space/global/demo',
+      search: {
+        returnTo: '/search?q=agent&sort=downloads&page=0&starredOnly=false&namespace=team-ai&label=code-generation&author=%E5%BC%A0%E4%B8%89',
+      },
+    })
+  })
+
+  it('commits a dirty author draft and resets paging instead of changing pages', () => {
+    const { rerender } = render(<SearchPage />)
+    authorFilterProps[authorFilterProps.length - 1]?.onDraftChange?.('Alice')
+    rerender(<SearchPage />)
+    navigateMock.mockClear()
+
+    paginationProps[paginationProps.length - 1]?.onPageChange(2)
+
+    expect(navigateMock).toHaveBeenCalledWith({
+      to: '/search',
+      search: {
+        q: 'agent',
+        namespace: 'team-ai',
+        label: 'code-generation',
+        sort: 'downloads',
+        page: 0,
+        starredOnly: false,
+        author: 'Alice',
+      },
+    })
+  })
+
+  it('shows author empty copy for an unmatched exact name', () => {
+    useSearchMock.mockReturnValue({
+      q: '',
+      namespace: '',
+      label: '',
+      sort: 'newest',
+      page: 0,
+      starredOnly: false,
+      author: '张三',
+    })
+    useSearchSkillsMock.mockReturnValue({
+      data: {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 12,
+      },
+      isLoading: false,
+      isFetching: false,
+      isError: false,
+      error: null,
+    })
+
+    const html = renderToStaticMarkup(<SearchPage />)
+    expect(html).toContain('search.noResultsForAuthor')
+    expect(html).toContain('search.noResultsForAuthorHint')
   })
 })

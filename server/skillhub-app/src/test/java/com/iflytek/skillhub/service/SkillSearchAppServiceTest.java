@@ -13,6 +13,8 @@ import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
+import com.iflytek.skillhub.domain.user.UserAccount;
+import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.search.SearchQuery;
 import com.iflytek.skillhub.search.SearchQueryService;
 import com.iflytek.skillhub.search.SearchResult;
@@ -34,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,6 +62,9 @@ class SkillSearchAppServiceTest {
     @Mock
     private RbacService rbacService;
 
+    @Mock
+    private UserAccountRepository userAccountRepository;
+
     private SkillSearchAppService service;
 
     @BeforeEach
@@ -69,7 +75,8 @@ class SkillSearchAppServiceTest {
                 namespaceRepository,
                 namespaceService,
                 new SkillLifecycleProjectionService(skillVersionRepository),
-                rbacService
+                rbacService,
+                userAccountRepository
         );
     }
 
@@ -326,6 +333,73 @@ class SkillSearchAppServiceTest {
         SearchVisibilityScope scope = captor.getValue().visibilityScope();
         assertEquals("admin-1", scope.userId());
         assertEquals(false, scope.platformWideAccess());
+    }
+
+    @Test
+    void search_shouldLeaveOwnerIdsNullWhenAuthorIsBlank() {
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(), 0, 0, 20));
+
+        service.search("skill", null, "newest", 0, 20, List.of(), "  ", null, null);
+
+        ArgumentCaptor<SearchQuery> captor = ArgumentCaptor.forClass(SearchQuery.class);
+        verify(searchQueryService).search(captor.capture());
+        assertNull(captor.getValue().ownerIds());
+        verify(userAccountRepository, never()).findByTrimmedDisplayNameIgnoreCase(any());
+    }
+
+    @Test
+    void search_shouldSkipSpiWhenAuthorDoesNotMatchAnyUser() {
+        when(userAccountRepository.findByTrimmedDisplayNameIgnoreCase("张三")).thenReturn(List.of());
+
+        SkillSearchAppService.SearchResponse response =
+                service.search("skill", null, "newest", 0, 20, List.of(), "张三", null, null);
+
+        assertEquals(0, response.items().size());
+        assertEquals(0, response.total());
+        verify(searchQueryService, never()).search(any());
+    }
+
+    @Test
+    void search_shouldPassMatchingOwnerIdsIncludingDuplicates() {
+        when(userAccountRepository.findByTrimmedDisplayNameIgnoreCase("Alice"))
+                .thenReturn(List.of(
+                        new UserAccount("user-a", "Alice", null, null),
+                        new UserAccount("user-b", "alice", null, null)
+                ));
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(), 0, 0, 20));
+
+        service.search(null, null, "newest", 0, 20, List.of(), "Alice", null, null);
+
+        ArgumentCaptor<SearchQuery> captor = ArgumentCaptor.forClass(SearchQuery.class);
+        verify(searchQueryService).search(captor.capture());
+        assertEquals(List.of("user-a", "user-b"), captor.getValue().ownerIds());
+    }
+
+    @Test
+    void searchInstallableLatest_shouldPassNullOwnerIds() {
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(), 0, 0, 20));
+
+        service.searchInstallableLatest("pdf", null, "newest", 0, 20, null, null);
+
+        ArgumentCaptor<SearchQuery> captor = ArgumentCaptor.forClass(SearchQuery.class);
+        verify(searchQueryService).search(captor.capture());
+        assertNull(captor.getValue().ownerIds());
+        assertEquals(true, captor.getValue().requireInstallableLatest());
+    }
+
+    @Test
+    void search_sevenArgOverloadShouldPassNullOwnerIds() {
+        when(searchQueryService.search(any()))
+                .thenReturn(new SearchResult(List.of(), 0, 0, 20));
+
+        service.search("skill", null, "newest", 0, 20, null, null);
+
+        ArgumentCaptor<SearchQuery> captor = ArgumentCaptor.forClass(SearchQuery.class);
+        verify(searchQueryService).search(captor.capture());
+        assertNull(captor.getValue().ownerIds());
     }
 
     private void setField(Object target, String fieldName, Object value) {

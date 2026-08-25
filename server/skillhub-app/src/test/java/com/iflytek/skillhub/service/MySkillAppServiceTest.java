@@ -13,6 +13,7 @@ import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.service.SkillLifecycleProjectionService;
+import com.iflytek.skillhub.domain.user.UserAccountRepository;
 import com.iflytek.skillhub.domain.social.SkillStar;
 import com.iflytek.skillhub.domain.social.SkillStarRepository;
 import com.iflytek.skillhub.domain.social.SkillSubscriptionRepository;
@@ -57,6 +58,9 @@ class MySkillAppServiceTest {
     @Mock
     private PromotionRequestRepository promotionRequestRepository;
 
+    @Mock
+    private UserAccountRepository userAccountRepository;
+
     private MySkillAppService service;
     private SkillLifecycleProjectionService skillLifecycleProjectionService;
     private JpaMySkillQueryRepository mySkillQueryRepository;
@@ -67,7 +71,8 @@ class MySkillAppServiceTest {
         mySkillQueryRepository = new JpaMySkillQueryRepository(
                 namespaceRepository,
                 promotionRequestRepository,
-                skillLifecycleProjectionService
+                skillLifecycleProjectionService,
+                userAccountRepository
         );
         service = new MySkillAppService(
                 skillRepository,

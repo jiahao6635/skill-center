@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+
 /**
  * JPA-backed user-account repository that provides filtered admin search over account records.
  */
@@ -33,4 +35,11 @@ public interface UserAccountJpaRepository
     Page<UserAccount> search(@Param("keyword") String keyword,
                              @Param("status") UserStatus status,
                              Pageable pageable);
+
+    @Override
+    @Query("""
+        SELECT u FROM UserAccount u
+        WHERE lower(trim(u.displayName)) = lower(trim(:displayName))
+        """)
+    List<UserAccount> findByTrimmedDisplayNameIgnoreCase(@Param("displayName") String displayName);
 }
