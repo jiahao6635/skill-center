@@ -1,5 +1,6 @@
 package com.iflytek.skillhub.search.event;
 
+import com.iflytek.skillhub.domain.event.SkillDeletedEvent;
 import com.iflytek.skillhub.domain.event.SkillPublishedEvent;
 import com.iflytek.skillhub.domain.event.SkillStatusChangedEvent;
 import com.iflytek.skillhub.domain.skill.SkillStatus;
@@ -30,6 +31,17 @@ class SearchIndexEventListenerTest {
         SearchIndexEventListener listener = new SearchIndexEventListener(searchRebuildService, searchIndexService);
 
         listener.onSkillStatusChanged(new SkillStatusChangedEvent(42L, SkillStatus.ACTIVE, SkillStatus.ARCHIVED));
+
+        verify(searchIndexService).remove(42L);
+    }
+
+    @Test
+    void skillDeletedEventShouldRemoveSearchDocument() {
+        SearchRebuildService searchRebuildService = mock(SearchRebuildService.class);
+        SearchIndexService searchIndexService = mock(SearchIndexService.class);
+        SearchIndexEventListener listener = new SearchIndexEventListener(searchRebuildService, searchIndexService);
+
+        listener.onSkillDeleted(new SkillDeletedEvent(42L));
 
         verify(searchIndexService).remove(42L);
     }

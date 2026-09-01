@@ -11,6 +11,7 @@ import com.iflytek.skillhub.domain.namespace.Namespace;
 import com.iflytek.skillhub.domain.namespace.NamespaceRepository;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
+import com.iflytek.skillhub.domain.skill.SkillStatus;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
@@ -323,6 +324,80 @@ class PostgresSearchRebuildServiceTest {
         assertThat(document.keywords()).contains("workflow");
         assertThat(document.keywords()).contains("Code Generation");
         assertThat(document.keywords()).contains("代码生成");
+    }
+
+    @Test
+    void rebuildBySkill_shouldRemoveIndexWhenSkillIsMissing() {
+        SkillRepository skillRepository = mock(SkillRepository.class);
+        SearchIndexService searchIndexService = mock(SearchIndexService.class);
+        when(skillRepository.findById(9L)).thenReturn(Optional.empty());
+
+        PostgresSearchRebuildService service = newService(
+                skillRepository,
+                mock(NamespaceRepository.class),
+                mock(SkillVersionRepository.class),
+                searchIndexService
+        );
+
+        service.rebuildBySkill(9L);
+
+        verify(searchIndexService).remove(9L);
+        verify(searchIndexService, org.mockito.Mockito.never()).index(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void rebuildBySkill_shouldRemoveIndexWhenSkillIsNotActive() {
+        SkillRepository skillRepository = mock(SkillRepository.class);
+        SearchIndexService searchIndexService = mock(SearchIndexService.class);
+        Skill skill = new Skill(7L, "archived-agent", "owner-1", SkillVisibility.PUBLIC);
+        skill.setStatus(SkillStatus.ARCHIVED);
+        when(skillRepository.findById(9L)).thenReturn(Optional.of(skill));
+
+        PostgresSearchRebuildService service = newService(
+                skillRepository,
+                mock(NamespaceRepository.class),
+                mock(SkillVersionRepository.class),
+                searchIndexService
+        );
+
+        service.rebuildBySkill(9L);
+
+        verify(searchIndexService).remove(9L);
+        verify(searchIndexService, org.mockito.Mockito.never()).index(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void rebuildAll_shouldDropDocumentsThatAreNoLongerActive() {
+        SkillRepository skillRepository = mock(SkillRepository.class);
+        NamespaceRepository namespaceRepository = mock(NamespaceRepository.class);
+        SkillVersionRepository skillVersionRepository = mock(SkillVersionRepository.class);
+        SearchIndexService searchIndexService = mock(SearchIndexService.class);
+
+        Skill active = new Skill(7L, "smart-agent", "owner-1", SkillVisibility.PUBLIC);
+        setField(active, "id", 1L);
+        active.setDisplayName("Smart Agent");
+        Skill archived = new Skill(7L, "old-agent", "owner-1", SkillVisibility.PUBLIC);
+        setField(archived, "id", 2L);
+        archived.setStatus(SkillStatus.ARCHIVED);
+        Namespace namespace = new Namespace("team-ai", "Team AI", "owner-1");
+
+        when(skillRepository.findAll()).thenReturn(List.of(active, archived));
+        when(namespaceRepository.findById(7L)).thenReturn(Optional.of(namespace));
+
+        PostgresSearchRebuildService service = newService(
+                skillRepository,
+                namespaceRepository,
+                skillVersionRepository,
+                searchIndexService
+        );
+
+        service.rebuildAll();
+
+        ArgumentCaptor<List<SkillSearchDocument>> captor = ArgumentCaptor.forClass(List.class);
+        verify(searchIndexService).batchIndex(captor.capture());
+        assertThat(captor.getValue()).extracting(SkillSearchDocument::skillId).containsExactly(1L);
+        verify(searchIndexService).retainOnly(List.of(1L));
     }
 
     private PostgresSearchRebuildService newService(SkillRepository skillRepository,

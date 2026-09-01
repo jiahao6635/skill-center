@@ -8,8 +8,10 @@ import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
+import com.iflytek.skillhub.domain.event.SkillDeletedEvent;
 import com.iflytek.skillhub.domain.skill.service.SkillHardDeleteService;
 import com.iflytek.skillhub.search.SearchIndexService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,17 +33,20 @@ public class SkillDeleteAppService {
     private final SkillVersionDeletionLock skillVersionDeletionLock;
     private final SkillHardDeleteService skillHardDeleteService;
     private final SearchIndexService searchIndexService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public SkillDeleteAppService(SkillRepository skillRepository,
                                  NamespaceRepository namespaceRepository,
                                  SkillVersionDeletionLock skillVersionDeletionLock,
                                  SkillHardDeleteService skillHardDeleteService,
-                                 SearchIndexService searchIndexService) {
+                                 SearchIndexService searchIndexService,
+                                 ApplicationEventPublisher eventPublisher) {
         this.skillRepository = skillRepository;
         this.namespaceRepository = namespaceRepository;
         this.skillVersionDeletionLock = skillVersionDeletionLock;
         this.skillHardDeleteService = skillHardDeleteService;
         this.searchIndexService = searchIndexService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -130,6 +135,7 @@ public class SkillDeleteAppService {
                 auditRequestContext != null ? auditRequestContext.clientIp() : null,
                 auditRequestContext != null ? auditRequestContext.userAgent() : null
         );
+        eventPublisher.publishEvent(new SkillDeletedEvent(lockedSkill.getId()));
         return new DeleteResult(lockedSkill.getId(), namespace, slug, true);
     }
 

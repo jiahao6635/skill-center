@@ -71,6 +71,8 @@ export function useSearchSkills(
     queryKey: ['skills', 'search', params],
     queryFn: () => searchSkills(params),
     enabled: params.starredOnly !== true,
+    staleTime: 0,
+    refetchOnMount: 'always',
     ...(options?.retry ? { retry: options.retry } : {}),
     ...(options?.skipGlobalErrorHandler ? { meta: { skipGlobalErrorHandler: true } } : {}),
   })

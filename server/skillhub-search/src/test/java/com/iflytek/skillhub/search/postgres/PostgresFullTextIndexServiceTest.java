@@ -7,10 +7,12 @@ import com.iflytek.skillhub.search.SkillSearchDocument;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -51,5 +53,48 @@ class PostgresFullTextIndexServiceTest {
         assertThat(entity.getTitle()).hasSize(300);
         assertThat(entity.getKeywords()).hasSize(700);
         assertThat(entity.getSearchText()).isEqualTo("search text");
+    }
+
+    @Test
+    void removeShouldDeleteAndFlushSearchDocument() {
+        SkillSearchDocumentJpaRepository repository = mock(SkillSearchDocumentJpaRepository.class);
+        PostgresFullTextIndexService service = new PostgresFullTextIndexService(
+                repository,
+                new HashingSearchEmbeddingService()
+        );
+
+        service.remove(11L);
+
+        verify(repository).deleteBySkillId(11L);
+        verify(repository).flush();
+    }
+
+    @Test
+    void retainOnlyShouldDeleteDocumentsOutsideTheActiveSkillSet() {
+        SkillSearchDocumentJpaRepository repository = mock(SkillSearchDocumentJpaRepository.class);
+        PostgresFullTextIndexService service = new PostgresFullTextIndexService(
+                repository,
+                new HashingSearchEmbeddingService()
+        );
+
+        service.retainOnly(List.of(1L, 3L));
+
+        verify(repository).deleteBySkillIdNotIn(List.of(1L, 3L));
+        verify(repository).flush();
+        verify(repository, never()).deleteAllInBatch();
+    }
+
+    @Test
+    void retainOnlyShouldClearTheIndexWhenNoActiveSkillsRemain() {
+        SkillSearchDocumentJpaRepository repository = mock(SkillSearchDocumentJpaRepository.class);
+        PostgresFullTextIndexService service = new PostgresFullTextIndexService(
+                repository,
+                new HashingSearchEmbeddingService()
+        );
+
+        service.retainOnly(List.of());
+
+        verify(repository).deleteAllInBatch();
+        verify(repository, never()).deleteBySkillIdNotIn(org.mockito.ArgumentMatchers.any());
     }
 }

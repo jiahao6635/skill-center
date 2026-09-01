@@ -8,6 +8,7 @@ import com.iflytek.skillhub.search.SkillSearchDocument;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -80,6 +81,18 @@ public class PostgresFullTextIndexService implements SearchIndexService {
     @Transactional
     public void remove(Long skillId) {
         repository.deleteBySkillId(skillId);
+        repository.flush();
+    }
+
+    @Override
+    @Transactional
+    public void retainOnly(Collection<Long> skillIds) {
+        if (skillIds == null || skillIds.isEmpty()) {
+            repository.deleteAllInBatch();
+            return;
+        }
+        repository.deleteBySkillIdNotIn(skillIds);
+        repository.flush();
     }
 
     private String buildSemanticVector(SkillSearchDocument document) {

@@ -98,6 +98,7 @@ public class PostgresSearchRebuildService implements SearchRebuildService {
                 .flatMap(Optional::stream)
                 .toList();
         searchIndexService.batchIndex(documents);
+        searchIndexService.retainOnly(documents.stream().map(SkillSearchDocument::skillId).toList());
     }
 
     @Override
@@ -112,11 +113,15 @@ public class PostgresSearchRebuildService implements SearchRebuildService {
     @Override
     public void rebuildBySkill(Long skillId) {
         Optional<Skill> skillOpt = skillRepository.findById(skillId);
-        if (skillOpt.isEmpty()) {
+        if (skillOpt.isEmpty() || skillOpt.get().getStatus() != SkillStatus.ACTIVE) {
+            searchIndexService.remove(skillId);
             return;
         }
 
-        toDocument(skillOpt.get()).ifPresent(searchIndexService::index);
+        toDocument(skillOpt.get()).ifPresentOrElse(
+                searchIndexService::index,
+                () -> searchIndexService.remove(skillId)
+        );
     }
 
     private SearchIndexPayload buildSearchPayload(Skill skill) {

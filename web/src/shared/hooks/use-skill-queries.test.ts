@@ -71,6 +71,8 @@ describe('useSearchSkills options bag', () => {
     expect(queryOptions).toMatchObject({
       queryKey: ['skills', 'search', { q: 'agent' }],
       enabled: true,
+      staleTime: 0,
+      refetchOnMount: 'always',
     })
     expect(queryOptions).not.toHaveProperty('meta')
     expect(queryOptions.retry).toBeUndefined()

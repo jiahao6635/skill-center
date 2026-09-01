@@ -9,6 +9,7 @@ import com.iflytek.skillhub.domain.skill.Skill;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionDeletionLock;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
+import com.iflytek.skillhub.domain.event.SkillDeletedEvent;
 import com.iflytek.skillhub.domain.skill.service.SkillHardDeleteService;
 import com.iflytek.skillhub.search.SearchIndexService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +43,8 @@ class SkillDeleteAppServiceTest {
     private SearchIndexService searchIndexService;
     @Mock
     private NamespaceRepository namespaceRepository;
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     private SkillDeleteAppService service;
 
@@ -51,7 +55,8 @@ class SkillDeleteAppServiceTest {
                 namespaceRepository,
                 skillVersionDeletionLock,
                 skillHardDeleteService,
-                searchIndexService
+                searchIndexService,
+                eventPublisher
         );
         org.mockito.Mockito.lenient().when(skillVersionDeletionLock.lockAndRefresh(org.mockito.ArgumentMatchers.any(Skill.class)))
                 .thenAnswer(invocation -> Optional.of(invocation.getArgument(0)));
@@ -68,10 +73,11 @@ class SkillDeleteAppServiceTest {
 
         assertThat(result.deleted()).isTrue();
         assertThat(result.skillId()).isEqualTo(11L);
-        InOrder inOrder = inOrder(skillVersionDeletionLock, searchIndexService, skillHardDeleteService);
+        InOrder inOrder = inOrder(skillVersionDeletionLock, searchIndexService, skillHardDeleteService, eventPublisher);
         inOrder.verify(skillVersionDeletionLock).lockAndRefresh(skill);
         inOrder.verify(searchIndexService).remove(11L);
         inOrder.verify(skillHardDeleteService).hardDeleteSkill(skill, "global", "super-1", "127.0.0.1", "JUnit");
+        inOrder.verify(eventPublisher).publishEvent(new SkillDeletedEvent(11L));
         verify(skillHardDeleteService).hardDeleteSkill(skill, "global", "super-1", "127.0.0.1", "JUnit");
     }
 
@@ -86,6 +92,7 @@ class SkillDeleteAppServiceTest {
         assertThat(result.skillId()).isNull();
         verify(skillHardDeleteService, never()).hardDeleteSkill(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(searchIndexService, never()).remove(org.mockito.ArgumentMatchers.anyLong());
+        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -184,6 +191,7 @@ class SkillDeleteAppServiceTest {
         assertThat(result.deleted()).isFalse();
         assertThat(result.skillId()).isNull();
         verify(skillHardDeleteService, never()).hardDeleteSkill(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
     }
 
     @Test

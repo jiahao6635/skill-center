@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -89,7 +90,7 @@ class SkillDeleteFlowIntegrationTest {
         assertThat(skillRepository.findById(graph.skill().getId())).isEmpty();
         assertThat(skillVersionRepository.findBySkillId(graph.skill().getId())).isEmpty();
         assertThat(skillFileRepository.findByVersionId(graph.version().getId())).isEmpty();
-        verify(searchIndexService).remove(graph.skill().getId());
+        verify(searchIndexService, timeout(1000).times(2)).remove(graph.skill().getId());
         verify(objectStorageService).deleteObjects(argThat(keys ->
                 keys.contains(graph.file().getStorageKey())
                         && keys.contains("packages/" + graph.skill().getId() + "/" + graph.version().getId() + "/bundle.zip")));
@@ -129,7 +130,7 @@ class SkillDeleteFlowIntegrationTest {
         assertThat(skillRepository.findById(graph.skill().getId())).isEmpty();
         assertThat(skillVersionRepository.findBySkillId(graph.skill().getId())).isEmpty();
         assertThat(skillFileRepository.findByVersionId(graph.version().getId())).isEmpty();
-        verify(searchIndexService).remove(graph.skill().getId());
+        verify(searchIndexService, timeout(1000).times(2)).remove(graph.skill().getId());
     }
 
     private PersistedSkillGraph createSkillGraph(String ownerId) {
