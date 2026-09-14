@@ -53,7 +53,9 @@ Qoder / Qoder IDE / QoderWork
 ]
 ```
 
-其他可选字段：`uid`（外部用户 ID）、`prompt_id`、`agent_id`、`skill_coordinate`（明确的 `@namespace/slug`）、`skill_version`、`product`、`product_version`。不提供时不猜测。`plugin:skill` 不是中心命名空间坐标。
+其他可选字段：`uid`（外部用户 ID）、`prompt_id`、`agent_id`、`skill_coordinate`（来源提供的 `@namespace/slug`）、`skill_version`、`product`、`product_version`。不提供时不猜测。
+
+中心技能关联仅按 `skill_name` 对应的技能标识（`skill.slug`）全局精确匹配，不考虑命名空间，也不依赖 `skill_coordinate`。名称中的 `plugin:` 或 `@namespace/` 前缀在匹配时去除，原始名称仍保留在账本和排行中；不按展示标题匹配。只有一个匹配项时关联，多项同名或没有匹配项时保留空关联。重复上报可刷新关联，不增加调用次数。
 
 元数据字符串最多 256 字符，`skill_name` 最多 512；日期要求 ISO-8601 时区，范围为 2000 年以后至服务器当前时间加一天。邮箱去空白并忽略大小写匹配；多个账号同邮箱时不任意选择。用户与技能无法关联时保留原始信息，中心 ID 为空。
 
@@ -75,7 +77,7 @@ Qoder / Qoder IDE / QoderWork
 
 ## 部署顺序与配置
 
-1. 先部署 skill-center，执行 Flyway `V49__skill_invocations.sql`。默认不删除使用记录。配置 `SKILLHUB_SKILL_INVOCATIONS_KEY_SHA256` 为独立服务密钥的 SHA-256 十六进制哈希；留空时写入入口关闭（401）。密钥与已有插件上传 Key 必须分开。
+1. 先部署 skill-center，执行 Flyway V49（调用账本）及 V50（按名称关联）。V50 为历史记录重新计算技能关联：唯一同名项补关联，无匹配或同名歧义清空原有技能关联；不改变事件、次数和时间。默认不删除使用记录。配置 `SKILLHUB_SKILL_INVOCATIONS_KEY_SHA256` 为独立服务密钥的 SHA-256 十六进制哈希；留空时写入入口关闭（401）。密钥与已有插件上传 Key 必须分开。
 2. 再部署日志服务，配置下表。未开启转发时仍把新事件保存到 outbox；开启后补送。队列应位于持久化卷，默认在 spool 下，受既有磁盘背压保护。自定义目录必须放在同一受监测文件系统。
 3. 最后分发插件 v1.2.0。交付 ZIP 沿用 v1.1.10 的日志上传地址 `https://qoder-log.sigmob.com/api/logs` 和原有插件上传 Key。源码模板仍保持空地址和空 Key；自行构建时使用现有 `gen-hooks.py` 注入分发配置。不要把中心服务密钥放进插件。
 
