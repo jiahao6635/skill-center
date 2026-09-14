@@ -564,6 +564,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/web/skills/{namespace}/{slug}/download-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["createDownloadLink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/web/skills/{namespace}/{slug}/confirm-publish": {
         parameters: {
             query?: never;
@@ -1662,6 +1678,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/internal/v1/skill-invocations/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recordSkillInvocations"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3076,6 +3108,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/skill-invocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSkillInvocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/profile-reviews": {
         parameters: {
             query?: never;
@@ -3164,6 +3212,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["search_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cli/v1/download-link/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["redirect"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3380,6 +3444,10 @@ export interface components {
             timestamp?: string;
             requestId?: string;
         };
+        LabelTranslationResponse: {
+            locale?: string;
+            displayName?: string;
+        };
         SkillLabelDto: {
             slug?: string;
             type?: string;
@@ -3470,7 +3538,7 @@ export interface components {
             status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
             description?: string;
             /** @enum {string} */
-            type?: "GLOBAL" | "TEAM";
+            type?: "GLOBAL" | "TEAM" | "SYSTEM";
             avatarUrl?: string;
             createdBy?: string;
             /** Format: date-time */
@@ -3550,10 +3618,6 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
-        LabelTranslationResponse: {
-            locale?: string;
-            displayName?: string;
-        };
         LabelSortOrderItemRequest: {
             slug: string;
             /** Format: int32 */
@@ -3613,6 +3677,19 @@ export interface components {
             /** Format: int64 */
             reportId?: number;
             status?: string;
+        };
+        ApiResponseDownloadLinkResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["DownloadLinkResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        DownloadLinkResponse: {
+            downloadUrl?: string;
+            expiresAt?: string;
         };
         ConfirmPublishRequest: {
             version: string;
@@ -3995,6 +4072,46 @@ export interface components {
         ConfirmMergeRequest: {
             /** Format: int64 */
             mergeRequestId: number;
+        };
+        SkillInvocationInput: {
+            source: string;
+            event_id: string;
+            occurred_at: string;
+            observed_at: string;
+            time_source: string;
+            email: string;
+            name?: string;
+            uid?: string;
+            session_id: string;
+            prompt_id?: string;
+            tool_call_id?: string;
+            agent_id?: string;
+            skill_name: string;
+            skill_plugin?: string;
+            skill_coordinate?: string;
+            skill_version?: string;
+            trigger_mode: string;
+            evidence: string;
+            client_product: string;
+            product?: string;
+            product_version?: string;
+        };
+        ApiResponseSkillInvocationBatchResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["SkillInvocationBatchResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        InvocationResult: {
+            event_id?: string;
+            status?: string;
+            error?: string;
+        };
+        SkillInvocationBatchResponse: {
+            results?: components["schemas"]["InvocationResult"][];
         };
         ApiResponseCliPublishResponse: {
             /** Format: int32 */
@@ -4534,7 +4651,7 @@ export interface components {
             status?: "ACTIVE" | "FROZEN" | "ARCHIVED";
             description?: string;
             /** @enum {string} */
-            type?: "GLOBAL" | "TEAM";
+            type?: "GLOBAL" | "TEAM" | "SYSTEM";
             avatarUrl?: string;
             createdBy?: string;
             /** Format: date-time */
@@ -4917,6 +5034,34 @@ export interface components {
             page?: number;
             /** Format: int32 */
             size?: number;
+        };
+        ApiResponsePageResponseSkillInvocationItem: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["PageResponseSkillInvocationItem"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        PageResponseSkillInvocationItem: {
+            items?: components["schemas"]["SkillInvocationItem"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+        };
+        SkillInvocationItem: {
+            /** Format: int64 */
+            id?: number;
+            centerUserId?: string;
+            /** Format: int64 */
+            centerSkillId?: number;
+            /** Format: date-time */
+            receivedAt?: string;
+            event?: components["schemas"]["SkillInvocationInput"];
         };
         ApiResponsePageResponseProfileReviewSummaryResponse: {
             /** Format: int32 */
@@ -6415,6 +6560,31 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseSkillReportMutationResponse"];
+                };
+            };
+        };
+    };
+    createDownloadLink: {
+        parameters: {
+            query?: {
+                version?: string;
+            };
+            header?: never;
+            path: {
+                namespace: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseDownloadLinkResponse"];
                 };
             };
         };
@@ -8396,6 +8566,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseMessageResponse"];
+                };
+            };
+        };
+    };
+    recordSkillInvocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillInvocationInput"][];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillInvocationBatchResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };
@@ -10600,6 +10812,55 @@ export interface operations {
             };
         };
     };
+    listSkillInvocations: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                email?: string;
+                userId?: string;
+                skillName?: string;
+                skillId?: number;
+                product?: string;
+                sessionId?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseSkillInvocationItem"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+        };
+    };
     list_3: {
         parameters: {
             query?: {
@@ -10748,6 +11009,26 @@ export interface operations {
                 content: {
                     "*/*": components["schemas"]["ApiResponseCliSearchResponse"];
                 };
+            };
+        };
+    };
+    redirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

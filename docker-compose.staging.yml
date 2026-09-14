@@ -24,6 +24,8 @@ services:
       SESSION_COOKIE_SECURE: "false"
       SKILLHUB_PUBLIC_BASE_URL: "http://localhost"
       DEVICE_AUTH_VERIFICATION_URI: "http://localhost/cli/auth"
+      # 独立 Skill 使用写入凭据；留空时内部接口拒绝写入
+      SKILLHUB_SKILL_INVOCATIONS_KEY_SHA256: ${SKILLHUB_SKILL_INVOCATIONS_KEY_SHA256:-}
       SKILLHUB_STORAGE_PROVIDER: s3
       STORAGE_BASE_PATH: /var/lib/skillhub/storage
       SKILLHUB_STORAGE_S3_ENDPOINT: http://minio:9000
