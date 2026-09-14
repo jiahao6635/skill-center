@@ -135,7 +135,7 @@ export function Layout() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 mt-auto" style={{ background: '#F1F5F9' }}>
+      <footer className="relative z-10 mt-auto bg-slate-100 dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-6 md:px-12 py-4" />
       </footer>
     </div>

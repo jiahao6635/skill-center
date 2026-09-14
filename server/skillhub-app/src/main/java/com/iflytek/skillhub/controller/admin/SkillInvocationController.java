@@ -46,7 +46,7 @@ public class SkillInvocationController extends BaseApiController {
 
     @io.swagger.v3.oas.annotations.Operation(operationId="listSkillInvocations")
     @GetMapping("/api/v1/admin/skill-invocations")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','AUDITOR')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     public ApiResponse<PageResponse<SkillInvocationItem>> list(
             @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="50") int size,
             @RequestParam(required=false) String email,@RequestParam(required=false) String userId,

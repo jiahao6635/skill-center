@@ -3124,6 +3124,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/skill-invocations/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["users"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/skill-invocations/user-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["userOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/skill-invocations/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["summary_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/skill-invocations/skills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["skills"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/profile-reviews": {
         parameters: {
             query?: never;
@@ -5062,6 +5126,106 @@ export interface components {
             /** Format: date-time */
             receivedAt?: string;
             event?: components["schemas"]["SkillInvocationInput"];
+        };
+        ApiResponsePageResponseUserRank: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["PageResponseUserRank"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        PageResponseUserRank: {
+            items?: components["schemas"]["UserRank"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+        };
+        UserRank: {
+            email?: string;
+            name?: string;
+            /** Format: int64 */
+            invocationCount?: number;
+            /** Format: int64 */
+            skillCount?: number;
+            /** Format: date-time */
+            lastUsedAt?: string;
+            /** Format: int64 */
+            rank?: number;
+        };
+        ApiResponseListUserOption: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["UserOption"][];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        UserOption: {
+            email?: string;
+            name?: string;
+        };
+        ApiResponseSummary: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["Summary"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        Summary: {
+            /** Format: int64 */
+            invocationCount?: number;
+            /** Format: int64 */
+            userCount?: number;
+            /** Format: int64 */
+            skillCount?: number;
+            /** Format: int64 */
+            sessionCount?: number;
+            /** Format: date-time */
+            queriedAt?: string;
+        };
+        ApiResponsePageResponseSkillRank: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["PageResponseSkillRank"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        PageResponseSkillRank: {
+            items?: components["schemas"]["SkillRank"][];
+            /** Format: int64 */
+            total?: number;
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+        };
+        SkillRank: {
+            skillName?: string;
+            /** Format: int64 */
+            invocationCount?: number;
+            /** Format: int64 */
+            userCount?: number;
+            /** Format: date-time */
+            lastUsedAt?: string;
+            unlinked?: boolean;
+            /** Format: int64 */
+            rank?: number;
+            /** Format: int64 */
+            peakCount?: number;
+            /** Format: int64 */
+            downloadCount?: number;
+            /** Format: int32 */
+            starCount?: number;
         };
         ApiResponsePageResponseProfileReviewSummaryResponse: {
             /** Format: int32 */
@@ -10857,6 +11021,108 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
+        };
+    };
+    users: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                email?: string;
+                product?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseUserRank"];
+                };
+            };
+        };
+    };
+    userOptions: {
+        parameters: {
+            query?: {
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseListUserOption"];
+                };
+            };
+        };
+    };
+    summary_2: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                email?: string;
+                product?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSummary"];
+                };
+            };
+        };
+    };
+    skills: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                email?: string;
+                product?: string;
+                search?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePageResponseSkillRank"];
                 };
             };
         };

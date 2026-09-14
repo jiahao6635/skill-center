@@ -67,11 +67,11 @@ Qoder / Qoder IDE / QoderWork
 
 ### 查询
 
-`GET /api/v1/admin/skill-invocations`，沿用中心会话鉴权，仅 `SUPER_ADMIN` / `AUDITOR`。
+`GET /api/v1/admin/skill-invocations`，沿用中心会话鉴权，仅 `SUPER_ADMIN`。Skill 使用看板上线后，`AUDITOR` 不再有此接口的读取权限。
 
 参数：`email`、`userId`、`skillName`、`skillId`、`product`、`sessionId`、`from`（包含）、`to`（不包含）、`page`（从 0 开始）、`size`（默认 50，范围 1–200）。名称精确匹配；按 `occurred_at DESC, id DESC` 排序。
 
-响应 `data` 为 `{items,total,page,size}`，每项含 `id`、`centerUserId`、`centerSkillId`、`receivedAt` 和 `event`。只提供接口，不修改下载次数、下载排行或管理页面。
+响应 `data` 为 `{items,total,page,size}`，每项含 `id`、`centerUserId`、`centerSkillId`、`receivedAt` 和 `event`。管理员可在 `/admin/skill-usage` 查看概览、Skill 排行、用户排行和调用明细，详见 [Skill 使用看板](17-skill-usage-dashboard.md)。下载和收藏仅展示中心现有计数，不因调用事件修改。
 
 ## 部署顺序与配置
 

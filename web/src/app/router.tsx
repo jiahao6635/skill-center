@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/api/client.ts'
 import { RoleGuard } from '@/shared/components/role-guard.tsx'
 import { createRequireAuth } from '@/shared/lib/auth-route.ts'
 import { parseSearchPageSearch } from '@/features/search/parse-search-page-search.ts'
+import { parseSkillUsageSearch } from '@/features/admin/skill-usage-state.ts'
 
 /**
  * Central route registry for the SkillHub web app.
@@ -134,6 +135,11 @@ const AuditLogPage = createRoleProtectedRouteComponent(
 const AdminLabelsPage = createRoleProtectedRouteComponent(
   () => import('@/pages/admin/labels.tsx'),
   'AdminLabelsPage',
+  ['SUPER_ADMIN'],
+)
+const SkillUsagePage = createRoleProtectedRouteComponent(
+  () => import('@/pages/admin/skill-usage.tsx'),
+  'SkillUsagePage',
   ['SUPER_ADMIN'],
 )
 const DeepLinkInstallPage = createLazyRouteComponent(
@@ -438,6 +444,14 @@ const adminLabelsRoute = createRoute({
   component: AdminLabelsPage,
 })
 
+const skillUsageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'admin/skill-usage',
+  beforeLoad: requireAuth,
+  validateSearch: parseSkillUsageSearch,
+  component: SkillUsagePage,
+})
+
 const deepLinkInstallRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/link/skill/install',
@@ -481,6 +495,7 @@ const routeTree = rootRoute.addChildren([
   adminUsersRoute,
   adminAuditLogRoute,
   adminLabelsRoute,
+  skillUsageRoute,
   deepLinkInstallRoute,
 ])
 

@@ -8,6 +8,7 @@ import { buildGlobalReviewsPath, canAccessReviewCenter } from '@/features/review
 import { clearSessionScopedQueries } from '@/features/notification/notification-session.ts'
 import { canViewGovernanceCenter } from '@/shared/lib/governance-access.ts'
 import { cn } from '@/shared/lib/utils.ts'
+import { parseSkillUsageSearch } from '@/features/admin/skill-usage-state.ts'
 
 interface User {
   displayName: string
@@ -182,6 +183,11 @@ export function UserMenu({ user, triggerClassName }: UserMenuProps) {
             {isUserAdmin ? (
               <Link to="/admin/users" className={menuItemClassName} onClick={closeMenu}>
                 {t('user.menu.users')}
+              </Link>
+            ) : null}
+            {isSuperAdmin ? (
+              <Link to="/admin/skill-usage" search={parseSkillUsageSearch({})} className={menuItemClassName} onClick={closeMenu}>
+                {t('skillUsage.title')}
               </Link>
             ) : null}
             {isSuperAdmin ? (

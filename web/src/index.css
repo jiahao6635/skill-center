@@ -72,6 +72,8 @@
     --input: 222 20% 18%;
     --ring: 239 100% 75%;
     --surface-glass: 222 35% 11%;
+    --border-card: 222 20% 18%;
+    --text-secondary: 215 20% 68%;
     --glow-primary: 239 100% 75%;
     --glow-accent: 271 100% 72%;
   }

@@ -2,6 +2,8 @@ import type { Config } from 'tailwindcss'
 
 const config: Config = {
   darkMode: ['class'],
+  // The theme class is applied at runtime; retain its base-layer variables during CSS pruning.
+  safelist: ['dark'],
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {

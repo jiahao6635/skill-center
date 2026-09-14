@@ -56,14 +56,15 @@ class SkillInvocationControllerTest {
         mvc.perform(post(PATH).header("X-Skill-Usage-Key","test-key").contentType("application/json").content(many))
                 .andExpect(status().isBadRequest());
     }
-    @Test void readIsRestrictedToAuditorAndSuperAdmin() throws Exception {
+    @Test void readIsRestrictedToSuperAdmin() throws Exception {
         when(query.list(anyInt(),anyInt(),any(),any(),any(),any(),any(),any(),any(),any()))
                 .thenReturn(new PageResponse<>(List.of(),0,0,50));
         mvc.perform(get(READ)).andExpect(status().isUnauthorized());
         mvc.perform(get(READ).with(user("regular").roles("USER"))).andExpect(status().isForbidden());
         mvc.perform(get(READ).header("X-Skill-Usage-Key","test-key")).andExpect(status().isUnauthorized());
-        for(String role:List.of("AUDITOR","SUPER_ADMIN"))
-            mvc.perform(get(READ).with(user("reader").roles(role))).andExpect(status().isOk());
+        for(String role:List.of("AUDITOR","SKILL_ADMIN","USER_ADMIN"))
+            mvc.perform(get(READ).with(user("reader").roles(role))).andExpect(status().isForbidden());
+        mvc.perform(get(READ).with(user("admin").roles("SUPER_ADMIN"))).andExpect(status().isOk());
     }
     @Test void exportFullOpenApiWhenRequested() throws Exception {
         String file=System.getenv("SKILL_INVOCATION_OPENAPI_OUTPUT");
