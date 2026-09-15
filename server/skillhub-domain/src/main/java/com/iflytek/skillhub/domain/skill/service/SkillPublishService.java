@@ -75,9 +75,7 @@ public class SkillPublishService {
             String slug,
             SkillVersion version,
             String namespace
-    ) {
-        public PublishResult(Long skillId, String slug, SkillVersion version) { this(skillId, slug, version, null); }
-    }
+    ) {}
 
     private final NamespaceRepository namespaceRepository;
     private final NamespaceMemberRepository namespaceMemberRepository;

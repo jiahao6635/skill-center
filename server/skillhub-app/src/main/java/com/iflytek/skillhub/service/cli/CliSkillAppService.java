@@ -144,7 +144,7 @@ public class CliSkillAppService {
         );
 
         return new CliPublishResponse(
-                result.namespace() != null ? result.namespace() : namespace,
+                result.namespace(),
                 result.slug(),
                 result.version().getVersion(),
                 visibility.name()

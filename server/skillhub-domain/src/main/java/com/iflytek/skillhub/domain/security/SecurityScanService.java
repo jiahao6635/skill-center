@@ -130,15 +130,7 @@ public class SecurityScanService {
     public void processSharingScanResult(Long auditId, Long versionId, SecurityScanResponse response) {
         SecurityAudit audit = auditRepository.findById(auditId).orElseThrow();
         if (audit.isDeleted() || audit.getScannedAt() != null || !java.util.Objects.equals(audit.getSkillVersionId(), versionId)) return;
-        audit.setScanId(response.scanId());
-        audit.setVerdict(response.verdict());
-        audit.setIsSafe(response.verdict() == SecurityVerdict.SAFE);
-        audit.setMaxSeverity(response.maxSeverity());
-        audit.setFindingsCount(response.findingsCount());
-        audit.setFindings(serializeFindings(response.findings()));
-        audit.setScanDurationSeconds(response.scanDurationSeconds());
-        audit.setScannedAt(Instant.now(Clock.systemUTC()));
-        auditRepository.save(audit);
+        saveScanResult(audit, response);
     }
 
     @Transactional
@@ -158,15 +150,7 @@ public class SecurityScanService {
         SkillVersion version = skillVersionRepository.findById(versionId)
                 .orElseThrow(() -> new IllegalStateException("SkillVersion not found: " + versionId));
 
-        audit.setScanId(response.scanId());
-        audit.setVerdict(response.verdict());
-        audit.setIsSafe(response.verdict() == SecurityVerdict.SAFE);
-        audit.setMaxSeverity(response.maxSeverity());
-        audit.setFindingsCount(response.findingsCount());
-        audit.setFindings(serializeFindings(response.findings()));
-        audit.setScanDurationSeconds(response.scanDurationSeconds());
-        audit.setScannedAt(Instant.now(Clock.systemUTC()));
-        auditRepository.save(audit);
+        saveScanResult(audit, response);
 
         // Only transition from SCANNING — leave PUBLISHED/REJECTED/YANKED untouched
         if (version.getStatus() == SkillVersionStatus.SCANNING) {
@@ -229,6 +213,18 @@ public class SecurityScanService {
                 version.getId(),
                 saved.getSubmittedBy(),
                 saved.getNamespaceId()));
+    }
+
+    private void saveScanResult(SecurityAudit audit, SecurityScanResponse response) {
+        audit.setScanId(response.scanId());
+        audit.setVerdict(response.verdict());
+        audit.setIsSafe(response.verdict() == SecurityVerdict.SAFE);
+        audit.setMaxSeverity(response.maxSeverity());
+        audit.setFindingsCount(response.findingsCount());
+        audit.setFindings(serializeFindings(response.findings()));
+        audit.setScanDurationSeconds(response.scanDurationSeconds());
+        audit.setScannedAt(Instant.now(Clock.systemUTC()));
+        auditRepository.save(audit);
     }
 
     private Path saveTempDirectory(Long versionId, List<PackageEntry> entries) {

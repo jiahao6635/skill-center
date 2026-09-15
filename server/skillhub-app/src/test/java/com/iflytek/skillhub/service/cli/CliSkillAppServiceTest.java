@@ -251,7 +251,7 @@ class CliSkillAppServiceTest {
         var mockVersion = org.mockito.Mockito.mock(SkillVersion.class);
         given(mockVersion.getVersion()).willReturn("1.0.0");
         given(skillPublishService.publishFromEntries("global", entries, "user-1", SkillVisibility.PUBLIC, Set.of("USER"), false))
-                .willReturn(new SkillPublishService.PublishResult(1L, "test-skill", mockVersion));
+                .willReturn(new SkillPublishService.PublishResult(1L, "test-skill", mockVersion, "global"));
 
         CliPublishResponse response = service.publish("global", entries, "user-1", SkillVisibility.PUBLIC, Set.of("USER"));
 

@@ -10,7 +10,6 @@ import com.iflytek.skillhub.domain.skill.*;
 import com.iflytek.skillhub.domain.skill.metadata.SkillMetadata;
 import com.iflytek.skillhub.domain.skill.metadata.SkillMetadataParser;
 import com.iflytek.skillhub.domain.skill.service.SkillSharingService;
-import com.iflytek.skillhub.domain.skill.service.SkillPublishService;
 import com.iflytek.skillhub.domain.skill.validation.*;
 import com.iflytek.skillhub.dto.*;
 import com.iflytek.skillhub.repository.SkillSharingQueryRepository;
@@ -41,28 +40,16 @@ public class SkillSharingAppService {
     private final PrePublishValidator prePublishValidator;
     private final SecurityScanService scanner;
     private final VisibilityChecker visibilityChecker;
-    private final SkillPublishService publisher;
 
     public SkillSharingAppService(SkillSharingService sharing, SkillSharingQueryRepository queries,
             SkillShareRequestRepository requests, SkillRepository skills, SkillFileRepository files,
             NamespaceRepository namespaces, ObjectStorageService storage, SkillPackageValidator validator,
             SkillMetadataParser parser, PrePublishValidator prePublishValidator, SecurityScanService scanner,
-            VisibilityChecker visibilityChecker, SkillPublishService publisher) {
+            VisibilityChecker visibilityChecker) {
         this.sharing = sharing; this.queries = queries; this.requests = requests; this.skills = skills;
         this.files = files; this.namespaces = namespaces; this.storage = storage; this.validator = validator;
         this.parser = parser; this.prePublishValidator = prePublishValidator; this.scanner = scanner;
         this.visibilityChecker = visibilityChecker;
-        this.publisher = publisher;
-    }
-
-    @Transactional
-    public PublishResponse savePrivateVersion(Long skillId, List<PackageEntry> entries, String actor,
-                                              java.util.Set<String> platformRoles, boolean confirmWarnings) {
-        var result = publisher.savePrivateVersion(skillId, entries, actor, platformRoles, confirmWarnings);
-        Skill skill = skills.findById(result.skillId()).orElseThrow();
-        String namespace = namespaces.findById(skill.getNamespaceId()).orElseThrow().getSlug();
-        return new PublishResponse(result.skillId(), namespace, result.slug(), result.version().getVersion(),
-                result.version().getStatus().name(), result.version().getFileCount(), result.version().getTotalSize());
     }
 
     @Transactional(readOnly = true)

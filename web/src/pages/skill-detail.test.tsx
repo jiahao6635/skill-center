@@ -193,7 +193,6 @@ vi.mock('@/shared/hooks/use-skill-queries', () => ({
   useRereleaseSkillVersion: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUnarchiveSkill: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useWithdrawSkillReview: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useSubmitForReview: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useConfirmPublish: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
