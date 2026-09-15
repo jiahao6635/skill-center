@@ -1,3 +1,4 @@
+import { useSharingSettings } from '@/features/skill/sharing-api.ts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -43,7 +44,9 @@ export function PublishPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const search = useSearch({ from: '/dashboard/publish' })
-  const prefill = normalizePublishPrefill(search)
+  const pinnedSkillId = search.skillId
+  const sharingSettings = useSharingSettings(pinnedSkillId ?? 0, !!pinnedSkillId)
+  const prefill = normalizePublishPrefill(pinnedSkillId ? { ...search, visibility: 'PRIVATE' } : search)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<FileErrorState | null>(null)
   const [uploadZoneNonce, setUploadZoneNonce] = useState(0)
@@ -150,6 +153,7 @@ export function PublishPage() {
         file: selectedFile,
         visibility,
         confirmWarnings,
+        skillId: pinnedSkillId,
       })
       setPrecheckWarnings([])
       setWarningDialogOpen(false)
@@ -159,13 +163,16 @@ export function PublishPage() {
           t('publish.publishedTitle'),
           t('publish.publishedDescription', { skill: skillLabel })
         )
+      } else if (isPrivate) {
+        toast.success(t('sharing.privateSaved'), t('sharing.privateSavedHelp'))
       } else {
         toast.success(
           t('publish.pendingReviewTitle'),
           t('publish.pendingReviewDescription', { skill: skillLabel })
         )
       }
-      navigate({ to: '/dashboard/skills' })
+      if (pinnedSkillId) navigate({ to: '/skills/by-id/$skillId', params: { skillId: String(pinnedSkillId) } })
+      else navigate({ to: '/dashboard/skills' })
     } catch (error) {
       if (error instanceof ApiError && error.status === 408) {
         toast.error(t('publish.timeoutTitle'), t('publish.timeoutDescription'))
@@ -222,7 +229,7 @@ export function PublishPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-up">
-      <DashboardPageHeader title={t('publish.title')} subtitle={t('publish.subtitle')} />
+      <DashboardPageHeader title={t(pinnedSkillId ? 'sharing.savePrivate' : 'publish.title')} subtitle={t(pinnedSkillId ? 'sharing.privateUploadHelp' : 'publish.subtitle')} />
 
       <Card className="p-4 bg-blue-500/5 border-blue-500/20">
         <div className="flex items-start gap-3">
@@ -231,13 +238,17 @@ export function PublishPage() {
           </svg>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-foreground mb-1">{t('publish.reviewNotice.title')}</h3>
-            <p className="text-sm text-muted-foreground">{t('publish.reviewNotice.description')}</p>
+            <p className="text-sm text-muted-foreground">{t(isPrivate ? 'sharing.privateUploadHelp' : 'publish.reviewNotice.description')}</p>
           </div>
         </div>
       </Card>
 
       <Card className="p-8 space-y-8">
-        <div className="space-y-3">
+        {pinnedSkillId && <div className="space-y-2">
+          <p className="font-medium">{sharingSettings.data?.slug}</p>
+          {sharingSettings.isError && <p role="alert" className="text-sm text-destructive">{sharingSettings.error.message}</p>}
+        </div>}
+        {!pinnedSkillId && <div className="space-y-3">
           <Label htmlFor="namespace" className="text-sm font-semibold font-heading">{t('publish.namespace')}</Label>
           {isLoadingNamespaces ? (
             <div className="h-11 animate-shimmer rounded-lg" />
@@ -268,11 +279,11 @@ export function PublishPage() {
               </SelectContent>
             </Select>
           )}
-        </div>
+        </div>}
 
         <div className="space-y-3">
           <Label htmlFor="visibility" className="text-sm font-semibold font-heading">{t('publish.visibility')}</Label>
-          <Select value={visibility} onValueChange={handleVisibilityChange}>
+          <Select value={visibility} onValueChange={handleVisibilityChange} disabled={!!pinnedSkillId}>
             <SelectTrigger id="visibility">
               <SelectValue />
             </SelectTrigger>
@@ -343,9 +354,9 @@ export function PublishPage() {
           className="w-full text-primary-foreground disabled:text-primary-foreground"
           size="lg"
           onClick={handlePublish}
-          disabled={!selectedFile || !namespaceSlug || publishMutation.isPending}
+          disabled={!selectedFile || !namespaceSlug || publishMutation.isPending || (!!pinnedSkillId && !sharingSettings.data)}
         >
-          {publishMutation.isPending ? t('publish.publishing') : t('publish.confirm')}
+          {publishMutation.isPending ? t('publish.publishing') : t(isPrivate ? 'sharing.savePrivate' : 'publish.confirm')}
         </Button>
       </Card>
 

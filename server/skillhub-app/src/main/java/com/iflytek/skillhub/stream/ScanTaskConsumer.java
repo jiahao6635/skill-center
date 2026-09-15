@@ -92,7 +92,8 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
                     blankToNull(data.get("skillPath")),
                     blankToNull(data.get("bundleKey")),
                     scannerType,
-                    parseRetryCount(data)
+                    parseRetryCount(data),
+                    data.containsKey("sharingAuditId") ? Long.valueOf(data.get("sharingAuditId")) : null
             );
         } catch (NumberFormatException e) {
             return null;
@@ -124,7 +125,11 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
                 Map.of()
         );
         SecurityScanResponse response = securityScanner.scan(request);
-        securityScanService.processScanResult(payload.versionId(), payload.scannerType(), response);
+        if (payload.sharingAuditId != null) {
+            securityScanService.processSharingScanResult(payload.sharingAuditId, payload.versionId(), response);
+        } else {
+            securityScanService.processScanResult(payload.versionId(), payload.scannerType(), response);
+        }
     }
 
     @Override
@@ -141,6 +146,10 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
                 payload.sourceDescription(),
                 error);
         try {
+            if (payload.sharingAuditId != null) {
+                securityScanService.failSharingScan(payload.sharingAuditId);
+                return;
+            }
             skillVersionRepository.findById(payload.versionId())
                     .filter(version -> version.getStatus() == SkillVersionStatus.SCANNING)
                     .ifPresent(version -> {
@@ -167,6 +176,10 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
                 retryCount,
                 payload.sourceDescription());
         cleanupRetryTempPath(payload);
+        Map<String, String> retryMetadata = new java.util.HashMap<>();
+        retryMetadata.put("retryCount", String.valueOf(retryCount));
+        retryMetadata.put("scannerType", payload.scannerType().getValue());
+        if (payload.sharingAuditId != null) retryMetadata.put("sharingAuditId", payload.sharingAuditId.toString());
         scanTaskProducer.publishScanTask(new ScanTask(
                 payload.taskId(),
                 payload.versionId(),
@@ -174,10 +187,7 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
                 payload.bundleKey(),
                 null,
                 System.currentTimeMillis(),
-                Map.of(
-                        "retryCount", String.valueOf(retryCount),
-                        "scannerType", payload.scannerType().getValue()
-                )
+                retryMetadata
         ));
     }
 
@@ -252,6 +262,7 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
         private final String bundleKey;
         private final ScannerType scannerType;
         private final int retryCount;
+        private final Long sharingAuditId;
         private String workingSkillPath;
 
         protected ScanTaskPayload(String taskId, Long versionId, String skillPath, String bundleKey, ScannerType scannerType) {
@@ -264,6 +275,12 @@ public class ScanTaskConsumer extends AbstractStreamConsumer<ScanTaskConsumer.Sc
                                   String bundleKey,
                                   ScannerType scannerType,
                                   int retryCount) {
+            this(taskId, versionId, skillPath, bundleKey, scannerType, retryCount, null);
+        }
+
+        protected ScanTaskPayload(String taskId, Long versionId, String skillPath, String bundleKey,
+                                  ScannerType scannerType, int retryCount, Long sharingAuditId) {
+            this.sharingAuditId = sharingAuditId;
             this.taskId = taskId;
             this.versionId = versionId;
             this.skillPath = skillPath;

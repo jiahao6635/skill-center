@@ -16,6 +16,8 @@ import org.springframework.util.AntPathMatcher;
 public class RouteSecurityPolicyRegistry {
 
     private static final List<RouteAuthorizationPolicy> AUTHORIZATION_POLICIES = List.of(
+            RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/v1/skills/by-id/*/location"),
+            RouteAuthorizationPolicy.permitAll(HttpMethod.GET, "/api/web/skills/by-id/*/location"),
             RouteAuthorizationPolicy.permitAll(null, "/api/v1/health"),
             RouteAuthorizationPolicy.permitAll(null, "/api/v1/search"),
             RouteAuthorizationPolicy.permitAll(null, "/api/v1/resolve/**"),
@@ -97,6 +99,14 @@ public class RouteSecurityPolicyRegistry {
     );
 
     private static final List<ApiTokenPolicy> API_TOKEN_POLICIES = List.of(
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/skills/by-id/*/sharing", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/skills/by-id/*/sharing/precheck", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/skills/by-id/*/sharing/*/withdraw", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/v1/skills/by-id/*/private-versions", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/web/skills/by-id/*/sharing", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/web/skills/by-id/*/sharing/precheck", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/web/skills/by-id/*/sharing/*/withdraw", "skill:publish"),
+            ApiTokenPolicy.require(HttpMethod.POST, "/api/web/skills/by-id/*/private-versions", "skill:publish"),
             ApiTokenPolicy.allow(null, "/api/v1/health"),
             ApiTokenPolicy.allow(null, "/api/v1/auth/providers"),
             ApiTokenPolicy.allow(null, "/api/v1/auth/methods"),

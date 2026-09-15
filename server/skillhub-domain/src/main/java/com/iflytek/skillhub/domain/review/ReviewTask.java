@@ -17,6 +17,12 @@ public class ReviewTask {
     @Column(name = "namespace_id", nullable = false)
     private Long namespaceId;
 
+    @Column(name = "share_request_id")
+    private Long shareRequestId;
+
+    public Long getShareRequestId() { return shareRequestId; }
+    public void setShareRequestId(Long shareRequestId) { this.shareRequestId = shareRequestId; }
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private ReviewTaskStatus status = ReviewTaskStatus.PENDING;

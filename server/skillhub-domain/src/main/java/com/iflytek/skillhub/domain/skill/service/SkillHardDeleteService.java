@@ -89,6 +89,7 @@ public class SkillHardDeleteService {
     @Transactional
     public void hardDeleteSkill(Skill skill, String namespaceSlug, String actorUserId, String clientIp, String userAgent) {
         List<SkillVersion> versions = skillVersionRepository.findBySkillId(skill.getId());
+        versions.forEach(SkillVersion::assertNotSharing);
         List<Long> versionIds = versions.stream().map(SkillVersion::getId).toList();
 
         List<String> storageKeys = new ArrayList<>();
@@ -104,7 +105,9 @@ public class SkillHardDeleteService {
 
         skill.setLatestVersionId(null);
         skill.setUpdatedBy(actorUserId);
-        skillRepository.save(skill);
+        // The caller may pass a detached entity. Keep the merged instance so its
+        // optimistic revision reflects the pointer update before deleting it.
+        Skill managedSkill = skillRepository.save(skill);
         skillRepository.flush();
 
         if (!versionIds.isEmpty()) {
@@ -122,7 +125,7 @@ public class SkillHardDeleteService {
             skillFileRepository.deleteByVersionId(versionId);
         }
         skillVersionRepository.deleteBySkillId(skill.getId());
-        skillRepository.delete(skill);
+        skillRepository.delete(managedSkill);
 
         auditLogService.record(
                 actorUserId,

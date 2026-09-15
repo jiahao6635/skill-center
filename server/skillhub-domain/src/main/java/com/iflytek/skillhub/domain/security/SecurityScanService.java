@@ -77,9 +77,18 @@ public class SecurityScanService {
 
     @Transactional
     public void triggerScan(Long versionId, List<PackageEntry> entries, String publisherId) {
+        startScan(versionId, entries, publisherId, false);
+    }
+
+    @Transactional
+    public SecurityAudit triggerSharingScan(Long versionId, List<PackageEntry> entries, String publisherId) {
+        return startScan(versionId, entries, publisherId, true);
+    }
+
+    private SecurityAudit startScan(Long versionId, List<PackageEntry> entries, String publisherId, boolean preserveVersion) {
         if (!enabled) {
             log.debug("Security scanner disabled, skipping trigger for versionId={}", versionId);
-            return;
+            return null;
         }
 
         SkillVersion version = skillVersionRepository.findById(versionId)
@@ -94,7 +103,7 @@ public class SecurityScanService {
             packagePath = saveTempDirectory(versionId, entries).toString();
         }
         // Always create a new audit record — supports multiple rounds per version
-        auditRepository.save(new SecurityAudit(versionId, ScannerType.SKILL_SCANNER));
+        SecurityAudit audit = auditRepository.save(new SecurityAudit(versionId, ScannerType.SKILL_SCANNER));
         final ScanTask scanTask = new ScanTask(
                 UUID.randomUUID().toString(),
                 versionId,
@@ -102,16 +111,43 @@ public class SecurityScanService {
                 bundleKey,
                 publisherId,
                 System.currentTimeMillis(),
-                Map.of("scannerType", ScannerType.SKILL_SCANNER.getValue())
+                preserveVersion ? Map.of("scannerType", ScannerType.SKILL_SCANNER.getValue(), "sharingAuditId", audit.getId().toString())
+                        : Map.of("scannerType", ScannerType.SKILL_SCANNER.getValue())
         );
         // The stream consumer must not observe this task before skill_version /
         // security_audit rows are committed and visible.
         TransactionCommitCallbacks.afterCommitOrNow(() -> scanTaskProducer.publishScanTask(scanTask));
         // Only transition to SCANNING if the version is not already published (auto-publish flow)
-        if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
+        if (!preserveVersion && version.getStatus() != SkillVersionStatus.PUBLISHED) {
             version.setStatus(SkillVersionStatus.SCANNING);
             skillVersionRepository.save(version);
         }
+        return audit;
+    }
+
+    /** A sharing scan belongs to one request; late results must never complete a newer scan. */
+    @Transactional
+    public void processSharingScanResult(Long auditId, Long versionId, SecurityScanResponse response) {
+        SecurityAudit audit = auditRepository.findById(auditId).orElseThrow();
+        if (audit.isDeleted() || audit.getScannedAt() != null || !java.util.Objects.equals(audit.getSkillVersionId(), versionId)) return;
+        audit.setScanId(response.scanId());
+        audit.setVerdict(response.verdict());
+        audit.setIsSafe(response.verdict() == SecurityVerdict.SAFE);
+        audit.setMaxSeverity(response.maxSeverity());
+        audit.setFindingsCount(response.findingsCount());
+        audit.setFindings(serializeFindings(response.findings()));
+        audit.setScanDurationSeconds(response.scanDurationSeconds());
+        audit.setScannedAt(Instant.now(Clock.systemUTC()));
+        auditRepository.save(audit);
+    }
+
+    @Transactional
+    public void failSharingScan(Long auditId) {
+        auditRepository.findById(auditId).filter(audit -> audit.getScannedAt() == null).ifPresent(audit -> {
+            audit.setIsSafe(false);
+            audit.setScannedAt(Instant.now(Clock.systemUTC()));
+            auditRepository.save(audit);
+        });
     }
 
     @Transactional

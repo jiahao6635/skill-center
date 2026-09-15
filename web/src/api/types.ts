@@ -246,7 +246,8 @@ export interface SubmitPromotionRequest {
   targetNamespaceId: number
 }
 
-export interface SkillVersion {
+type GeneratedSkillVersion = components['schemas']['SkillVersionResponse']
+export interface SkillVersion extends GeneratedSkillVersion {
   id: number
   version: string
   status: string

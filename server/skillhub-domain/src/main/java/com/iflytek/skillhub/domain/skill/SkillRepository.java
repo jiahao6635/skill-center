@@ -31,6 +31,7 @@ public interface SkillRepository {
                                        Long replacementVersionId,
                                        String updatedBy,
                                        Instant updatedAt);
+    Optional<Skill> findByPrivateSourceNamespaceIdAndSlugAndOwnerId(Long namespaceId, String slug, String ownerId);
     List<Skill> findBySlug(String slug);
     List<Skill> findByNamespaceSlugAndSlug(String namespaceSlug, String slug);
 }

@@ -71,7 +71,9 @@ public class SecurityAuditController extends BaseApiController {
         }
         Skill skill = skillRepository.findById(skillId)
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.notFound", skillId));
-        if (!canViewAudit(skill, principal, userNsRoles)) {
+        if (!canViewAudit(skill, principal, userNsRoles)
+                || !com.iflytek.skillhub.domain.skill.VersionAccessPolicy.canRead(skill, version,
+                        principal == null ? null : principal.userId(), userNsRoles)) {
             throw new DomainForbiddenException("error.forbidden");
         }
 

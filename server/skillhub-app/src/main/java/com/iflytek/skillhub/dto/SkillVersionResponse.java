@@ -10,5 +10,6 @@ public record SkillVersionResponse(
         int fileCount,
         long totalSize,
         Instant publishedAt,
-        boolean downloadAvailable
+        boolean downloadAvailable,
+        String distributionVisibility
 ) {}

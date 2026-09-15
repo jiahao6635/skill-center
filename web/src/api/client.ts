@@ -98,6 +98,7 @@ export function isI18nEnabled(): boolean {
 }
 
 const client = createClient<paths>({ baseUrl: getApiBaseUrl() })
+export { client as openApiClient }
 
 function getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)
@@ -124,7 +125,7 @@ function withCsrf(headers?: HeadersInit): HeadersInit {
   return merged
 }
 
-async function ensureCsrfHeaders(headers?: HeadersInit): Promise<HeadersInit> {
+export async function ensureCsrfHeaders(headers?: HeadersInit): Promise<HeadersInit> {
   if (!getCsrfToken()) {
     await client.GET('/api/v1/auth/providers', {
       headers: withRequestHeaders(),

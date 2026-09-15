@@ -10,6 +10,7 @@ import com.iflytek.skillhub.domain.review.ReviewTaskRepository;
 import com.iflytek.skillhub.domain.review.ReviewTaskStatus;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
+import com.iflytek.skillhub.domain.skill.VersionAccessPolicy;
 import com.iflytek.skillhub.domain.skill.*;
 import com.iflytek.skillhub.domain.user.UserAccount;
 import com.iflytek.skillhub.domain.user.UserAccountRepository;
@@ -115,7 +116,8 @@ public class SkillQueryService {
             SkillLifecycleProjectionService.VersionProjection publishedVersion,
             SkillLifecycleProjectionService.VersionProjection ownerPreviewVersion,
             String ownerPreviewReviewComment,
-            String resolutionMode
+            String resolutionMode,
+            String namespaceSlug
     ) {}
 
     public record SkillVersionDetailDTO(
@@ -247,7 +249,8 @@ public class SkillQueryService {
                 publishedVersion,
                 ownerPreviewVersion,
                 ownerPreviewReviewComment,
-                projection.resolutionMode().name()
+                projection.resolutionMode().name(),
+                namespaceRepository.findById(skill.getNamespaceId()).map(Namespace::getSlug).orElse(namespaceSlug)
         );
     }
 
@@ -405,6 +408,7 @@ public class SkillQueryService {
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
         assertPublishedAccessible(namespace, skill, currentUserId, userNsRoles);
         SkillVersion skillVersion = resolveVersionEntity(skill, null, tagName, null);
+        assertPreviewAccessible(skill, skillVersion, skillVersion.getVersion(), currentUserId, userNsRoles);
         return availableFiles(skillVersion.getId());
     }
 
@@ -442,6 +446,7 @@ public class SkillQueryService {
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
         assertPublishedAccessible(namespace, skill, currentUserId, userNsRoles);
         SkillVersion skillVersion = resolveVersionEntity(skill, null, tagName, null);
+        assertPreviewAccessible(skill, skillVersion, skillVersion.getVersion(), currentUserId, userNsRoles);
         SkillFile file = findFile(skillVersion, filePath);
         return readFileContent(file);
     }
@@ -479,6 +484,10 @@ public class SkillQueryService {
         }
 
         // Manual pagination
+        visibleVersions = visibleVersions.stream()
+                .filter(version -> VersionAccessPolicy.canRead(skill, version, currentUserId, userNsRoles))
+                .toList();
+
         int start = Math.min((int) pageable.getOffset(), visibleVersions.size());
         int end = Math.min(start + pageable.getPageSize(), visibleVersions.size());
         List<SkillVersion> pageContent = visibleVersions.subList(start, end);
@@ -501,6 +510,8 @@ public class SkillQueryService {
                 .orElse(null);
 
         List<SkillVersion> versions = skillVersionRepository.findBySkillId(skill.getId()).stream()
+                .filter(version -> version.getId().equals(activeVersion.getId())
+                        || !VersionAccessPolicy.isPrivate(skill, version))
                 .filter(version -> version.getStatus() == SkillVersionStatus.PUBLISHED
                         || version.getStatus() == SkillVersionStatus.PENDING_REVIEW
                         || version.getStatus() == SkillVersionStatus.UPLOADED
@@ -559,13 +570,15 @@ public class SkillQueryService {
         Skill skill = resolveVisibleSkill(namespace.getId(), skillSlug, currentUserId);
         assertPublishedAccessible(namespace, skill, currentUserId, userNsRoles);
         SkillVersion resolved = resolveVersionEntity(skill, version, tag, hash);
+        assertPreviewAccessible(skill, resolved, resolved.getVersion(), currentUserId, userNsRoles);
         assertInstallableVersion(resolved, resolved.getVersion());
         String fingerprint = computeFingerprint(resolved);
         Boolean matched = hash == null || hash.isBlank() ? null : Objects.equals(hash, fingerprint);
 
+        String canonicalNamespace = namespaceRepository.findById(skill.getNamespaceId()).map(Namespace::getSlug).orElse(namespaceSlug);
         return new ResolvedVersionDTO(
                 skill.getId(),
-                namespaceSlug,
+                canonicalNamespace,
                 skill.getSlug(),
                 resolved.getVersion(),
                 resolved.getId(),
@@ -573,7 +586,7 @@ public class SkillQueryService {
                 matched,
                 String.format(
                         "/api/v1/skills/%s/%s/versions/%s/download",
-                        encodePathSegment(namespaceSlug),
+                        encodePathSegment(canonicalNamespace),
                         encodePathSegment(skill.getSlug()),
                         encodePathSegment(resolved.getVersion()))
         );
@@ -841,7 +854,7 @@ public class SkillQueryService {
             SkillLifecycleProjectionService.VersionProjection publishedVersion,
             String currentUserId,
             Map<Long, NamespaceRole> userNsRoles) {
-        if (namespace.getType() == NamespaceType.GLOBAL) {
+        if (namespace.getType() == NamespaceType.GLOBAL || skill.getVisibility() == com.iflytek.skillhub.domain.skill.SkillVisibility.PRIVATE) {
             return false;
         }
         if (namespace.getStatus() != NamespaceStatus.ACTIVE || skill.getStatus() != SkillStatus.ACTIVE) {
@@ -925,10 +938,7 @@ public class SkillQueryService {
      */
     private void assertPreviewAccessible(Skill skill, SkillVersion version, String versionStr,
                                           String currentUserId, Map<Long, NamespaceRole> userNsRoles) {
-        if (version.getStatus() == SkillVersionStatus.PUBLISHED) {
-            return;
-        }
-        if (canManageRestrictedSkill(skill, currentUserId, userNsRoles)) {
+        if (VersionAccessPolicy.canRead(skill, version, currentUserId, userNsRoles)) {
             return;
         }
         throw new DomainBadRequestException("error.skill.version.notPublished", versionStr);

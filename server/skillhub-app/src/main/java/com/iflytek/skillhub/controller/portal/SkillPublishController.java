@@ -86,7 +86,7 @@ public class SkillPublishController extends BaseApiController {
 
         PublishResponse response = new PublishResponse(
                 publishResult.skillId(),
-                namespace,
+                publishResult.namespace() != null ? publishResult.namespace() : namespace,
                 publishResult.slug(),
                 publishResult.version().getVersion(),
                 publishResult.version().getStatus().name(),

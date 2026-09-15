@@ -184,6 +184,11 @@ class SkillTagServiceTest {
         when(skillTagRepository.findBySkillId(1L)).thenReturn(List.of(tag1, tag2));
         when(visibilityChecker.canAccess(eq(skill), isNull(), eq(java.util.Map.of()))).thenReturn(true);
 
+        for (long versionId = 1; versionId <= 3; versionId++) {
+            SkillVersion taggedVersion = new SkillVersion(1L, "1.0." + versionId, "user-100");
+            taggedVersion.setStatus(SkillVersionStatus.PUBLISHED);
+            when(skillVersionRepository.findById(versionId)).thenReturn(Optional.of(taggedVersion));
+        }
         // Act
         List<SkillTag> result = service.listTags(namespaceSlug, skillSlug, null, java.util.Map.of());
 

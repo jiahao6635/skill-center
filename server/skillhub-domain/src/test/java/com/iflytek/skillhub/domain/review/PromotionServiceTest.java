@@ -61,7 +61,7 @@ class PromotionServiceTest {
     void setUp() {
         promotionService = new PromotionService(
                 promotionRequestRepository, skillRepository, skillVersionRepository,
-                skillFileRepository, namespaceRepository, permissionChecker, eventPublisher, governanceNotificationService, entityManager, CLOCK);
+                skillFileRepository, namespaceRepository, permissionChecker, eventPublisher, governanceNotificationService, entityManager, CLOCK, org.mockito.Mockito.mock(com.iflytek.skillhub.domain.skill.NamespacePublishLock.class));
     }
 
     private static void setField(Object target, String fieldName, Object value) {

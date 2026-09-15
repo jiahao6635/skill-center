@@ -18,6 +18,9 @@ import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersionStatus;
 import com.iflytek.skillhub.domain.skill.service.SkillGovernanceService;
 import com.iflytek.skillhub.domain.skill.service.SkillPublicationService;
+import com.iflytek.skillhub.domain.skill.service.SkillSharingService;
+import com.iflytek.skillhub.domain.skill.NamespacePublishLock;
+import com.iflytek.skillhub.domain.skill.VersionAccessPolicy;
 import jakarta.persistence.EntityManager;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -51,6 +54,8 @@ public class ReviewService {
     private final GovernanceNotificationService governanceNotificationService;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final SkillSharingService sharingService;
+    private final NamespacePublishLock namespacePublishLock;
 
     public ReviewService(ReviewTaskRepository reviewTaskRepository,
                          SkillVersionRepository skillVersionRepository,
@@ -62,7 +67,7 @@ public class ReviewService {
                          SkillPublicationService skillPublicationService,
                          GovernanceNotificationService governanceNotificationService,
                          EntityManager entityManager,
-                         Clock clock) {
+                         Clock clock, SkillSharingService sharingService, NamespacePublishLock namespacePublishLock) {
         this.reviewTaskRepository = reviewTaskRepository;
         this.skillVersionRepository = skillVersionRepository;
         this.skillRepository = skillRepository;
@@ -74,6 +79,8 @@ public class ReviewService {
         this.governanceNotificationService = governanceNotificationService;
         this.entityManager = entityManager;
         this.clock = clock;
+        this.sharingService = sharingService;
+        this.namespacePublishLock = namespacePublishLock;
     }
 
     /**
@@ -90,6 +97,8 @@ public class ReviewService {
 
         Skill skill = skillRepository.findById(skillVersion.getSkillId())
                 .orElseThrow(() -> new DomainNotFoundException("skill.not_found", skillVersion.getSkillId()));
+        if (VersionAccessPolicy.isPrivate(skill, skillVersion)) throw new DomainBadRequestException("sharing.useSharingFlow");
+        skillVersion.assertNotSharing();
         Namespace namespace = namespaceRepository.findById(skill.getNamespaceId())
                 .orElseThrow(() -> new DomainNotFoundException("namespace.not_found", skill.getNamespaceId()));
         assertNamespaceActive(namespace);
@@ -132,6 +141,8 @@ public class ReviewService {
 
         Skill skill = skillRepository.findById(skillVersion.getSkillId())
                 .orElseThrow(() -> new DomainNotFoundException("skill.not_found", skillVersion.getSkillId()));
+        if (VersionAccessPolicy.isPrivate(skill, skillVersion)) throw new DomainBadRequestException("sharing.useSharingFlow");
+        skillVersion.assertNotSharing();
         Namespace namespace = namespaceRepository.findById(skill.getNamespaceId())
                 .orElseThrow(() -> new DomainNotFoundException("namespace.not_found", skill.getNamespaceId()));
         assertNamespaceActive(namespace);
@@ -176,6 +187,13 @@ public class ReviewService {
             throw new DomainBadRequestException("review.not_pending", reviewTaskId);
         }
 
+        if (task.getShareRequestId() != null) {
+            sharingService.decide(task, reviewerId, comment, userNamespaceRoles, platformRoles, true);
+            entityManager.detach(task);
+            syncReviewTaskState(task, ReviewTaskStatus.APPROVED, reviewerId, comment);
+            return task;
+        }
+        namespacePublishLock.lock(task.getNamespaceId());
         Namespace namespace = namespaceRepository.findById(task.getNamespaceId())
                 .orElseThrow(() -> new DomainNotFoundException("namespace.not_found", task.getNamespaceId()));
         assertNamespaceActive(namespace);
@@ -236,6 +254,13 @@ public class ReviewService {
             throw new DomainBadRequestException("review.not_pending", reviewTaskId);
         }
 
+        if (task.getShareRequestId() != null) {
+            sharingService.decide(task, reviewerId, comment, userNamespaceRoles, platformRoles, false);
+            entityManager.detach(task);
+            syncReviewTaskState(task, ReviewTaskStatus.REJECTED, reviewerId, comment);
+            return task;
+        }
+        namespacePublishLock.lock(task.getNamespaceId());
         Namespace namespace = namespaceRepository.findById(task.getNamespaceId())
                 .orElseThrow(() -> new DomainNotFoundException("namespace.not_found", task.getNamespaceId()));
         assertNamespaceActive(namespace);
@@ -288,6 +313,11 @@ public class ReviewService {
             throw new DomainForbiddenException("review.withdraw.not_submitter");
         }
 
+        if (task.getShareRequestId() != null) {
+            SkillVersion version = skillVersionRepository.findById(skillVersionId).orElseThrow();
+            sharingService.withdraw(version.getSkillId(), task.getShareRequestId(), userId);
+            return version;
+        }
         reviewTaskRepository.delete(task);
 
         SkillVersion skillVersion = skillVersionRepository.findById(skillVersionId)

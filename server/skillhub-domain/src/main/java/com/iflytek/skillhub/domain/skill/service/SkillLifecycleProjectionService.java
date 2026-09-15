@@ -2,6 +2,8 @@ package com.iflytek.skillhub.domain.skill.service;
 
 import com.iflytek.skillhub.domain.namespace.NamespaceRole;
 import com.iflytek.skillhub.domain.skill.Skill;
+import com.iflytek.skillhub.domain.skill.VersionAccessPolicy;
+import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.SkillInstallability;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
@@ -55,6 +57,8 @@ public class SkillLifecycleProjectionService {
         SkillVersion preview = canManage(skill, currentUserId, userNsRoles)
                 ? resolveNewerNonPublishedVersion(skill, published)
                 : null;
+        if (published != null && !VersionAccessPolicy.canRead(skill, published, currentUserId, userNsRoles)) published = null;
+        if (preview != null && !VersionAccessPolicy.canRead(skill, preview, currentUserId, userNsRoles)) preview = null;
         return buildProjection(published, preview);
     }
 
@@ -91,7 +95,7 @@ public class SkillLifecycleProjectionService {
         Map<Long, SkillVersion> publishedBySkillId = new java.util.HashMap<>();
         for (Skill skill : skills) {
             SkillVersion latestVersion = latestVersionsById.get(skill.getLatestVersionId());
-            if (SkillInstallability.isInstallableVersion(latestVersion)) {
+            if (SkillInstallability.isInstallableVersion(latestVersion) && VersionAccessPolicy.isShared(latestVersion)) {
                 publishedBySkillId.put(skill.getId(), latestVersion);
             }
         }
@@ -106,11 +110,13 @@ public class SkillLifecycleProjectionService {
     private SkillVersion resolvePublishedVersion(Skill skill) {
         if (skill.getLatestVersionId() != null) {
             SkillVersion latest = skillVersionRepository.findById(skill.getLatestVersionId()).orElse(null);
-            if (latest != null && latest.getStatus() == SkillVersionStatus.PUBLISHED) {
+            if (latest != null && latest.getStatus() == SkillVersionStatus.PUBLISHED
+                    && (skill.getVisibility() == SkillVisibility.PRIVATE || VersionAccessPolicy.isShared(latest))) {
                 return latest;
             }
         }
         return skillVersionRepository.findBySkillIdAndStatus(skill.getId(), SkillVersionStatus.PUBLISHED).stream()
+                .filter(version -> skill.getVisibility() == SkillVisibility.PRIVATE || VersionAccessPolicy.isShared(version))
                 .max(versionComparator())
                 .orElse(null);
     }
@@ -125,7 +131,7 @@ public class SkillLifecycleProjectionService {
      */
     private SkillVersion resolveNewerNonPublishedVersion(Skill skill, SkillVersion publishedVersion) {
         return skillVersionRepository.findBySkillId(skill.getId()).stream()
-                .filter(version -> version.getStatus() != SkillVersionStatus.PUBLISHED
+                .filter(version -> (version.getStatus() != SkillVersionStatus.PUBLISHED || !VersionAccessPolicy.isShared(version))
                         && version.getStatus() != SkillVersionStatus.YANKED)
                 .filter(version -> publishedVersion == null || RECENCY.compare(version, publishedVersion) > 0)
                 .max(RECENCY)

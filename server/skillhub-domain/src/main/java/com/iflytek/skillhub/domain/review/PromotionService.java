@@ -47,6 +47,7 @@ public class PromotionService {
     private final GovernanceNotificationService governanceNotificationService;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final com.iflytek.skillhub.domain.skill.NamespacePublishLock namespacePublishLock;
 
     public PromotionService(PromotionRequestRepository promotionRequestRepository,
                             SkillRepository skillRepository,
@@ -57,7 +58,7 @@ public class PromotionService {
                             ApplicationEventPublisher eventPublisher,
                             GovernanceNotificationService governanceNotificationService,
                             EntityManager entityManager,
-                            Clock clock) {
+                            Clock clock, com.iflytek.skillhub.domain.skill.NamespacePublishLock namespacePublishLock) {
         this.promotionRequestRepository = promotionRequestRepository;
         this.skillRepository = skillRepository;
         this.skillVersionRepository = skillVersionRepository;
@@ -68,6 +69,7 @@ public class PromotionService {
         this.governanceNotificationService = governanceNotificationService;
         this.entityManager = entityManager;
         this.clock = clock;
+        this.namespacePublishLock = namespacePublishLock;
     }
 
     /**
@@ -89,6 +91,9 @@ public class PromotionService {
             throw new DomainBadRequestException("promotion.version_skill_mismatch", sourceVersionId, sourceSkillId);
         }
 
+        if (com.iflytek.skillhub.domain.skill.VersionAccessPolicy.isPrivate(sourceSkill, sourceVersion)) {
+            throw new DomainBadRequestException("sharing.useSharingFlow");
+        }
         if (sourceVersion.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("promotion.version_not_published", sourceVersionId);
         }
@@ -139,6 +144,9 @@ public class PromotionService {
             throw new DomainBadRequestException("promotion.version_skill_mismatch", sourceVersionId, sourceSkillId);
         }
 
+        if (com.iflytek.skillhub.domain.skill.VersionAccessPolicy.isPrivate(sourceSkill, sourceVersion)) {
+            throw new DomainBadRequestException("sharing.useSharingFlow");
+        }
         if (sourceVersion.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("promotion.version_not_published", sourceVersionId);
         }
@@ -193,6 +201,7 @@ public class PromotionService {
             throw new DomainForbiddenException("promotion.no_permission");
         }
 
+        namespacePublishLock.lock(request.getTargetNamespaceId());
         int updated = promotionRequestRepository.updateStatusWithVersion(
                 promotionId, ReviewTaskStatus.APPROVED, reviewerId, comment, null, request.getVersion());
         if (updated == 0) {
@@ -207,6 +216,7 @@ public class PromotionService {
         SkillVersion sourceVersion = skillVersionRepository.findById(approvedRequest.getSourceVersionId())
                 .orElseThrow(() -> new DomainNotFoundException("skill_version.not_found", approvedRequest.getSourceVersionId()));
 
+        if (VersionAccessPolicy.isPrivate(sourceSkill, sourceVersion)) throw new DomainBadRequestException("sharing.useSharingFlow");
         assertTargetSkillNotExists(approvedRequest, sourceSkill);
 
         // Create new skill in global namespace

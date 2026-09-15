@@ -119,6 +119,11 @@ public class JpaSkillRepositoryAdapter implements SkillRepository {
     }
 
     @Override
+    public Optional<Skill> findByPrivateSourceNamespaceIdAndSlugAndOwnerId(Long namespaceId, String slug, String ownerId) {
+        return delegate.findByPrivateSourceNamespaceIdAndSlugAndOwnerId(namespaceId, slug, ownerId);
+    }
+
+    @Override
     public List<Skill> findBySlug(String slug) {
         return delegate.findBySlug(slug);
     }

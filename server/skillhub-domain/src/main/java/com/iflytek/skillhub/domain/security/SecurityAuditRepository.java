@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface SecurityAuditRepository {
+    Optional<SecurityAudit> findById(Long id);
     SecurityAudit save(SecurityAudit audit);
 
     List<SecurityAudit> saveAll(List<SecurityAudit> audits);

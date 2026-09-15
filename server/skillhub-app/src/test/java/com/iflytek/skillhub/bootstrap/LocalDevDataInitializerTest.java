@@ -55,6 +55,9 @@ class LocalDevDataInitializerTest {
         Namespace global = new Namespace("global", "Global", "system");
         setField(global, "id", 1L);
 
+        Namespace privateNamespace = new Namespace("private", "Private", "system");
+        setField(privateNamespace, "id", 2L);
+
         Role superAdminRole = new Role();
         setField(superAdminRole, "id", 1L);
         setField(superAdminRole, "code", "SUPER_ADMIN");
@@ -63,6 +66,7 @@ class LocalDevDataInitializerTest {
         when(userAccountRepository.findById(LocalDevDataInitializer.LOCAL_ADMIN_ID)).thenReturn(Optional.empty());
         when(userAccountRepository.save(any(UserAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(namespaceRepository.findBySlug("global")).thenReturn(Optional.of(global));
+        when(namespaceRepository.findBySlug("private")).thenReturn(Optional.of(privateNamespace));
         when(namespaceMemberRepository.findByNamespaceIdAndUserId(anyLong(), any())).thenReturn(Optional.empty());
         when(namespaceMemberRepository.save(any(NamespaceMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(roleRepository.findByCode("SUPER_ADMIN")).thenReturn(Optional.of(superAdminRole));
@@ -77,12 +81,12 @@ class LocalDevDataInitializerTest {
         assertTrue(savedUsers.stream().anyMatch(user -> LocalDevDataInitializer.LOCAL_ADMIN_ID.equals(user.getId())));
 
         ArgumentCaptor<NamespaceMember> memberCaptor = ArgumentCaptor.forClass(NamespaceMember.class);
-        verify(namespaceMemberRepository, times(2)).save(memberCaptor.capture());
+        verify(namespaceMemberRepository, times(4)).save(memberCaptor.capture());
         assertEquals(
                 List.of(LocalDevDataInitializer.LOCAL_USER_ID, LocalDevDataInitializer.LOCAL_ADMIN_ID),
-                memberCaptor.getAllValues().stream().map(NamespaceMember::getUserId).toList()
+                memberCaptor.getAllValues().stream().filter(member -> member.getNamespaceId().equals(1L)).map(NamespaceMember::getUserId).toList()
         );
-        assertTrue(memberCaptor.getAllValues().stream().allMatch(member -> member.getRole() == NamespaceRole.OWNER));
+        assertTrue(memberCaptor.getAllValues().stream().allMatch(member -> member.getRole() == (member.getNamespaceId().equals(1L) ? NamespaceRole.OWNER : NamespaceRole.MEMBER)));
 
         ArgumentCaptor<UserRoleBinding> roleBindingCaptor = ArgumentCaptor.forClass(UserRoleBinding.class);
         verify(userRoleBindingRepository).save(roleBindingCaptor.capture());

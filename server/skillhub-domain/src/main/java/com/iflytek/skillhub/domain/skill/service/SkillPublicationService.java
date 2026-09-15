@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iflytek.skillhub.domain.event.SkillPublishedEvent;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.skill.Skill;
+import com.iflytek.skillhub.domain.skill.NamespacePublishLock;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillVersion;
 import com.iflytek.skillhub.domain.skill.SkillVersionRepository;
@@ -34,17 +35,19 @@ public class SkillPublicationService {
     private final ApplicationEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final NamespacePublishLock namespacePublishLock;
 
     public SkillPublicationService(SkillRepository skillRepository,
                                    SkillVersionRepository skillVersionRepository,
                                    ApplicationEventPublisher eventPublisher,
                                    ObjectMapper objectMapper,
-                                   Clock clock) {
+                                   Clock clock, NamespacePublishLock namespacePublishLock) {
         this.skillRepository = skillRepository;
         this.skillVersionRepository = skillVersionRepository;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.namespacePublishLock = namespacePublishLock;
     }
 
     /**
@@ -56,6 +59,7 @@ public class SkillPublicationService {
      */
     @Transactional
     public void publishVersion(Skill skill, SkillVersion version, String actorId) {
+        namespacePublishLock.lock(skill.getNamespaceId());
         // No other owner may already hold a published skill with the same slug.
         List<Skill> sameSlugSkills = skillRepository.findByNamespaceIdAndSlug(skill.getNamespaceId(), skill.getSlug());
         for (Skill other : sameSlugSkills) {
@@ -69,6 +73,8 @@ public class SkillPublicationService {
             }
         }
 
+        version.setDistributionVisibility(version.getRequestedVisibility() != null
+                ? version.getRequestedVisibility() : skill.getVisibility());
         version.setStatus(SkillVersionStatus.PUBLISHED);
         version.setPublishedAt(Instant.now(clock));
         version.setAutoPublishOnScanPass(false);

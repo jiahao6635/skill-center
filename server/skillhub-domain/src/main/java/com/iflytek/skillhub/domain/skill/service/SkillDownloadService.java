@@ -423,6 +423,9 @@ public class SkillDownloadService {
                                            SkillVersion version,
                                            String currentUserId,
                                            Map<Long, NamespaceRole> userNsRoles) {
+        if (!com.iflytek.skillhub.domain.skill.VersionAccessPolicy.canRead(skill, version, currentUserId, userNsRoles)) {
+            throw new DomainForbiddenException("error.skill.access.denied", skill.getSlug());
+        }
         switch (version.getStatus()) {
             case PUBLISHED -> {
                 if (!SkillInstallability.isInstallableVersion(version)) {

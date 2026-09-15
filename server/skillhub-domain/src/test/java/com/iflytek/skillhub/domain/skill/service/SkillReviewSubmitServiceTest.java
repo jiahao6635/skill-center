@@ -70,7 +70,7 @@ class SkillReviewSubmitServiceTest {
             String userId = "user-1";
             Long namespaceId = 10L;
 
-            Skill skill = createSkill(skillId, userId, namespaceId, SkillVisibility.PRIVATE);
+            Skill skill = createSkill(skillId, userId, namespaceId, SkillVisibility.PUBLIC);
             SkillVersion version = createVersion(versionId, skillId, SkillVersionStatus.UPLOADED);
 
             when(skillRepository.findById(skillId)).thenReturn(Optional.of(skill));
@@ -100,7 +100,7 @@ class SkillReviewSubmitServiceTest {
             String userId = "user-1";
             Long namespaceId = 10L;
 
-            Skill skill = createSkill(skillId, userId, namespaceId, SkillVisibility.PRIVATE);
+            Skill skill = createSkill(skillId, userId, namespaceId, SkillVisibility.PUBLIC);
             SkillVersion version = createVersion(versionId, skillId, SkillVersionStatus.DRAFT);
 
             when(skillRepository.findById(skillId)).thenReturn(Optional.of(skill));

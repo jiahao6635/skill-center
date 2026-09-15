@@ -80,6 +80,8 @@ class SkillHardDeleteServiceTest {
 
     @BeforeEach
     void setUp() {
+        given(skillRepository.save(org.mockito.ArgumentMatchers.any(Skill.class)))
+                .willAnswer(call -> call.getArgument(0));
         service = new SkillHardDeleteService(
                 skillRepository,
                 skillVersionRepository,

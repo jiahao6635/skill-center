@@ -104,7 +104,7 @@ class SkillPublishServiceTest {
                 securityScanService,
                 compensationService,
                 eventPublisher,
-                CLOCK
+                CLOCK, org.mockito.Mockito.mock(com.iflytek.skillhub.domain.skill.NamespacePublishLock.class)
         );
         lenient().when(securityScanService.isEnabled()).thenReturn(true);
         lenient().when(skillVersionDeletionLock.lockAndRefresh(any(Skill.class)))
@@ -957,7 +957,8 @@ class SkillPublishServiceTest {
                 Set.of()
         );
 
-        assertEquals(longDescription, skill.getSummary());
+        assertTrue(result.version().getParsedMetadataJson().contains(longDescription));
+        assertNull(skill.getSummary());
         assertEquals(SkillVersionStatus.PENDING_REVIEW, result.version().getStatus());
         verify(prePublishValidator).validate(any());
         verify(skillRepository).save(skill);
@@ -1116,6 +1117,7 @@ class SkillPublishServiceTest {
             }
             return saved;
         });
+        when(skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "demo-skill", publisherId)).thenReturn(Optional.of(skill));
         when(skillRepository.save(any())).thenReturn(skill);
 
         SkillPublishService.PublishResult result = service.rereleasePublishedVersion(
@@ -1133,8 +1135,8 @@ class SkillPublishServiceTest {
         // No review task for PRIVATE skill
         verify(reviewTaskRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any(SkillPublishedEvent.class));
-        // latestVersionId should be updated for PRIVATE skill
-        assertEquals(30L, skill.getLatestVersionId());
+        // An uploaded debug version is not an installable published version.
+        assertNull(skill.getLatestVersionId());
     }
 
     @Test
@@ -1266,7 +1268,7 @@ class SkillPublishServiceTest {
 
     @Test
     void testPublishFromEntries_ShouldRejectWithPrivateConflictWhenOtherOwnerHasPrivatePublishedSkill() throws Exception {
-        String namespaceSlug = "test-ns";
+        String namespaceSlug = "private";
         String publisherId = "user-200";
         String skillMdContent = "---\nname: test-skill\ndescription: Test\nversion: 1.0.0\n---\nBody";
 
@@ -1495,7 +1497,7 @@ class SkillPublishServiceTest {
 
     @Test
     void testPublishFromEntries_PrivateWhenScannerDisabled_ShouldAllowUploadWithoutScan() throws Exception {
-        String namespaceSlug = "test-ns";
+        String namespaceSlug = "private";
         String publisherId = "user-100";
         PublishFixture fixture = stubValidPublishInputs(namespaceSlug, publisherId, "private-skill", "private-skill", "1.0.0", true);
         when(securityScanService.isEnabled()).thenReturn(false);
@@ -1840,6 +1842,57 @@ class SkillPublishServiceTest {
     }
 
     private record PublishFixture(List<PackageEntry> entries) {
+    }
+
+    @Test
+    void savePrivateVersionRetainsSharedIdentityMetadataAndPendingShare() throws Exception {
+        PublishFixture fixture = stubValidPublishInputs("team", "author", "demo", "demo", "2.0.0", false);
+        Skill shared = skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "demo", "author").orElseThrow();
+        shared.setSummary("Current shared description");
+        shared.setLatestVersionId(9L);
+        when(skillRepository.findById(1L)).thenReturn(Optional.of(shared));
+        var sourceNamespace = namespaceRepository.findBySlug("team");
+        when(namespaceRepository.findById(1L)).thenReturn(sourceNamespace);
+        SkillVersion pending = new SkillVersion(1L, "1.1.0", "author");
+        pending.setStatus(SkillVersionStatus.PENDING_REVIEW);
+        pending.setSharingRequestId(99L);
+        when(skillVersionRepository.findBySkillIdAndStatus(1L, SkillVersionStatus.PENDING_REVIEW)).thenReturn(List.of(pending));
+
+        var result = service.savePrivateVersion(1L, fixture.entries(), "author", Set.of("SUPER_ADMIN"), false);
+
+        assertEquals(1L, result.skillId());
+        assertEquals(SkillVisibility.PUBLIC, shared.getVisibility());
+        assertEquals(1L, shared.getNamespaceId());
+        assertEquals(9L, shared.getLatestVersionId());
+        assertEquals("Current shared description", shared.getSummary());
+        assertEquals(SkillVisibility.PRIVATE, result.version().getDistributionVisibility());
+        assertEquals(SkillVersionStatus.UPLOADED, result.version().getStatus());
+        assertEquals(SkillVersionStatus.PENDING_REVIEW, pending.getStatus());
+        verify(reviewTaskRepository, never()).delete(any());
+        verify(namespaceRepository, never()).findBySlug("private");
+    }
+
+    @Test
+    void privateUploadAfterSharingFollowsAuthorAliasInsteadOfCreatingDuplicate() throws Exception {
+        PublishFixture fixture = stubValidPublishInputs("team", "author", "demo", "demo", "2.0.0", false);
+        Skill original = skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "demo", "author").orElseThrow();
+        original.setLatestVersionId(9L);
+        Namespace privateSpace = new Namespace("private", "Private", "system");
+        setId(privateSpace, 99L);
+        var targetSpace = namespaceRepository.findBySlug("team");
+        when(namespaceRepository.findById(1L)).thenReturn(targetSpace);
+        when(namespaceRepository.findBySlug("private")).thenReturn(Optional.of(privateSpace));
+        when(skillRepository.findByPrivateSourceNamespaceIdAndSlugAndOwnerId(99L, "demo", "author")).thenReturn(Optional.of(original));
+
+        var result = service.publishFromEntries("private", fixture.entries(), "author", SkillVisibility.PRIVATE, Set.of("SUPER_ADMIN"));
+
+        assertEquals(original.getId(), result.skillId());
+        assertEquals(1L, original.getNamespaceId());
+        assertEquals(9L, original.getLatestVersionId());
+        assertEquals(SkillVisibility.PUBLIC, original.getVisibility());
+        assertEquals(SkillVisibility.PRIVATE, result.version().getDistributionVisibility());
+        assertEquals(SkillVersionStatus.UPLOADED, result.version().getStatus());
+        verify(skillRepository, never()).findByNamespaceIdAndSlugAndOwnerId(99L, "demo", "author");
     }
 
     private PublishFixture stubValidPublishInputs(
