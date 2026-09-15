@@ -27,6 +27,9 @@ public class SkillSlugResolutionService {
 
     public Skill resolve(Long namespaceId, String slug, String currentUserId, Preference preference) {
         List<Skill> skills = skillRepository.findByNamespaceIdAndSlug(namespaceId, slug);
+        Optional<Skill> alias = currentUserId == null ? Optional.empty()
+                : skillRepository.findByPrivateSourceNamespaceIdAndSlugAndOwnerId(namespaceId, slug, currentUserId);
+        if (alias.isPresent()) return alias.get();
         if (skills.isEmpty()) {
             throw new DomainBadRequestException("error.skill.notFound", slug);
         }

@@ -13,8 +13,24 @@ public class Skill {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private int revision;
+
     @Column(name = "namespace_id", nullable = false)
     private Long namespaceId;
+
+    @Column(name = "private_source_namespace_id")
+    private Long privateSourceNamespaceId;
+
+    public Long getPrivateSourceNamespaceId() { return privateSourceNamespaceId; }
+
+    public void shareToNamespace(Long targetNamespaceId) {
+        if (visibility == SkillVisibility.PRIVATE && privateSourceNamespaceId == null) {
+            privateSourceNamespaceId = namespaceId;
+        }
+        namespaceId = targetNamespaceId;
+    }
 
     @Column(nullable = false, length = 100)
     private String slug;

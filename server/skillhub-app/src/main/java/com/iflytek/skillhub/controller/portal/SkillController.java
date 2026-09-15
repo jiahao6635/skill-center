@@ -98,7 +98,7 @@ public class SkillController extends BaseApiController {
                 detail.ratingAvg(),
                 detail.ratingCount(),
                 detail.hidden(),
-                namespace,
+                detail.namespaceSlug(),
                 skillLabelAppService.listSkillLabelsBySkillId(detail.id()),
                 detail.canManageLifecycle(),
                 detail.canSubmitPromotion(),
@@ -142,7 +142,8 @@ public class SkillController extends BaseApiController {
                 v.getFileCount(),
                 v.getTotalSize(),
                 v.getPublishedAt(),
-                skillQueryService.isDownloadAvailable(v)
+                skillQueryService.isDownloadAvailable(v),
+                v.getDistributionVisibility().name()
         )));
 
         return ok("response.success.read", response);

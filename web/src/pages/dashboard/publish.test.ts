@@ -6,6 +6,10 @@ const useSearchMock = vi.fn()
 const selectRecords: Array<{ value?: string }> = []
 const selectItemRecords: Array<{ value?: string; description?: unknown; children?: unknown }> = []
 
+vi.mock('@/features/skill/sharing-api', () => ({
+  useSharingSettings: () => ({ data: undefined, isError: false }),
+}))
+
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
   useSearch: () => useSearchMock(),

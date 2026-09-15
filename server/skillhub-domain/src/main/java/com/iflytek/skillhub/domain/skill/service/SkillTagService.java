@@ -60,7 +60,9 @@ public class SkillTagService {
         if (skill.getLatestVersionId() != null) {
             tags.add(new SkillTag(skill.getId(), RESERVED_TAG_LATEST, skill.getLatestVersionId(), skill.getOwnerId()));
         }
-        return tags;
+        return tags.stream().filter(tag -> tag.getVersionId() != null
+                && skillVersionRepository.findById(tag.getVersionId())
+                    .filter(v -> VersionAccessPolicy.canRead(skill, v, currentUserId, userNamespaceRoles)).isPresent()).toList();
     }
 
     public List<SkillTag> listTags(String namespaceSlug, String skillSlug) {
@@ -88,6 +90,9 @@ public class SkillTagService {
         SkillVersion version = skillVersionRepository.findBySkillIdAndVersion(skill.getId(), targetVersion)
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", targetVersion));
 
+        if (VersionAccessPolicy.isPrivate(skill, version) && !skill.getOwnerId().equals(operatorId)) {
+            throw new DomainForbiddenException("error.skill.access.denied", skillSlug);
+        }
         // Target must be PUBLISHED
         if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("error.skill.tag.targetVersion.notPublished");

@@ -73,7 +73,8 @@ public class SkillPublishService {
     public record PublishResult(
             Long skillId,
             String slug,
-            SkillVersion version
+            SkillVersion version,
+            String namespace
     ) {}
 
     private final NamespaceRepository namespaceRepository;
@@ -92,6 +93,7 @@ public class SkillPublishService {
     private final SkillStorageDeletionCompensationService compensationService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
+    private final NamespacePublishLock namespacePublishLock;
 
     public SkillPublishService(
             NamespaceRepository namespaceRepository,
@@ -109,7 +111,7 @@ public class SkillPublishService {
             SecurityScanService securityScanService,
             SkillStorageDeletionCompensationService compensationService,
             ApplicationEventPublisher eventPublisher,
-            Clock clock) {
+            Clock clock, NamespacePublishLock namespacePublishLock) {
         this.namespaceRepository = namespaceRepository;
         this.namespaceMemberRepository = namespaceMemberRepository;
         this.skillRepository = skillRepository;
@@ -126,6 +128,7 @@ public class SkillPublishService {
         this.compensationService = compensationService;
         this.eventPublisher = eventPublisher;
         this.clock = clock;
+        this.namespacePublishLock = namespacePublishLock;
     }
 
     public record DryRunResult(
@@ -307,6 +310,9 @@ public class SkillPublishService {
 
         SkillVersion publishedVersion = skillVersionRepository.findBySkillIdAndVersion(skillId, sourceVersion)
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.version.notFound", sourceVersion));
+        if (!VersionAccessPolicy.canRead(skill, publishedVersion, publisherId, userNamespaceRoles)) {
+            throw new DomainForbiddenException("error.skill.lifecycle.noPermission");
+        }
         if (publishedVersion.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("error.skill.version.notPublished", sourceVersion);
         }
@@ -327,8 +333,26 @@ public class SkillPublishService {
                 Set.of(),
                 confirmWarnings,  // confirmWarnings: honour caller's choice for rerelease
                 false,  // forceAutoPublish=false: respect visibility rules
-                true
+                true,
+                skill.getId()
         );
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public PublishResult savePrivateVersion(Long skillId, List<PackageEntry> entries, String actor,
+                                            Set<String> platformRoles, boolean confirmWarnings) {
+        Skill skill = skillRepository.findById(skillId)
+                .orElseThrow(() -> new DomainBadRequestException("error.skill.notFound", skillId));
+        if (!skill.getOwnerId().equals(actor)) throw new DomainForbiddenException("sharing.ownerOnly");
+        return publishFromEntriesInternal(resolveNamespaceSlug(skill.getNamespaceId()), entries, actor,
+                SkillVisibility.PRIVATE, platformRoles, confirmWarnings, false, true, skillId);
+    }
+
+    private PublishResult publishFromEntriesInternal(String namespaceSlug, List<PackageEntry> entries,
+            String publisherId, SkillVisibility visibility, Set<String> platformRoles,
+            boolean confirmWarnings, boolean forceAutoPublish, boolean bypassMembershipCheck) {
+        return publishFromEntriesInternal(namespaceSlug, entries, publisherId, visibility, platformRoles,
+                confirmWarnings, forceAutoPublish, bypassMembershipCheck, null);
     }
 
     private static final String PRIVATE_NAMESPACE_SLUG = "private";
@@ -341,10 +365,10 @@ public class SkillPublishService {
             Set<String> platformRoles,
             boolean confirmWarnings,
             boolean forceAutoPublish,
-            boolean bypassMembershipCheck) {
+            boolean bypassMembershipCheck, Long targetSkillId) {
 
         // Route PRIVATE skills to the built-in @private namespace
-        final String resolvedNamespaceSlug = (visibility == SkillVisibility.PRIVATE)
+        final String resolvedNamespaceSlug = (visibility == SkillVisibility.PRIVATE && targetSkillId == null)
                 ? PRIVATE_NAMESPACE_SLUG
                 : namespaceSlug;
 
@@ -352,6 +376,7 @@ public class SkillPublishService {
         Namespace namespace = namespaceRepository.findBySlug(resolvedNamespaceSlug)
                 .orElseThrow(() -> new DomainBadRequestException("error.namespace.slug.notFound", resolvedNamespaceSlug));
         assertNamespaceWritable(namespace);
+        namespacePublishLock.lock(namespace.getId());
 
         boolean isSuperAdmin = platformRoles.contains("SUPER_ADMIN");
 
@@ -378,6 +403,15 @@ public class SkillPublishService {
         String skillMdContent = new String(skillMd.content());
         SkillMetadata metadata = skillMetadataParser.parse(skillMdContent);
         String skillSlug = SlugValidator.slugify(metadata.name());
+        if (visibility == SkillVisibility.PRIVATE && targetSkillId == null) {
+            var sharedOrigin = skillRepository.findByPrivateSourceNamespaceIdAndSlugAndOwnerId(
+                    namespace.getId(), skillSlug, publisherId);
+            if (sharedOrigin.isPresent()) {
+                Skill original = sharedOrigin.get();
+                return publishFromEntriesInternal(resolveNamespaceSlug(original.getNamespaceId()), entries, publisherId,
+                        SkillVisibility.PRIVATE, platformRoles, confirmWarnings, false, true, original.getId());
+            }
+        }
         if (metadata.version() == null || metadata.version().isBlank()) {
             String autoVersion = resolveAutoVersion(namespace.getId(), skillSlug, publisherId);
             metadata = new SkillMetadata(metadata.name(), metadata.description(), autoVersion, metadata.body(), metadata.frontmatter());
@@ -438,6 +472,11 @@ public class SkillPublishService {
                     return skillRepository.save(newSkill);
                 });
 
+        if (!skill.getNamespaceId().equals(namespace.getId())) throw new DomainBadRequestException("sharing.skillMoved");
+        if (targetSkillId != null && !targetSkillId.equals(skill.getId())) {
+            throw new DomainBadRequestException("sharing.packageNameMismatch");
+        }
+        if (skill.isHidden()) throw new DomainBadRequestException("sharing.skillUnavailable");
         if (skill.getStatus() == SkillStatus.ARCHIVED) {
             throw new DomainBadRequestException("error.skill.publish.archived", skillSlug);
         }
@@ -447,6 +486,7 @@ public class SkillPublishService {
         List<SkillVersion> pendingVersions = skillVersionRepository
                 .findBySkillIdAndStatus(skill.getId(), SkillVersionStatus.PENDING_REVIEW);
         for (SkillVersion pending : pendingVersions) {
+            if (visibility == SkillVisibility.PRIVATE || pending.getSharingRequestId() != null) continue;
             reviewTaskRepository.findBySkillVersionIdAndStatus(pending.getId(), ReviewTaskStatus.PENDING)
                     .ifPresent(reviewTaskRepository::delete);
             pending.setStatus(SkillVersionStatus.UPLOADED);
@@ -457,6 +497,7 @@ public class SkillPublishService {
         java.util.Optional<SkillVersion> existingVersion = skillVersionRepository.findBySkillIdAndVersion(skill.getId(), metadata.version());
         if (existingVersion.isPresent()) {
             SkillVersion matchedVersion = existingVersion.get();
+            matchedVersion.assertNotSharing();
             if (matchedVersion.getStatus() == SkillVersionStatus.PUBLISHED) {
                 throw new DomainBadRequestException("error.skill.version.exists", metadata.version());
             }
@@ -470,7 +511,8 @@ public class SkillPublishService {
         // 8. Create SkillVersion
         SkillVersion version = new SkillVersion(skill.getId(), metadata.version(), publisherId);
         version.setRequestedVisibility(visibility);
-        boolean autoPublish = forceAutoPublish || isSuperAdmin;
+        version.setDistributionVisibility(visibility);
+        boolean autoPublish = (forceAutoPublish || isSuperAdmin) && targetSkillId == null;
         if (autoPublish) {
             version.setStatus(SkillVersionStatus.PUBLISHED);
             version.setPublishedAt(currentTime());
@@ -577,10 +619,12 @@ public class SkillPublishService {
         }
 
         // 12. Update skill metadata and move the published pointer for auto-publish flows
-        skill.setDisplayName(metadata.name());
-        skill.setSummary(metadata.description());
-        if (autoPublish || visibility == SkillVisibility.PRIVATE) {
-            // Update latestVersionId for autoPublish or PRIVATE skill (UPLOADED status)
+        if (autoPublish || skill.getVisibility() == SkillVisibility.PRIVATE || existingOwnedSkill.isEmpty()) {
+            skill.setDisplayName(metadata.name());
+            skill.setSummary(metadata.description());
+        }
+        if (autoPublish) {
+            // Only published versions may become the installable latest version.
             skill.setLatestVersionId(version.getId());
             skill.setVisibility(visibility);
         }
@@ -592,7 +636,7 @@ public class SkillPublishService {
         }
 
         // 13. Return identifiers for the created version
-        return new PublishResult(skill.getId(), skill.getSlug(), version);
+        return new PublishResult(skill.getId(), skill.getSlug(), version, namespace.getSlug());
     }
 
     private String resolveAutoVersion(Long namespaceId, String skillSlug, String publisherId) {

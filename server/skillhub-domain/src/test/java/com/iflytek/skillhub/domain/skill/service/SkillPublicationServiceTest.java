@@ -48,7 +48,7 @@ class SkillPublicationServiceTest {
     @BeforeEach
     void setUp() {
         service = new SkillPublicationService(
-                skillRepository, skillVersionRepository, eventPublisher, objectMapper, CLOCK);
+                skillRepository, skillVersionRepository, eventPublisher, objectMapper, CLOCK, org.mockito.Mockito.mock(com.iflytek.skillhub.domain.skill.NamespacePublishLock.class));
     }
 
     @Test

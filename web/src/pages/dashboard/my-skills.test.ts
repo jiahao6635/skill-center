@@ -142,7 +142,7 @@ describe('MySkillsPage', () => {
     renderToStaticMarkup(createElement(MySkillsPage))
 
     const stopPropagation = vi.fn()
-    findButton('mySkills.update').onClick?.({ stopPropagation })
+    findButton('sharing.savePrivate').onClick?.({ stopPropagation })
 
     expect(stopPropagation).toHaveBeenCalledTimes(1)
     expect(navigateMock).toHaveBeenCalledWith({
@@ -150,6 +150,7 @@ describe('MySkillsPage', () => {
       search: {
         namespace: 'team-ai',
         visibility: 'PRIVATE',
+        skillId: 1,
       },
     })
   })
@@ -189,7 +190,7 @@ describe('MySkillsPage', () => {
     expect(buttonRecords.some((button) => button.label === 'mySkills.update')).toBe(false)
   })
 
-  it('falls back to public visibility when the skill card data has no visibility field', () => {
+  it('keeps updates private and pinned to the same skill when visibility is missing', () => {
     useMySkillsMock.mockReturnValue({
       data: {
         items: [
@@ -213,13 +214,14 @@ describe('MySkillsPage', () => {
 
     renderToStaticMarkup(createElement(MySkillsPage))
 
-    findButton('mySkills.update').onClick?.({ stopPropagation: vi.fn() })
+    findButton('sharing.savePrivate').onClick?.({ stopPropagation: vi.fn() })
 
     expect(navigateMock).toHaveBeenCalledWith({
       to: '/dashboard/publish',
       search: {
         namespace: 'team-ai',
-        visibility: 'PUBLIC',
+        visibility: 'PRIVATE',
+        skillId: 3,
       },
     })
   })

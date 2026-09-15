@@ -74,6 +74,7 @@ const SkillDetailPage = createLazyRouteComponent(() => import('@/pages/skill-det
 const SkillVersionComparePage = createLazyRouteComponent(() => import('@/pages/skill-version-compare.tsx'), 'SkillVersionComparePage')
 const DashboardPage = createLazyRouteComponent(() => import('@/pages/dashboard.tsx'), 'DashboardPage')
 const MySkillsPage = createLazyRouteComponent(() => import('@/pages/dashboard/my-skills.tsx'), 'MySkillsPage')
+const SkillLocationPage = createLazyRouteComponent(() => import('@/pages/skill-location.tsx'), 'SkillLocationPage')
 const PublishPage = createLazyRouteComponent(() => import('@/pages/dashboard/publish.tsx'), 'PublishPage')
 const MyNamespacesPage = createLazyRouteComponent(
   () => import('@/pages/dashboard/my-namespaces.tsx'),
@@ -228,6 +229,12 @@ const namespaceRoute = createRoute({
   component: NamespacePage,
 })
 
+const skillLocationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/skills/by-id/$skillId',
+  component: SkillLocationPage,
+})
+
 const skillDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/space/$namespace/$slug',
@@ -271,7 +278,8 @@ const dashboardPublishRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'dashboard/publish',
   beforeLoad: requireAuth,
-  validateSearch: (search: Record<string, unknown>): { namespace?: string; visibility?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { namespace?: string; visibility?: string; skillId?: number } => ({
+    skillId: Number.isSafeInteger(Number(search.skillId)) && Number(search.skillId) > 0 ? Number(search.skillId) : undefined,
     namespace: typeof search.namespace === 'string' && search.namespace ? search.namespace : undefined,
     visibility: typeof search.visibility === 'string' && search.visibility ? search.visibility : undefined,
   }),
@@ -468,6 +476,7 @@ const routeTree = rootRoute.addChildren([
   searchRoute,
   termsRoute,
   namespaceRoute,
+  skillLocationRoute,
   skillDetailRoute,
   skillVersionCompareRoute,
   dashboardRoute,

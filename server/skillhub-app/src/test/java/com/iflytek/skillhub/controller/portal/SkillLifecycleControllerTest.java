@@ -220,7 +220,7 @@ class SkillLifecycleControllerTest {
                 eq("usr_1"),
                 anyMap(),
                 eq(false)))
-                .willReturn(new SkillPublishService.PublishResult(1L, "demo-skill", newVersion));
+                .willReturn(new SkillPublishService.PublishResult(1L, "demo-skill", newVersion, "global"));
 
         mockMvc.perform(post("/api/web/skills/global/demo-skill/versions/1.2.3/rerelease")
                         .requestAttr("userId", "usr_1")
@@ -288,7 +288,7 @@ class SkillLifecycleControllerTest {
                 eq("usr_1"),
                 anyMap(),
                 eq(false)))
-                .willReturn(new SkillPublishService.PublishResult(1L, "demo-skill", newVersion));
+                .willReturn(new SkillPublishService.PublishResult(1L, "demo-skill", newVersion, "global"));
 
         mockMvc.perform(post("/api/web/skills/global/demo-skill/versions/1.2.3/rerelease")
                         .requestAttr("userId", "usr_1")
@@ -330,7 +330,7 @@ class SkillLifecycleControllerTest {
         given(skillVersionRepository.findBySkillIdAndVersion(1L, "1.2.3")).willReturn(java.util.Optional.of(sourceVersion));
         given(skillPublishService.rereleasePublishedVersion(
                 eq(1L), eq("1.2.3"), eq("1.2.4"), eq("usr_1"), anyMap(), eq(true)))
-                .willReturn(new SkillPublishService.PublishResult(1L, "demo-skill", newVersion));
+                .willReturn(new SkillPublishService.PublishResult(1L, "demo-skill", newVersion, "global"));
 
         mockMvc.perform(post("/api/web/skills/global/demo-skill/versions/1.2.3/rerelease")
                         .requestAttr("userId", "usr_1")

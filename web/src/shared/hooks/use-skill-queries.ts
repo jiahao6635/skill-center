@@ -44,7 +44,7 @@ async function getSkillDocumentation(namespace: string, slug: string, version: s
   return fetchText(`${WEB_API_PREFIX}/skills/${cleanNamespace}/${encodeURIComponent(slug)}/versions/${encodeURIComponent(version)}/file?path=${encodeURIComponent(path)}`)
 }
 
-async function publishSkill(params: { namespace: string; file: File; visibility: string; confirmWarnings?: boolean }): Promise<PublishResult> {
+async function publishSkill(params: { namespace: string; file: File; visibility: string; confirmWarnings?: boolean; skillId?: number }): Promise<PublishResult> {
   const cleanNamespace = params.namespace.startsWith('@') ? params.namespace.slice(1) : params.namespace
 
   const formData = new FormData()
@@ -52,7 +52,9 @@ async function publishSkill(params: { namespace: string; file: File; visibility:
   formData.append('visibility', params.visibility)
   formData.append('confirmWarnings', String(params.confirmWarnings === true))
 
-  return fetchJson<PublishResult>(`${WEB_API_PREFIX}/skills/${cleanNamespace}/publish`, {
+  return fetchJson<PublishResult>(params.skillId
+    ? `${WEB_API_PREFIX}/skills/by-id/${params.skillId}/private-versions`
+    : `${WEB_API_PREFIX}/skills/${cleanNamespace}/publish`, {
     method: 'POST',
     headers: getCsrfHeaders(),
     body: formData,
@@ -237,25 +239,6 @@ export function useRereleaseSkillVersion() {
     meta: {
       skipGlobalErrorHandler: true,
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['skills', 'my'] })
-      queryClient.invalidateQueries({ queryKey: ['skills', variables.namespace, variables.slug] })
-      queryClient.invalidateQueries({ queryKey: ['skills', variables.namespace, variables.slug, 'versions'] })
-      queryClient.invalidateQueries({ queryKey: ['skills'] })
-    },
-  })
-}
-
-/**
- * Submit an UPLOADED version for review.
- * Transitions version status from UPLOADED to PENDING_REVIEW.
- */
-export function useSubmitForReview() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ namespace, slug, version, targetVisibility }: { namespace: string; slug: string; version: string; targetVisibility: 'PUBLIC' | 'NAMESPACE_ONLY' }) =>
-      skillLifecycleApi.submitForReview(namespace, slug, version, targetVisibility),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['skills', 'my'] })
       queryClient.invalidateQueries({ queryKey: ['skills', variables.namespace, variables.slug] })

@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -78,7 +80,7 @@ class SkillPublishControllerTest {
             eq(SkillVisibility.PUBLIC),
             eq(Set.of("SUPER_ADMIN")),
             eq(false)))
-            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version));
+            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version, "global"));
 
         PlatformPrincipal principal = new PlatformPrincipal(
             "usr_1",
@@ -129,7 +131,7 @@ class SkillPublishControllerTest {
             eq(SkillVisibility.PUBLIC),
             eq(Set.of("SUPER_ADMIN")),
             eq(true)))
-            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version));
+            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version, "global"));
 
         PlatformPrincipal principal = new PlatformPrincipal(
             "usr_1",
@@ -199,7 +201,7 @@ class SkillPublishControllerTest {
             eq("global"), ArgumentMatchers.<List<PackageEntry>>any(),
             eq("usr_1"), eq(SkillVisibility.PUBLIC),
             eq(Set.of("SUPER_ADMIN")), eq(true)))
-            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version));
+            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version, "global"));
 
         PlatformPrincipal principal = new PlatformPrincipal(
             "usr_1", "publisher", "publisher@example.com", "", "local", Set.of("SUPER_ADMIN"));
@@ -218,6 +220,39 @@ class SkillPublishControllerTest {
                 .with(csrf()))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(0));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1", "/api/web"})
+    void savePrivateVersion_preservesWarningConfirmationAndResponse(String prefix) throws Exception {
+        var principal = new PlatformPrincipal("usr_1", "publisher", "publisher@example.com", "", "local", Set.of());
+        var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
+        var file = new MockMultipartFile("file", "skill.zip", "application/zip", buildZipWithNestedSkillMd());
+        String path = prefix + "/skills/by-id/12/private-versions";
+
+        mockMvc.perform(multipart(path).file(file).with(authentication(auth)).with(csrf()))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.msg").value(org.hamcrest.Matchers.containsString("stray.txt")));
+        verify(skillPublishService, never()).savePrivateVersion(eq(12L), anyList(), eq("usr_1"), eq(Set.of()), eq(false));
+
+        var version = new SkillVersion(12L, "1.0.0", "usr_1");
+        version.setStatus(SkillVersionStatus.UPLOADED);
+        version.setFileCount(1);
+        version.setTotalSize(128L);
+        given(skillPublishService.savePrivateVersion(eq(12L), anyList(), eq("usr_1"), eq(Set.of()), eq(true)))
+            .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version, "team-ai"));
+
+        mockMvc.perform(multipart(path).file(file).param("confirmWarnings", "true")
+                .with(authentication(auth)).with(csrf()))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(0))
+            .andExpect(jsonPath("$.data.skillId").value(12))
+            .andExpect(jsonPath("$.data.namespace").value("team-ai"))
+            .andExpect(jsonPath("$.data.slug").value("demo-skill"))
+            .andExpect(jsonPath("$.data.version").value("1.0.0"))
+            .andExpect(jsonPath("$.data.status").value("UPLOADED"))
+            .andExpect(jsonPath("$.data.fileCount").value(1))
+            .andExpect(jsonPath("$.data.totalSize").value(128));
     }
 
     private byte[] buildZipBytes() throws Exception {

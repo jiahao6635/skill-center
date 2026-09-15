@@ -676,6 +676,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/web/skills/by-id/{skillId}/sharing/{requestId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["withdraw"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/by-id/{skillId}/sharing/{requestId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["withdraw_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/by-id/{skillId}/sharing/precheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["precheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/web/skills/by-id/{skillId}/sharing/precheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["precheck_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/by-id/{skillId}/sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["settings"];
+        put?: never;
+        post: operations["submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/web/skills/by-id/{skillId}/sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["settings_1"];
+        put?: never;
+        post: operations["submit_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/by-id/{skillId}/private-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["save"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/web/skills/by-id/{skillId}/private-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["save_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/web/reviews/{id}/withdraw": {
         parameters: {
             query?: never;
@@ -2207,6 +2335,38 @@ export interface paths {
         put?: never;
         post?: never;
         delete: operations["deleteSkill"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/web/skills/by-id/{skillId}/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["location"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/by-id/{skillId}/location": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["location_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3782,6 +3942,61 @@ export interface components {
             /** Format: int64 */
             totalSize?: number;
         };
+        ApiResponseSkillShareResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["SkillShareResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        SkillShareResponse: {
+            /** Format: int64 */
+            id?: number;
+            status?: string;
+            /** Format: int64 */
+            versionId?: number;
+            version?: string;
+            /** Format: int64 */
+            targetNamespaceId?: number;
+            targetNamespace?: string;
+            targetDisplayName?: string;
+            targetVisibility?: string;
+            /** Format: int64 */
+            reviewTaskId?: number;
+            reviewComment?: string;
+            errorCode?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        SkillShareCommand: {
+            /** Format: int64 */
+            versionId: number;
+            /** Format: int64 */
+            targetNamespaceId: number;
+            /** @enum {string} */
+            targetVisibility: "PUBLIC" | "NAMESPACE_ONLY" | "PRIVATE";
+            idempotencyKey: string;
+            confirmPublic?: boolean;
+            confirmWarnings?: boolean;
+        };
+        ApiResponseSkillSharePrecheckResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["SkillSharePrecheckResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        SkillSharePrecheckResponse: {
+            valid?: boolean;
+            errors?: string[];
+            warnings?: string[];
+        };
         ReviewActionRequest: {
             comment?: string;
         };
@@ -4435,6 +4650,7 @@ export interface components {
             /** Format: date-time */
             publishedAt?: string;
             downloadAvailable?: boolean;
+            distributionVisibility?: string;
         };
         ApiResponseListTagResponse: {
             /** Format: int32 */
@@ -4515,6 +4731,58 @@ export interface components {
             ownerPreviewVersion?: components["schemas"]["SkillLifecycleVersionResponse"];
             ownerPreviewReviewComment?: string;
             resolutionMode?: string;
+        };
+        ApiResponseSkillSharingSettingsResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["SkillSharingSettingsResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        SkillSharingSettingsResponse: {
+            /** Format: int64 */
+            skillId?: number;
+            slug?: string;
+            namespace?: string;
+            visibility?: string;
+            sharedVersion?: string;
+            versions?: components["schemas"]["VersionOption"][];
+            targets?: components["schemas"]["TargetOption"][];
+            latestRequest?: components["schemas"]["SkillShareResponse"];
+        };
+        TargetOption: {
+            /** Format: int64 */
+            id?: number;
+            slug?: string;
+            displayName?: string;
+            type?: string;
+        };
+        VersionOption: {
+            /** Format: int64 */
+            id?: number;
+            version?: string;
+            status?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int32 */
+            fileCount?: number;
+        };
+        ApiResponseSkillLocationResponse: {
+            /** Format: int32 */
+            code?: number;
+            msg?: string;
+            data?: components["schemas"]["SkillLocationResponse"];
+            /** Format: date-time */
+            timestamp?: string;
+            requestId?: string;
+        };
+        SkillLocationResponse: {
+            /** Format: int64 */
+            skillId?: number;
+            namespace?: string;
+            slug?: string;
         };
         ApiResponseReviewSkillDetailResponse: {
             /** Format: int32 */
@@ -6902,6 +7170,262 @@ export interface operations {
             header?: never;
             path: {
                 namespace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
+                };
+            };
+        };
+    };
+    withdraw: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillShareResponse"];
+                };
+            };
+        };
+    };
+    withdraw_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+                requestId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillShareResponse"];
+                };
+            };
+        };
+    };
+    precheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillShareCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillSharePrecheckResponse"];
+                };
+            };
+        };
+    };
+    precheck_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillShareCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillSharePrecheckResponse"];
+                };
+            };
+        };
+    };
+    settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillSharingSettingsResponse"];
+                };
+            };
+        };
+    };
+    submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillShareCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillShareResponse"];
+                };
+            };
+        };
+    };
+    settings_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillSharingSettingsResponse"];
+                };
+            };
+        };
+    };
+    submit_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkillShareCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillShareResponse"];
+                };
+            };
+        };
+    };
+    save: {
+        parameters: {
+            query?: {
+                confirmWarnings?: boolean;
+            };
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
+                };
+            };
+        };
+    };
+    save_1: {
+        parameters: {
+            query?: {
+                confirmWarnings?: boolean;
+            };
+            header?: never;
+            path: {
+                skillId: number;
             };
             cookie?: never;
         };
@@ -9693,6 +10217,50 @@ export interface operations {
             };
         };
     };
+    location: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillLocationResponse"];
+                };
+            };
+        };
+    };
+    location_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseSkillLocationResponse"];
+                };
+            };
+        };
+    };
     getReviewSkillDetail: {
         parameters: {
             query?: never;
@@ -11050,6 +11618,15 @@ export interface operations {
                     "*/*": components["schemas"]["ApiResponsePageResponseUserRank"];
                 };
             };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
+                };
+            };
         };
     };
     userOptions: {
@@ -11070,6 +11647,15 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseListUserOption"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };
@@ -11095,6 +11681,15 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseSummary"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };
@@ -11123,6 +11718,15 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponsePageResponseSkillRank"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponseVoid"];
                 };
             };
         };

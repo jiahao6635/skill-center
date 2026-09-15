@@ -9,7 +9,7 @@ test.describe('My Skills Update Prefill (Real API)', () => {
     await registerSession(page, testInfo)
   })
 
-  test('opens publish page with namespace and visibility prefilled from my skills card', async ({ page }, testInfo) => {
+  test('opens a private update pinned to the original skill from my skills card', async ({ page }, testInfo) => {
     const builder = new E2eTestDataBuilder(page, testInfo)
     await builder.init()
 
@@ -25,15 +25,16 @@ test.describe('My Skills Update Prefill (Real API)', () => {
         has: page.getByRole('heading', { name: skillName, exact: true }),
       }).first()
       await expect(skillCard).toBeVisible()
-      await skillCard.getByRole('button', { name: 'Update' }).click()
+      await skillCard.getByRole('button', { name: 'Save private version' }).click()
 
       await expect(page).toHaveURL(/\/dashboard\/publish/)
 
       const currentUrl = new URL(page.url())
       expect(currentUrl.searchParams.get('namespace')).toBe(namespace.slug)
-      expect(currentUrl.searchParams.get('visibility')).toBe('PUBLIC')
-      await expect(page.locator('#namespace')).toContainText(`@${namespace.slug}`)
-      await expect(page.locator('#visibility')).toContainText('Public')
+      expect(currentUrl.searchParams.get('visibility')).toBe('PRIVATE')
+      expect(Number(currentUrl.searchParams.get('skillId'))).toBeGreaterThan(0)
+      await expect(page.locator('#namespace')).toHaveCount(0)
+      await expect(page.locator('#visibility')).toContainText('Private')
     } finally {
       await builder.cleanup()
     }

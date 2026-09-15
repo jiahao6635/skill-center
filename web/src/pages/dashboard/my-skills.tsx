@@ -1,3 +1,4 @@
+import { SkillSharingButton } from '@/features/skill/skill-sharing-dialog.tsx'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearch } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
@@ -116,10 +117,10 @@ export function MySkillsPage() {
     updateSearch({ q: undefined, namespace: undefined, page: 0 })
   }
 
-  const handleUpdateSkill = (namespace: string, visibility?: string) => {
+  const handleUpdateSkill = (namespace: string, visibility?: string, skillId?: number) => {
     navigate({
       to: '/dashboard/publish',
-      search: { namespace, visibility: visibility || 'PUBLIC' },
+      search: { namespace, visibility: visibility || 'PUBLIC', skillId },
     })
   }
 
@@ -410,17 +411,18 @@ export function MySkillsPage() {
                           ) : null}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pl-4">
+                      <div className="flex flex-wrap items-center gap-2 pl-4">
+                        {skill.status !== 'ARCHIVED' && <SkillSharingButton skillId={skill.id} shared={skill.visibility !== 'PRIVATE'} />}
                         {skill.status !== 'ARCHIVED' && (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={(event) => {
                               event.stopPropagation()
-                              handleUpdateSkill(skill.namespace, skill.visibility ?? 'PUBLIC')
+                              handleUpdateSkill(skill.namespace, 'PRIVATE', skill.id)
                             }}
                           >
-                            {t('mySkills.update')}
+                            {t('sharing.savePrivate')}
                           </Button>
                         )}
                         {hasPendingPreview && ownerPreviewVersion ? (

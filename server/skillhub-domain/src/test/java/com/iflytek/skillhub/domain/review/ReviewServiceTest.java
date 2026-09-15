@@ -68,7 +68,7 @@ class ReviewServiceTest {
     void setUp() {
         reviewService = new ReviewService(
                 reviewTaskRepository, skillVersionRepository, skillRepository,
-                namespaceRepository, permissionChecker, eventPublisher, skillGovernanceService, skillPublicationService, governanceNotificationService, entityManager, CLOCK);
+                namespaceRepository, permissionChecker, eventPublisher, skillGovernanceService, skillPublicationService, governanceNotificationService, entityManager, CLOCK, org.mockito.Mockito.mock(com.iflytek.skillhub.domain.skill.service.SkillSharingService.class), org.mockito.Mockito.mock(com.iflytek.skillhub.domain.skill.NamespacePublishLock.class));
     }
 
     private SkillVersion createDraftSkillVersion() {

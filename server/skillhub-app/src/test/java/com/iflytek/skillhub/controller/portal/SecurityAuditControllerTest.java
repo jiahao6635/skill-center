@@ -144,7 +144,9 @@ class SecurityAuditControllerTest {
         audit.setMaxSeverity("LOW");
         audit.setFindingsCount(0);
         given(skillVersionRepository.findById(42L)).willReturn(java.util.Optional.of(skillVersion(42L, 8L)));
-        given(skillRepository.findById(8L)).willReturn(java.util.Optional.of(skill(8L, "owner-1")));
+        Skill pendingSkill = skill(8L, "owner-1");
+        pendingSkill.setVisibility(SkillVisibility.NAMESPACE_ONLY);
+        given(skillRepository.findById(8L)).willReturn(java.util.Optional.of(pendingSkill));
         given(securityAuditRepository.findLatestActiveByVersionId(42L)).willReturn(List.of(audit));
         given(namespaceMemberRepository.findByUserId("team-admin"))
                 .willReturn(List.of(new NamespaceMember(5L, "team-admin", NamespaceRole.ADMIN)));

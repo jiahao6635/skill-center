@@ -14,6 +14,10 @@ public class SkillVersion {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private int revision;
+
     @Column(name = "skill_id", nullable = false)
     private Long skillId;
 
@@ -38,6 +42,24 @@ public class SkillVersion {
     @Enumerated(EnumType.STRING)
     @Column(name = "requested_visibility", length = 20)
     private SkillVisibility requestedVisibility;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "distribution_visibility", nullable = false, length = 20)
+    private SkillVisibility distributionVisibility = SkillVisibility.PUBLIC;
+
+    @Column(name = "sharing_request_id")
+    private Long sharingRequestId;
+
+    public SkillVisibility getDistributionVisibility() { return distributionVisibility; }
+    public void setDistributionVisibility(SkillVisibility visibility) { this.distributionVisibility = visibility; }
+    public Long getSharingRequestId() { return sharingRequestId; }
+    public void setSharingRequestId(Long sharingRequestId) { this.sharingRequestId = sharingRequestId; }
+
+    public void assertNotSharing() {
+        if (sharingRequestId != null) {
+            throw new com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException("sharing.versionLocked");
+        }
+    }
 
     @Column(name = "file_count", nullable = false)
     private Integer fileCount = 0;

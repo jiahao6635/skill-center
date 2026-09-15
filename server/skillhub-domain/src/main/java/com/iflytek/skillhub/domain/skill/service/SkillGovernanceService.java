@@ -9,6 +9,7 @@ import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.shared.exception.DomainForbiddenException;
 import com.iflytek.skillhub.domain.shared.exception.DomainNotFoundException;
 import com.iflytek.skillhub.domain.skill.Skill;
+import com.iflytek.skillhub.domain.skill.SkillVisibility;
 import com.iflytek.skillhub.domain.skill.SkillFile;
 import com.iflytek.skillhub.domain.skill.SkillRepository;
 import com.iflytek.skillhub.domain.skill.SkillFileRepository;
@@ -172,6 +173,10 @@ public class SkillGovernanceService {
                               String userAgent,
                               String namespaceSlug) {
         assertCanManageLifecycle(skill, actorUserId, userNamespaceRoles);
+        version.assertNotSharing();
+        if (!com.iflytek.skillhub.domain.skill.VersionAccessPolicy.canRead(skill, version, actorUserId, userNamespaceRoles)) {
+            throw new DomainForbiddenException("error.skill.lifecycle.noPermission");
+        }
         if (!DELETABLE_VERSION_STATUSES.contains(version.getStatus())) {
             throw new DomainBadRequestException("error.skill.version.delete.unsupported", version.getVersion());
         }
@@ -279,6 +284,7 @@ public class SkillGovernanceService {
     public SkillVersion yankVersion(Long versionId, String actorUserId, String clientIp, String userAgent, String reason) {
         SkillVersion version = skillVersionRepository.findById(versionId)
             .orElseThrow(() -> new DomainNotFoundException("error.skill.version.notFound", versionId));
+        version.assertNotSharing();
         if (version.getStatus() != SkillVersionStatus.PUBLISHED) {
             throw new DomainBadRequestException("error.skill.version.notPublished", version.getVersion());
         }
@@ -302,7 +308,10 @@ public class SkillGovernanceService {
     }
 
     private Long findLatestPublishedVersionId(Long skillId) {
+        boolean privateSkill = skillRepository.findById(skillId)
+                .map(skill -> skill.getVisibility() == SkillVisibility.PRIVATE).orElse(false);
         return skillVersionRepository.findBySkillIdAndStatus(skillId, SkillVersionStatus.PUBLISHED).stream()
+                .filter(version -> privateSkill || com.iflytek.skillhub.domain.skill.VersionAccessPolicy.isShared(version))
                 .max(java.util.Comparator
                         .comparing(SkillVersion::getPublishedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
                         .thenComparing(SkillVersion::getCreatedAt, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))

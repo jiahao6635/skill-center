@@ -98,6 +98,7 @@ export function isI18nEnabled(): boolean {
 }
 
 const client = createClient<paths>({ baseUrl: getApiBaseUrl() })
+export { client as openApiClient }
 
 function getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)
@@ -124,7 +125,7 @@ function withCsrf(headers?: HeadersInit): HeadersInit {
   return merged
 }
 
-async function ensureCsrfHeaders(headers?: HeadersInit): Promise<HeadersInit> {
+export async function ensureCsrfHeaders(headers?: HeadersInit): Promise<HeadersInit> {
   if (!getCsrfToken()) {
     await client.GET('/api/v1/auth/providers', {
       headers: withRequestHeaders(),
@@ -518,21 +519,6 @@ export const skillLifecycleApi = {
         'Content-Type': 'application/json',
       }),
       body: JSON.stringify({ targetVersion, confirmWarnings }),
-    })
-  },
-
-  /**
-   * Submit an UPLOADED version for review.
-   * Transitions version status from UPLOADED to PENDING_REVIEW.
-   */
-  async submitForReview(namespace: string, slug: string, version: string, targetVisibility: 'PUBLIC' | 'NAMESPACE_ONLY'): Promise<void> {
-    const cleanNamespace = namespace.startsWith('@') ? namespace.slice(1) : namespace
-    await fetchJson<void>(`${WEB_API_PREFIX}/skills/${cleanNamespace}/${encodeURIComponent(slug)}/submit-review`, {
-      method: 'POST',
-      headers: await ensureCsrfHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({ version, targetVisibility }),
     })
   },
 

@@ -94,7 +94,8 @@ public class ReviewSkillDetailAppService {
                         version.getTotalSize(),
                         version.getPublishedAt(),
                         version.getId().equals(snapshot.activeVersion().getId())
-                                || skillQueryService.isDownloadAvailable(version)
+                                || skillQueryService.isDownloadAvailable(version),
+                        version.getDistributionVisibility().name()
                 ))
                 .toList();
 

@@ -12,6 +12,7 @@ import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.PublishResponse;
 import com.iflytek.skillhub.metrics.SkillHubMetrics;
 import com.iflytek.skillhub.ratelimit.RateLimit;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -58,43 +59,54 @@ public class SkillPublishController extends BaseApiController {
 
         SkillVisibility skillVisibility = SkillVisibility.valueOf(visibility.toUpperCase());
 
-        List<PackageEntry> entries;
-        List<String> extractionWarnings;
-        try {
-            SkillPackageArchiveExtractor.ExtractionResult extractionResult =
-                    skillPackageArchiveExtractor.extractWithWarnings(file);
-            entries = extractionResult.entries();
-            extractionWarnings = extractionResult.warnings();
-        } catch (IllegalArgumentException e) {
-            throw new DomainBadRequestException("error.skill.publish.package.invalid", e.getMessage());
-        }
-
-        if (!confirmWarnings && !extractionWarnings.isEmpty()) {
-            throw new DomainBadRequestException(
-                    "error.skill.publish.precheck.confirmRequired",
-                    String.join("\n", extractionWarnings));
-        }
-
         SkillPublishService.PublishResult publishResult = skillPublishService.publishFromEntries(
                 namespace,
-                entries,
+                extractEntries(file, confirmWarnings),
                 principal.userId(),
                 skillVisibility,
                 principal.platformRoles(),
                 confirmWarnings
         );
 
-        PublishResponse response = new PublishResponse(
+        PublishResponse response = toResponse(publishResult);
+        skillHubMetrics.incrementSkillPublish(namespace, publishResult.version().getStatus().name());
+
+        return ok("response.success.published", response);
+    }
+
+    @PostMapping("/by-id/{skillId}/private-versions")
+    @RateLimit(category = "publish", authenticated = 10, anonymous = 0)
+    @Operation(tags = "skill-private-version-controller")
+    public ApiResponse<PublishResponse> save(@PathVariable Long skillId, @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "confirmWarnings", defaultValue = "false") boolean confirmWarnings,
+            @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
+        var result = skillPublishService.savePrivateVersion(skillId, extractEntries(file, confirmWarnings),
+                principal.userId(), principal.platformRoles(), confirmWarnings);
+        return ok("response.success.updated", toResponse(result));
+    }
+
+    private List<PackageEntry> extractEntries(MultipartFile file, boolean confirmWarnings) throws IOException {
+        SkillPackageArchiveExtractor.ExtractionResult extracted;
+        try {
+            extracted = skillPackageArchiveExtractor.extractWithWarnings(file);
+        } catch (IllegalArgumentException ex) {
+            throw new DomainBadRequestException("error.skill.publish.package.invalid", ex.getMessage());
+        }
+        if (!confirmWarnings && !extracted.warnings().isEmpty()) {
+            throw new DomainBadRequestException("error.skill.publish.precheck.confirmRequired", String.join("\n", extracted.warnings()));
+        }
+        return extracted.entries();
+    }
+
+    private PublishResponse toResponse(SkillPublishService.PublishResult publishResult) {
+        return new PublishResponse(
                 publishResult.skillId(),
-                namespace,
+                publishResult.namespace(),
                 publishResult.slug(),
                 publishResult.version().getVersion(),
                 publishResult.version().getStatus().name(),
                 publishResult.version().getFileCount(),
                 publishResult.version().getTotalSize()
         );
-        skillHubMetrics.incrementSkillPublish(namespace, publishResult.version().getStatus().name());
-
-        return ok("response.success.published", response);
     }
 }

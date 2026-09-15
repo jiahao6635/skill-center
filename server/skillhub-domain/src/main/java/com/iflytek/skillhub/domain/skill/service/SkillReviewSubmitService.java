@@ -90,6 +90,12 @@ public class SkillReviewSubmitService {
             throw new DomainBadRequestException("error.skill.version.mismatch");
         }
 
+        if (skill.getVisibility() == SkillVisibility.PRIVATE
+                || version.getDistributionVisibility() == SkillVisibility.PRIVATE) {
+            throw new DomainBadRequestException("sharing.useSharingFlow");
+        }
+        version.assertNotSharing();
+
         // Update version
         version.setStatus(SkillVersionStatus.PENDING_REVIEW);
         version.setRequestedVisibility(targetVisibility);
@@ -142,6 +148,9 @@ public class SkillReviewSubmitService {
         if (!version.getSkillId().equals(skillId)) {
             throw new DomainBadRequestException("error.skill.version.mismatch");
         }
+
+        version.assertNotSharing();
+        version.setDistributionVisibility(SkillVisibility.PRIVATE);
 
         // Update version to PUBLISHED
         version.setStatus(SkillVersionStatus.PUBLISHED);

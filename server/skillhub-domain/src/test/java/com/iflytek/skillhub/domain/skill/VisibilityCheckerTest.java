@@ -84,17 +84,17 @@ class VisibilityCheckerTest {
     }
 
     @Test
-    void testPrivateSkillAccessibleByAdmin() {
+    void testPrivateSkillNotAccessibleByAdmin() {
         Map<Long, NamespaceRole> roles = Map.of(NAMESPACE_ID, NamespaceRole.ADMIN);
         boolean canAccess = checker.canAccess(privateSkill, ADMIN_USER_ID, roles);
-        assertTrue(canAccess);
+        assertFalse(canAccess);
     }
 
     @Test
-    void testPrivateSkillAccessibleByNamespaceOwner() {
+    void testPrivateSkillNotAccessibleByNamespaceOwner() {
         Map<Long, NamespaceRole> roles = Map.of(NAMESPACE_ID, NamespaceRole.OWNER);
         boolean canAccess = checker.canAccess(privateSkill, NAMESPACE_OWNER_ID, roles);
-        assertTrue(canAccess);
+        assertFalse(canAccess);
     }
 
     @Test

@@ -6,6 +6,10 @@ import { PublishPage } from './publish.tsx'
 const useSearchMock = vi.fn()
 const toastError = vi.fn()
 
+vi.mock('@/features/skill/sharing-api', () => ({
+  useSharingSettings: () => ({ data: undefined, isError: false }),
+}))
+
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
   useSearch: () => useSearchMock(),

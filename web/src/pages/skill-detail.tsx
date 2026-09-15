@@ -1,6 +1,7 @@
+import { SkillSharingButton } from '@/features/skill/skill-sharing-dialog.tsx'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useNavigate, useRouterState, useSearch } from '@tanstack/react-router'
+import { Navigate, useParams, useNavigate, useRouterState, useSearch } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowUpCircle, ChevronDown, ChevronUp, Clock, Folder, Globe, Lock, RefreshCw, ShieldCheck, Terminal, User, Users } from 'lucide-react'
 import { MarkdownRenderer } from '@/features/skill/markdown-renderer.tsx'
@@ -59,7 +60,6 @@ import {
   useRereleaseSkillVersion,
   useUnarchiveSkill,
   useWithdrawSkillReview,
-  useSubmitForReview,
   useConfirmPublish,
 } from '@/shared/hooks/use-skill-queries.ts'
 import { useSubmitPromotion } from '@/shared/hooks/use-user-queries.ts'
@@ -140,7 +140,6 @@ export function SkillDetailPage() {
   const [rereleaseWarningDialogOpen, setRereleaseWarningDialogOpen] = useState(false)
   const [diffSourceVersion, setDiffSourceVersion] = useState<string | null>(null)
   const [confirmPublishTarget, setConfirmPublishTarget] = useState<string | null>(null)
-  const [submitReviewTarget, setSubmitReviewTarget] = useState<string | null>(null)
   const [diffCompareVersion, setDiffCompareVersion] = useState<string | null>(null)
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(false)
   const [isOverviewCollapsible, setIsOverviewCollapsible] = useState(false)
@@ -285,7 +284,6 @@ export function SkillDetailPage() {
   const rereleaseVersionMutation = useRereleaseSkillVersion()
   const submitPromotionMutation = useSubmitPromotion()
   const reportMutation = useSubmitSkillReport(namespace, slug)
-  const submitForReviewMutation = useSubmitForReview()
   const confirmPublishMutation = useConfirmPublish()
 
   const triggerBrowserDownload = (url: string) => {
@@ -610,22 +608,6 @@ export function SkillDetailPage() {
     }
   }
 
-  const handleSubmitForReview = async () => {
-    if (!submitReviewTarget) {
-      return
-    }
-    try {
-      await submitForReviewMutation.mutateAsync({ namespace, slug, version: submitReviewTarget, targetVisibility: 'PUBLIC' })
-      toast.success(
-        t('skillDetail.submitReviewSuccessTitle'),
-        t('skillDetail.submitReviewSuccessDescription', { version: submitReviewTarget }),
-      )
-      setSubmitReviewTarget(null)
-    } catch (error) {
-      toast.error(t('skillDetail.submitReviewErrorTitle'), error instanceof Error ? error.message : '')
-      throw error
-    }
-  }
 
   const handleOpenRerelease = (version: string) => {
     setRereleaseTarget(version)
@@ -762,6 +744,10 @@ export function SkillDetailPage() {
     return null
   }
 
+  if (skill.namespace && skill.namespace !== namespace) {
+    return <Navigate to="/space/$namespace/$slug" params={{ namespace: skill.namespace, slug: skill.slug }} search={{ returnTo: search.returnTo }} replace />
+  }
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-8 animate-fade-up">
       {/* Main Content */}
@@ -816,6 +802,7 @@ export function SkillDetailPage() {
             )}
           </div>
           <h1 className="text-balance text-4xl font-bold font-heading text-foreground">{skill.displayName}</h1>
+          {skill.ownerId === user?.userId && skill.status !== 'ARCHIVED' && <SkillSharingButton skillId={skill.id} shared={skill.visibility !== 'PRIVATE'} />}
           {skill.ownerDisplayName && (
             <div className="flex min-w-0">
               <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1.5 text-sm text-muted-foreground shadow-sm backdrop-blur-sm">
@@ -962,6 +949,11 @@ export function SkillDetailPage() {
                           <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-sm font-mono">
                             v{version.version}
                           </span>
+                          {(skill.visibility === 'PRIVATE' || version.distributionVisibility === 'PRIVATE') && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2.5 py-0.5 text-xs text-muted-foreground">
+                              <Lock className="h-3 w-3" />{t('sharing.onlyYou')}
+                            </span>
+                          )}
                           {version.status && (
                             <span className="rounded-full border border-border/60 bg-secondary/40 px-2.5 py-0.5 text-xs text-muted-foreground">
                               {resolveVersionStatusLabel(version.status)}
@@ -1024,14 +1016,8 @@ export function SkillDetailPage() {
                               {t('skillDetail.confirmPublish')}
                             </Button>
                           )}
-                          {skill.canManageLifecycle && version.status === 'UPLOADED' && skill.visibility === 'PRIVATE' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setSubmitReviewTarget(version.version)}
-                            >
-                              {t('skillDetail.submitReview')}
-                            </Button>
+                          {skill.ownerId === user?.userId && (skill.visibility === 'PRIVATE' || version.distributionVisibility === 'PRIVATE') && ['UPLOADED', 'PUBLISHED', 'DRAFT'].includes(version.status) && (
+                            <SkillSharingButton skillId={skill.id} initialVersionId={version.id} shared={skill.visibility !== 'PRIVATE'} />
                           )}
                         </div>
                       </div>
@@ -1570,19 +1556,6 @@ export function SkillDetailPage() {
         description={confirmPublishTarget ? t('skillDetail.confirmPublishDialogDescription', { version: confirmPublishTarget }) : ''}
         confirmText={t('skillDetail.confirmPublish')}
         onConfirm={handleConfirmPublish}
-      />
-
-      <ConfirmDialog
-        open={!!submitReviewTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSubmitReviewTarget(null)
-          }
-        }}
-        title={t('skillDetail.submitReviewDialogTitle')}
-        description={submitReviewTarget ? t('skillDetail.submitReviewDialogDescription', { version: submitReviewTarget }) : ''}
-        confirmText={t('skillDetail.submitReview')}
-        onConfirm={handleSubmitForReview}
       />
 
       <Dialog
