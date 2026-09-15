@@ -1,15 +1,19 @@
-import { createElement, type ReactNode } from 'react'
+/** @vitest-environment jsdom */
+
+import { act, createElement, useState, type ReactNode } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const navigateMock = vi.fn()
 const buttonRecords: Array<{ label: string; onClick?: ((event?: { stopPropagation: () => void }) => void) | undefined }> = []
 const useMySkillsMock = vi.fn()
+const useSearchMock = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
   useLocation: () => ({ pathname: '/dashboard/skills' }),
-  useSearch: () => ({}),
+  useSearch: () => useSearchMock(),
 }))
 
 vi.mock('react-i18next', async () => {
@@ -36,7 +40,7 @@ vi.mock('@/shared/ui/button', () => ({
   }) => {
     const label = Array.isArray(children) ? children.join('') : String(children ?? '')
     buttonRecords.push({ label, onClick })
-    return createElement('button', null, children)
+    return createElement('button', { onClick }, children)
   },
 }))
 
@@ -67,16 +71,12 @@ vi.mock('@/shared/hooks/use-skill-queries', () => ({
 }))
 
 vi.mock('@/shared/hooks/use-user-queries', () => ({
-  useMySkills: () => useMySkillsMock(),
+  useMySkills: (params: unknown) => useMySkillsMock(params),
   useSubmitPromotion: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 
 vi.mock('@/shared/hooks/use-namespace-queries', () => ({
   useMyNamespaces: () => ({ data: [] }),
-}))
-
-vi.mock('@/shared/hooks/use-debounce', () => ({
-  useDebounce: (value: string) => value,
 }))
 
 vi.mock('@/shared/lib/skill-lifecycle', () => ({
@@ -110,9 +110,30 @@ function findButton(label: string) {
   return record
 }
 
+type SearchState = { q?: string; namespace?: string; filter?: string; page?: number }
+
+function renderFilters(initialSearch: SearchState) {
+  function RoutedPage() {
+    const [search, setSearch] = useState(initialSearch)
+    useSearchMock.mockReturnValue(search)
+    navigateMock.mockImplementation(({ search: next }: { search: (previous: SearchState) => SearchState }) => {
+      setSearch(next)
+    })
+    return createElement(MySkillsPage)
+  }
+  return render(createElement(RoutedPage))
+}
+
 describe('MySkillsPage', () => {
+  afterEach(() => {
+    cleanup()
+    vi.useRealTimers()
+  })
+
   beforeEach(() => {
     navigateMock.mockReset()
+    useSearchMock.mockReturnValue({})
+    useMySkillsMock.mockClear()
     buttonRecords.length = 0
     useMySkillsMock.mockReturnValue({
       data: {
@@ -136,6 +157,67 @@ describe('MySkillsPage', () => {
       },
       isLoading: false,
     })
+  })
+
+  it('offers the built-in private namespace even when managed namespaces are empty', () => {
+    renderFilters({ namespace: 'private' })
+
+    expect(screen.getByRole('combobox').textContent).toContain('@private')
+    expect(useMySkillsMock).toHaveBeenLastCalledWith(expect.objectContaining({ namespace: 'private' }))
+  })
+
+  it.each([false, true])('clears all filters without restoring a stale keyword (pending edit: %s)', async (pendingEdit) => {
+    vi.useFakeTimers()
+    renderFilters({ q: 'agent', namespace: 'private', filter: 'PUBLISHED', page: 2 })
+    const input = screen.getByRole('searchbox') as HTMLInputElement
+    if (pendingEdit) {
+      fireEvent.change(input, { target: { value: 'new keyword' } })
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: 'mySkills.clearSearch' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+
+    expect(input.value).toBe('')
+    expect(screen.getByRole('combobox').textContent).toContain('mySkills.namespaceFilterAll')
+    expect(screen.queryByRole('button', { name: 'mySkills.clearSearch' })).toBeNull()
+    expect(useMySkillsMock).toHaveBeenLastCalledWith({
+      page: 0, size: 10, q: undefined, namespace: undefined, filter: undefined,
+    })
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears a status filter when it is the only active filter', () => {
+    renderFilters({ filter: 'ARCHIVED', page: 2 })
+    fireEvent.click(screen.getByRole('button', { name: 'mySkills.clearSearch' }))
+
+    expect(useMySkillsMock).toHaveBeenLastCalledWith(expect.objectContaining({ filter: undefined, page: 0 }))
+  })
+
+  it('debounces typing and resets pagination while retaining the other filters', async () => {
+    vi.useFakeTimers()
+    renderFilters({ namespace: 'private', filter: 'PUBLISHED', page: 2 })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: ' agent ' } })
+    await act(async () => { await vi.advanceTimersByTimeAsync(299) })
+    expect(navigateMock).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+
+    expect(useMySkillsMock).toHaveBeenLastCalledWith({
+      page: 0, size: 10, q: 'agent', namespace: 'private', filter: 'PUBLISHED',
+    })
+  })
+
+  it('accepts URL navigation without writing the previous keyword back', async () => {
+    vi.useFakeTimers()
+    useSearchMock.mockReturnValue({ q: 'old', page: 2 })
+    const view = render(createElement(MySkillsPage))
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'pending' } })
+    useSearchMock.mockReturnValue({ q: 'restored', namespace: 'private', page: 1 })
+    view.rerender(createElement(MySkillsPage))
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+
+    expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('restored')
+    expect(navigateMock).not.toHaveBeenCalled()
+    expect(useMySkillsMock).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'restored', page: 1 }))
   })
 
   it('navigates to publish page with namespace and visibility when update is clicked', () => {

@@ -14,7 +14,6 @@ import { Pagination } from '@/shared/components/pagination.tsx'
 import { useArchiveSkill, useUnarchiveSkill, useWithdrawSkillReview } from '@/shared/hooks/use-skill-queries.ts'
 import { useMyNamespaces } from '@/shared/hooks/use-namespace-queries.ts'
 import { useMySkills, useSubmitPromotion } from '@/shared/hooks/use-user-queries.ts'
-import { useDebounce } from '@/shared/hooks/use-debounce.ts'
 import { getHeadlineVersion, getPublishedVersion, getOwnerPreviewVersion, hasPendingOwnerPreview } from '@/shared/lib/skill-lifecycle.ts'
 import { formatCompactDateTime } from '@/shared/lib/date-time.ts'
 import { formatCompactCount } from '@/shared/lib/number-format.ts'
@@ -59,7 +58,6 @@ export function MySkillsPage() {
   // Keep an instant-feedback copy of the keyword input, debounced before it is
   // pushed to the URL so each keystroke does not create a history entry or query.
   const [keywordInput, setKeywordInput] = useState(keyword)
-  const debouncedKeyword = useDebounce(keywordInput.trim(), 300)
 
   const [archiveTarget, setArchiveTarget] = useState<{ namespace: string; slug: string; name: string } | null>(null)
   const [unarchiveTarget, setUnarchiveTarget] = useState<{ namespace: string; slug: string; name: string } | null>(null)
@@ -74,12 +72,17 @@ export function MySkillsPage() {
     })
   }, [navigate])
 
-  // Push the debounced keyword to the URL (reset page to 0 when search changes)
+  // Cancel pending edits when the input or URL changes, including clear/back navigation.
   useEffect(() => {
-    if (debouncedKeyword !== keyword) {
-      updateSearch({ q: debouncedKeyword || undefined, page: 0 }, { replace: true })
+    const nextKeyword = keywordInput.trim()
+    if (nextKeyword === keyword) {
+      return
     }
-  }, [debouncedKeyword, keyword, updateSearch])
+    const timer = setTimeout(() => {
+      updateSearch({ q: nextKeyword || undefined, page: 0 }, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [keywordInput, keyword, updateSearch])
 
   // Sync keywordInput when navigating back via returnTo
   useEffect(() => {
@@ -114,7 +117,7 @@ export function MySkillsPage() {
 
   const handleClearSearch = () => {
     setKeywordInput('')
-    updateSearch({ q: undefined, namespace: undefined, page: 0 })
+    updateSearch({ q: undefined, namespace: undefined, filter: undefined, page: 0 })
   }
 
   const handleUpdateSkill = (namespace: string, visibility?: string, skillId?: number) => {
@@ -315,6 +318,7 @@ export function MySkillsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL_NAMESPACES_VALUE}>{t('mySkills.namespaceFilterAll')}</SelectItem>
+              <SelectItem value="private">@private</SelectItem>
               {(namespaceOptions ?? []).map((ns: { id: number; slug: string }) => (
                 <SelectItem key={ns.id} value={ns.slug}>
                   @{ns.slug}
@@ -322,7 +326,7 @@ export function MySkillsPage() {
               ))}
             </SelectContent>
           </Select>
-          {hasActiveSearch ? (
+          {hasActiveSearch || keywordInput.trim() !== '' || filter !== 'ALL' ? (
             <Button
               type="button"
               size="sm"
