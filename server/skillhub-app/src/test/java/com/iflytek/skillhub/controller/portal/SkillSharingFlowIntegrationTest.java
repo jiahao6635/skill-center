@@ -6,6 +6,7 @@ import com.iflytek.skillhub.auth.rbac.PlatformPrincipal;
 import com.iflytek.skillhub.auth.rbac.RbacService;
 import com.iflytek.skillhub.domain.namespace.*;
 import com.iflytek.skillhub.domain.security.*;
+import com.iflytek.skillhub.domain.review.*;
 import com.iflytek.skillhub.domain.skill.*;
 import com.iflytek.skillhub.domain.skill.service.SkillSharingService;
 import com.iflytek.skillhub.domain.skill.service.SkillHardDeleteService;
@@ -56,6 +57,7 @@ class SkillSharingFlowIntegrationTest {
     @Autowired SkillFileRepository files;
     @Autowired SkillShareRequestRepository requests;
     @Autowired SecurityAuditRepository audits;
+    @Autowired ReviewTaskRepository reviews;
     @Autowired ObjectStorageService storage;
     @Autowired SkillSharingService sharing;
     @Autowired SkillHardDeleteService hardDelete;
@@ -170,6 +172,59 @@ class SkillSharingFlowIntegrationTest {
     }
 
     @Test
+    void publishedSkillMovesAcrossSpacesUsingLatestAndCancelsSourceUpdateReview() throws Exception {
+        source.setType(NamespaceType.TEAM);
+        source = namespaces.save(source);
+        members.save(new NamespaceMember(source.getId(), author, NamespaceRole.MEMBER));
+        skill.setVisibility(SkillVisibility.PUBLIC);
+        skill.setLatestVersionId(selected.getId());
+        skill = skills.save(skill);
+        selected.setStatus(SkillVersionStatus.PUBLISHED);
+        selected.setDistributionVisibility(SkillVisibility.PUBLIC);
+        selected.setRequestedVisibility(SkillVisibility.PUBLIC);
+        selected = versions.save(selected);
+        SkillVersion pendingUpdate = privateVersion("2.0.0", SkillVersionStatus.PENDING_REVIEW);
+        pendingUpdate.setRequestedVisibility(SkillVisibility.PUBLIC);
+        pendingUpdate.setDistributionVisibility(SkillVisibility.PUBLIC);
+        pendingUpdate = versions.save(pendingUpdate);
+        ReviewTask oldReview = reviews.save(new ReviewTask(pendingUpdate.getId(), source.getId(), author));
+
+        mvc.perform(get(base()).with(auth(author)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.versions.length()").value(1))
+                .andExpect(jsonPath("$.data.versions[0].id").value(selected.getId()))
+                .andExpect(jsonPath("$.data.targets.length()").value(1))
+                .andExpect(jsonPath("$.data.targets[0].id").value(target.getId()));
+        long requestId = submit("move-published");
+        assertThat(requests.findById(requestId).orElseThrow().getSkillVersionId()).isEqualTo(selected.getId());
+        SkillShareRequest request = sharing.advance(requestId);
+        assertThat(skills.findById(skill.getId()).orElseThrow().getNamespaceId()).isEqualTo(source.getId());
+        assertThat(versions.findById(selected.getId()).orElseThrow().getStatus()).isEqualTo(SkillVersionStatus.PUBLISHED);
+        assertThat(reviews.findById(oldReview.getId())).isPresent();
+        mvc.perform(post("/api/v1/reviews/" + request.getReviewTaskId() + "/approve")
+                        .with(auth("reviewer")).with(csrf()).contentType("application/json").content("{}"))
+                .andExpect(status().isOk());
+        Skill moved = skills.findById(skill.getId()).orElseThrow();
+        assertThat(moved.getNamespaceId()).isEqualTo(target.getId());
+        assertThat(moved.getLatestVersionId()).isEqualTo(selected.getId());
+        assertThat(moved.getOwnerId()).isEqualTo(author);
+        assertThat(moved.getVisibility()).isEqualTo(SkillVisibility.NAMESPACE_ONLY);
+        assertThat(skills.findByNamespaceIdAndSlug(source.getId(), skill.getSlug())).isEmpty();
+        assertThat(reviews.findById(oldReview.getId())).isEmpty();
+        assertThat(versions.findById(pendingUpdate.getId()).orElseThrow().getStatus()).isEqualTo(SkillVersionStatus.UPLOADED);
+        assertThat(files.findByVersionId(pendingUpdate.getId())).hasSize(1);
+        assertThat(versions.findById(history.getId()).orElseThrow().getDistributionVisibility()).isEqualTo(SkillVisibility.PRIVATE);
+        mvc.perform(post("/api/v1/reviews/" + oldReview.getId() + "/approve")
+                        .with(auth("reviewer")).with(csrf()).contentType("application/json").content("{}"))
+                .andExpect(status().is4xxClientError());
+        mvc.perform(get(base()).with(auth(author)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.targets[0].id").value(source.getId()));
+        mvc.perform(get("/api/v1/skills/" + target.getSlug() + "/" + skill.getSlug() + "/versions/1.1.0").with(auth("outsider")))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
     void ownerOnlyAndCsrfGuardsProtectSharingMutations() throws Exception {
         mvc.perform(get(base()).with(auth("reviewer"))).andExpect(status().isForbidden());
         mvc.perform(post(base().replace("/api/v1/", "/api/web/")).with(auth(author)).contentType("application/json").content(command("csrf")))
@@ -195,7 +250,7 @@ class SkillSharingFlowIntegrationTest {
         return version;
     }
     private String base() { return "/api/v1/skills/by-id/" + skill.getId() + "/sharing"; }
-    private String command(String key) throws Exception { return json.writeValueAsString(Map.of("versionId", selected.getId(), "targetNamespaceId", target.getId(), "targetVisibility", "NAMESPACE_ONLY", "idempotencyKey", key, "confirmWarnings", true)); }
+    private String command(String key) throws Exception { return json.writeValueAsString(Map.of("targetNamespaceId", target.getId(), "idempotencyKey", key, "confirmWarnings", true)); }
     private long submit(String key) throws Exception {
         String response = mvc.perform(post(base()).with(auth(author)).with(csrf()).contentType("application/json").content(command(key)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("SCANNING"))

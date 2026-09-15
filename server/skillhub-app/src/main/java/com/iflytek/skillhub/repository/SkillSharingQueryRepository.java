@@ -6,7 +6,6 @@ import com.iflytek.skillhub.domain.review.ReviewTaskRepository;
 import com.iflytek.skillhub.domain.skill.*;
 import com.iflytek.skillhub.domain.skill.service.SkillSharingService;
 import com.iflytek.skillhub.dto.*;
-import java.util.Comparator;
 import java.util.Objects;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,17 +33,12 @@ public class SkillSharingQueryRepository {
         Skill skill = sharing.requireOwner(skillId, actor);
         Namespace source = namespaces.findById(skill.getNamespaceId()).orElseThrow();
         boolean superAdmin = privileges.isSuperAdmin(actor);
-        var candidates = versions.findBySkillId(skillId).stream()
-                .filter(v -> VersionAccessPolicy.isPrivate(skill, v))
-                .filter(v -> v.getStatus() == SkillVersionStatus.UPLOADED || v.getStatus() == SkillVersionStatus.PUBLISHED
-                        || v.getStatus() == SkillVersionStatus.DRAFT)
-                .sorted(Comparator.comparing(SkillVersion::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(SkillVersion::getId, Comparator.reverseOrder()))
+        var candidates = sharing.latestAvailableVersion(skill).stream()
                 .map(v -> new SkillSharingSettingsResponse.VersionOption(v.getId(), v.getVersion(), v.getStatus().name(), v.getCreatedAt(), v.getFileCount()))
                 .toList();
         var targets = namespaces.findAll().stream()
                 .filter(n -> n.getStatus() == NamespaceStatus.ACTIVE && n.getType() != NamespaceType.SYSTEM)
-                .filter(n -> skill.getVisibility() == SkillVisibility.PRIVATE || Objects.equals(n.getId(), skill.getNamespaceId()))
+                .filter(n -> !Objects.equals(n.getId(), skill.getNamespaceId()))
                 .filter(n -> superAdmin || members.findByNamespaceIdAndUserId(n.getId(), actor).isPresent())
                 .map(n -> new SkillSharingSettingsResponse.TargetOption(n.getId(), n.getSlug(), n.getDisplayName(), n.getType().name()))
                 .toList();

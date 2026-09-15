@@ -224,22 +224,22 @@ class SkillPublishControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1", "/api/web"})
-    void savePrivateVersion_preservesWarningConfirmationAndResponse(String prefix) throws Exception {
+    void updateVersion_preservesWarningConfirmationAndResponse(String prefix) throws Exception {
         var principal = new PlatformPrincipal("usr_1", "publisher", "publisher@example.com", "", "local", Set.of());
         var auth = new UsernamePasswordAuthenticationToken(principal, null, List.of());
         var file = new MockMultipartFile("file", "skill.zip", "application/zip", buildZipWithNestedSkillMd());
-        String path = prefix + "/skills/by-id/12/private-versions";
+        String path = prefix + "/skills/by-id/12/versions";
 
         mockMvc.perform(multipart(path).file(file).with(authentication(auth)).with(csrf()))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.msg").value(org.hamcrest.Matchers.containsString("stray.txt")));
-        verify(skillPublishService, never()).savePrivateVersion(eq(12L), anyList(), eq("usr_1"), eq(Set.of()), eq(false));
+        verify(skillPublishService, never()).updateVersion(eq(12L), anyList(), eq("usr_1"), eq(Set.of()), eq(false));
 
         var version = new SkillVersion(12L, "1.0.0", "usr_1");
         version.setStatus(SkillVersionStatus.UPLOADED);
         version.setFileCount(1);
         version.setTotalSize(128L);
-        given(skillPublishService.savePrivateVersion(eq(12L), anyList(), eq("usr_1"), eq(Set.of()), eq(true)))
+        given(skillPublishService.updateVersion(eq(12L), anyList(), eq("usr_1"), eq(Set.of()), eq(true)))
             .willReturn(new SkillPublishService.PublishResult(12L, "demo-skill", version, "team-ai"));
 
         mockMvc.perform(multipart(path).file(file).param("confirmWarnings", "true")

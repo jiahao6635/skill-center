@@ -1394,53 +1394,15 @@ class SkillPublishServiceTest {
     }
 
     @Test
-    void testPublishFromEntries_ShouldDeferVisibilityChangeUntilApproval() throws Exception {
-        // Arrange
-        String namespaceSlug = "test-ns";
-        String publisherId = "user-100";
-        String skillMdContent = "---\nname: test-skill\ndescription: Test\nversion: 2.0.0\n---\nBody";
-
-        PackageEntry skillMd = new PackageEntry("SKILL.md", skillMdContent.getBytes(), skillMdContent.length(), "text/markdown");
-        List<PackageEntry> entries = List.of(skillMd);
-
-        Namespace namespace = new Namespace(namespaceSlug, "Test NS", "user-1");
-        setId(namespace, 1L);
-        NamespaceMember member = mock(NamespaceMember.class);
-        SkillMetadata metadata = new SkillMetadata("test-skill", "Test", "2.0.0", "Body", Map.of());
-
-        // Skill was created with PRIVATE visibility
-        Skill skill = new Skill(1L, "test-skill", publisherId, SkillVisibility.PRIVATE);
-        setId(skill, 1L);
-
-        when(namespaceRepository.findBySlug(namespaceSlug)).thenReturn(Optional.of(namespace));
-        when(namespaceMemberRepository.findByNamespaceIdAndUserId(any(), eq(publisherId))).thenReturn(Optional.of(member));
-        when(skillPackageValidator.validate(entries)).thenReturn(ValidationResult.pass());
-        when(skillMetadataParser.parse(skillMdContent)).thenReturn(metadata);
-        when(prePublishValidator.validate(any())).thenReturn(ValidationResult.pass());
-        when(skillRepository.findByNamespaceIdAndSlug(any(), eq("test-skill"))).thenReturn(List.of(skill));
-        when(skillRepository.findByNamespaceIdAndSlugAndOwnerId(any(), eq("test-skill"), eq(publisherId))).thenReturn(Optional.of(skill));
-        when(skillVersionRepository.findBySkillIdAndVersion(any(), eq("2.0.0"))).thenReturn(Optional.empty());
-        when(skillVersionRepository.save(any(SkillVersion.class))).thenAnswer(invocation -> {
-            SkillVersion saved = invocation.getArgument(0);
-            if (saved.getId() == null) {
-                setId(saved, 20L);
-            }
-            return saved;
-        });
-        when(skillRepository.save(any())).thenReturn(skill);
-
-        // Act — submit with PUBLIC visibility on an existing PRIVATE skill
-        SkillPublishService.PublishResult result = service.publishFromEntries(
-                namespaceSlug,
-                entries,
-                publisherId,
-                SkillVisibility.PUBLIC,
-                Set.of()
-        );
-
-        // Assert — current published visibility stays unchanged until approval
+    void existingSkillCannotChangeVisibilityThroughUpload() throws Exception {
+        PublishFixture fixture = stubValidPublishInputs("team", "author", "demo", "demo", "2.0.0", true);
+        Skill skill = skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "demo", "author").orElseThrow();
+        skill.setVisibility(SkillVisibility.PRIVATE);
+        var error = assertThrows(DomainBadRequestException.class,
+                () -> service.publishFromEntries("team", fixture.entries(), "author", SkillVisibility.PUBLIC, Set.of()));
+        assertEquals("sharing.scopeFixed", error.messageCode());
         assertEquals(SkillVisibility.PRIVATE, skill.getVisibility());
-        assertEquals(SkillVisibility.PUBLIC, result.version().getRequestedVisibility());
+        verify(skillVersionRepository, never()).save(any());
     }
 
     @Test
@@ -1500,6 +1462,7 @@ class SkillPublishServiceTest {
         String namespaceSlug = "private";
         String publisherId = "user-100";
         PublishFixture fixture = stubValidPublishInputs(namespaceSlug, publisherId, "private-skill", "private-skill", "1.0.0", true);
+        skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "private-skill", publisherId).orElseThrow().setVisibility(SkillVisibility.PRIVATE);
         when(securityScanService.isEnabled()).thenReturn(false);
 
         SkillPublishService.PublishResult result = service.publishFromEntries(
@@ -1845,7 +1808,7 @@ class SkillPublishServiceTest {
     }
 
     @Test
-    void savePrivateVersionRetainsSharedIdentityMetadataAndPendingShare() throws Exception {
+    void updateVersionRetainsSharedScopeMetadataAndPendingMove() throws Exception {
         PublishFixture fixture = stubValidPublishInputs("team", "author", "demo", "demo", "2.0.0", false);
         Skill shared = skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "demo", "author").orElseThrow();
         shared.setSummary("Current shared description");
@@ -1858,22 +1821,22 @@ class SkillPublishServiceTest {
         pending.setSharingRequestId(99L);
         when(skillVersionRepository.findBySkillIdAndStatus(1L, SkillVersionStatus.PENDING_REVIEW)).thenReturn(List.of(pending));
 
-        var result = service.savePrivateVersion(1L, fixture.entries(), "author", Set.of("SUPER_ADMIN"), false);
+        var result = service.updateVersion(1L, fixture.entries(), "author", Set.of("SUPER_ADMIN"), false);
 
         assertEquals(1L, result.skillId());
         assertEquals(SkillVisibility.PUBLIC, shared.getVisibility());
         assertEquals(1L, shared.getNamespaceId());
         assertEquals(9L, shared.getLatestVersionId());
         assertEquals("Current shared description", shared.getSummary());
-        assertEquals(SkillVisibility.PRIVATE, result.version().getDistributionVisibility());
-        assertEquals(SkillVersionStatus.UPLOADED, result.version().getStatus());
+        assertEquals(SkillVisibility.PUBLIC, result.version().getDistributionVisibility());
+        assertEquals(SkillVersionStatus.SCANNING, result.version().getStatus());
         assertEquals(SkillVersionStatus.PENDING_REVIEW, pending.getStatus());
         verify(reviewTaskRepository, never()).delete(any());
         verify(namespaceRepository, never()).findBySlug("private");
     }
 
     @Test
-    void privateUploadAfterSharingFollowsAuthorAliasInsteadOfCreatingDuplicate() throws Exception {
+    void privateUploadAfterMovingCannotCreateIntermediatePrivateVersion() throws Exception {
         PublishFixture fixture = stubValidPublishInputs("team", "author", "demo", "demo", "2.0.0", false);
         Skill original = skillRepository.findByNamespaceIdAndSlugAndOwnerId(1L, "demo", "author").orElseThrow();
         original.setLatestVersionId(9L);
@@ -1884,14 +1847,10 @@ class SkillPublishServiceTest {
         when(namespaceRepository.findBySlug("private")).thenReturn(Optional.of(privateSpace));
         when(skillRepository.findByPrivateSourceNamespaceIdAndSlugAndOwnerId(99L, "demo", "author")).thenReturn(Optional.of(original));
 
-        var result = service.publishFromEntries("private", fixture.entries(), "author", SkillVisibility.PRIVATE, Set.of("SUPER_ADMIN"));
-
-        assertEquals(original.getId(), result.skillId());
-        assertEquals(1L, original.getNamespaceId());
+        assertThrows(com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException.class,
+                () -> service.publishFromEntries("private", fixture.entries(), "author", SkillVisibility.PRIVATE, Set.of("SUPER_ADMIN")));
         assertEquals(9L, original.getLatestVersionId());
         assertEquals(SkillVisibility.PUBLIC, original.getVisibility());
-        assertEquals(SkillVisibility.PRIVATE, result.version().getDistributionVisibility());
-        assertEquals(SkillVersionStatus.UPLOADED, result.version().getStatus());
         verify(skillRepository, never()).findByNamespaceIdAndSlugAndOwnerId(99L, "demo", "author");
     }
 

@@ -62,6 +62,7 @@ class SkillSharingServiceTest {
         target = id(new Namespace("team", "Team", "reviewer"), 2L);
         when(skills.findById(10L)).thenReturn(Optional.of(skill));
         when(skillLock.lockAndRefresh(10L)).thenReturn(Optional.of(skill));
+        when(versions.findBySkillId(10L)).thenReturn(List.of(history, selected));
         when(versions.findById(21L)).thenReturn(Optional.of(selected));
         when(versions.findById(20L)).thenReturn(Optional.of(history));
         when(namespaces.findById(1L)).thenReturn(Optional.of(source));
@@ -104,31 +105,95 @@ class SkillSharingServiceTest {
         SkillShareRequest first = submit();
         assertThat(submit()).isSameAs(first);
         verify(requests, times(1)).save(any());
-        assertThatThrownBy(() -> service.submit(10L, 20L, 2L, SkillVisibility.NAMESPACE_ONLY, "author", "one", false))
+        assertThatThrownBy(() -> service.submit(10L, 3L, "author", "one"))
                 .isInstanceOf(LocalizedDomainException.class);
     }
 
     @Test
     void anotherSubmissionIsBlockedWhileActive() {
         submit();
-        assertThatThrownBy(() -> service.submit(10L, 21L, 2L, SkillVisibility.NAMESPACE_ONLY, "author", "two", false))
+        assertThatThrownBy(() -> service.submit(10L, 2L, "author", "two"))
                 .isInstanceOf(LocalizedDomainException.class);
     }
 
     @Test
     void namespaceAdminCannotShareAnotherAuthorsPrivateVersion() {
-        assertThatThrownBy(() -> service.submit(10L, 21L, 2L, SkillVisibility.NAMESPACE_ONLY, "reviewer", "one", false))
+        assertThatThrownBy(() -> service.submit(10L, 2L, "reviewer", "one"))
                 .isInstanceOf(LocalizedDomainException.class);
         verify(requests, never()).save(any());
     }
 
     @Test
-    void publicAccessRequiresExplicitConfirmation() {
+    void moveAlwaysUsesMemberVisibilityEvenForGlobalSpace() {
         target.setType(NamespaceType.GLOBAL);
-        assertThatThrownBy(() -> service.submit(10L, 21L, 2L, SkillVisibility.PUBLIC, "author", "one", false))
+        assertThat(submit().getTargetVisibility()).isEqualTo(SkillVisibility.NAMESPACE_ONLY);
+        assertThatThrownBy(() -> service.validateTarget(skill, 21L, 2L, SkillVisibility.PUBLIC, "author"))
                 .isInstanceOf(LocalizedDomainException.class);
-        assertThat(service.submit(10L, 21L, 2L, SkillVisibility.PUBLIC, "author", "one", true).getTargetVisibility())
-                .isEqualTo(SkillVisibility.PUBLIC);
+    }
+
+    @Test
+    void sharedSkillUsesPublishedVersionAndWithdrawsUnfinishedUpdatesOnlyOnCompletion() {
+        skill.setVisibility(SkillVisibility.PUBLIC);
+        history.setDistributionVisibility(SkillVisibility.PUBLIC);
+        selected.setStatus(SkillVersionStatus.PENDING_REVIEW);
+        selected.setDistributionVisibility(SkillVisibility.PUBLIC);
+        ReviewTask oldReview = id(new ReviewTask(21L, 1L, "author"), 201L);
+        when(reviews.findBySkillVersionIdAndStatus(21L, ReviewTaskStatus.PENDING)).thenReturn(Optional.of(oldReview));
+        SkillVersion scanning = privateVersion(22L, "1.2.0", SkillVersionStatus.SCANNING);
+        scanning.setDistributionVisibility(SkillVisibility.PUBLIC);
+        scanning.setAutoPublishOnScanPass(true);
+        when(versions.findBySkillId(10L)).thenReturn(List.of(history, selected, scanning));
+        safeAudit = id(new SecurityAudit(20L, ScannerType.SKILL_SCANNER), 301L);
+        safeAudit.setVerdict(SecurityVerdict.SAFE);
+        safeAudit.setScannedAt(now);
+        when(audits.findById(301L)).thenReturn(Optional.of(safeAudit));
+        SkillShareRequest request = submit();
+        request.setSecurityAuditId(301L);
+        assertThat(request.getSkillVersionId()).isEqualTo(20L);
+        assertThat(history.getStatus()).isEqualTo(SkillVersionStatus.PUBLISHED);
+        assertThat(skill.getNamespaceId()).isEqualTo(1L);
+        assertThat(selected.getStatus()).isEqualTo(SkillVersionStatus.PENDING_REVIEW);
+        service.advance(100L);
+        service.decide(review, "reviewer", "Ready", Map.of(2L, NamespaceRole.ADMIN), Set.of(), true);
+        assertThat(skill.getNamespaceId()).isEqualTo(2L);
+        assertThat(skill.getLatestVersionId()).isEqualTo(20L);
+        assertThat(skill.getVisibility()).isEqualTo(SkillVisibility.NAMESPACE_ONLY);
+        assertThat(selected.getStatus()).isEqualTo(SkillVersionStatus.UPLOADED);
+        assertThat(scanning.getStatus()).isEqualTo(SkillVersionStatus.UPLOADED);
+        assertThat(scanning.isAutoPublishOnScanPass()).isFalse();
+        verify(reviews).delete(oldReview);
+        assertThat(history.getDistributionVisibility()).isEqualTo(SkillVisibility.NAMESPACE_ONLY);
+        assertThat(selected.getRequestedVisibility()).isEqualTo(SkillVisibility.NAMESPACE_ONLY);
+    }
+
+    @Test
+    void newerUnavailablePrivateVersionDoesNotReplaceLatestAvailable() {
+        SkillVersion scanning = privateVersion(22L, "2.0.0", SkillVersionStatus.SCANNING);
+        when(versions.findBySkillId(10L)).thenReturn(List.of(history, selected, scanning));
+        assertThat(submit().getSkillVersionId()).isEqualTo(selected.getId());
+    }
+
+    @Test
+    void sameSpaceAndPrivateSpaceTargetsAreRejected() {
+        assertThatThrownBy(() -> service.validateTarget(skill, 21L, 1L, SkillVisibility.NAMESPACE_ONLY, "author"))
+                .isInstanceOf(LocalizedDomainException.class);
+        skill.shareToNamespace(2L);
+        assertThatThrownBy(this::submit).isInstanceOf(LocalizedDomainException.class);
+    }
+
+    @Test
+    void newerPublishedVersionDuringReviewFailsMoveWithoutRollingBackLatest() {
+        skill.setVisibility(SkillVisibility.NAMESPACE_ONLY);
+        skill.setLatestVersionId(21L);
+        selected.setStatus(SkillVersionStatus.PUBLISHED);
+        selected.setDistributionVisibility(SkillVisibility.NAMESPACE_ONLY);
+        SkillShareRequest request = scannedRequest();
+        history.setDistributionVisibility(SkillVisibility.NAMESPACE_ONLY);
+        skill.setLatestVersionId(20L);
+        service.advance(100L);
+        assertThat(request.getStatus()).isEqualTo(SkillShareStatus.FAILED);
+        assertThat(skill.getLatestVersionId()).isEqualTo(20L);
+        assertThat(skill.getNamespaceId()).isEqualTo(1L);
     }
 
     @Test
@@ -226,7 +291,7 @@ class SkillSharingServiceTest {
         assertOriginalUnchanged();
     }
 
-    private SkillShareRequest submit() { return service.submit(10L, 21L, 2L, SkillVisibility.NAMESPACE_ONLY, "author", "one", false); }
+    private SkillShareRequest submit() { return service.submit(10L, 2L, "author", "one"); }
     private SkillShareRequest scannedRequest() { SkillShareRequest request = submit(); request.setSecurityAuditId(300L); return request; }
     private void assertOriginalUnchanged() {
         assertThat(skill.getNamespaceId()).isEqualTo(1L);

@@ -56,8 +56,10 @@ public class SkillSharingAppService {
     public SkillSharePrecheckResponse precheck(Long skillId, SkillShareCommand command, String actor) {
         Skill skill = sharing.requireOwner(skillId, actor);
         try {
-            sharing.validateTarget(skill, command.versionId(), command.targetNamespaceId(), command.targetVisibility(), actor);
-            return validatePackage(command, actor, loadPackage(command.versionId()));
+            Long versionId = sharing.latestAvailableVersion(skill)
+                    .orElseThrow(() -> new DomainBadRequestException("sharing.versionUnavailable")).getId();
+            sharing.validateTarget(skill, versionId, command.targetNamespaceId(), SkillVisibility.NAMESPACE_ONLY, actor);
+            return validatePackage(command, actor, loadPackage(versionId));
         } catch (LocalizedDomainException ex) {
             return new SkillSharePrecheckResponse(false, List.of(ex.messageCode()), List.of());
         }
@@ -66,16 +68,15 @@ public class SkillSharingAppService {
     @Transactional
     public SkillShareResponse submit(Long skillId, SkillShareCommand command, String actor) {
         if (!scanner.isEnabled()) throw new DomainBadRequestException("error.security.scanner.required");
-        SkillShareRequest request = sharing.submit(skillId, command.versionId(), command.targetNamespaceId(),
-                command.targetVisibility(), actor, command.idempotencyKey(), command.confirmPublic());
+        SkillShareRequest request = sharing.submit(skillId, command.targetNamespaceId(), actor, command.idempotencyKey());
         if (request.getStatus().isActive() && request.getSecurityAuditId() == null) {
-            List<PackageEntry> entries = loadPackage(command.versionId());
+            List<PackageEntry> entries = loadPackage(request.getSkillVersionId());
             SkillSharePrecheckResponse check = validatePackage(command, actor, entries);
             if (!check.errors().isEmpty()) throw new DomainBadRequestException("error.skill.publish.package.invalid", String.join("; ", check.errors()));
             if (!check.warnings().isEmpty() && !command.confirmWarnings()) {
                 throw new DomainBadRequestException("error.skill.publish.precheck.confirmRequired", String.join("\n", check.warnings()));
             }
-            SecurityAudit audit = scanner.triggerSharingScan(command.versionId(), entries, actor);
+            SecurityAudit audit = scanner.triggerSharingScan(request.getSkillVersionId(), entries, actor);
             if (audit == null) throw new DomainBadRequestException("error.security.scanner.required");
             request.setSecurityAuditId(audit.getId());
             requests.save(request);

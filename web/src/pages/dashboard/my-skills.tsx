@@ -416,17 +416,17 @@ export function MySkillsPage() {
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 pl-4">
-                        {skill.status !== 'ARCHIVED' && <SkillSharingButton skillId={skill.id} shared={skill.visibility !== 'PRIVATE'} />}
+                        {skill.status !== 'ARCHIVED' && <SkillSharingButton skillId={skill.id} />}
                         {skill.status !== 'ARCHIVED' && (
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={(event) => {
                               event.stopPropagation()
-                              handleUpdateSkill(skill.namespace, 'PRIVATE', skill.id)
+                              handleUpdateSkill(skill.namespace, skill.visibility, skill.id)
                             }}
                           >
-                            {t('sharing.savePrivate')}
+                            {t('sharing.update')}
                           </Button>
                         )}
                         {hasPendingPreview && ownerPreviewVersion ? (

@@ -339,13 +339,13 @@ public class SkillPublishService {
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public PublishResult savePrivateVersion(Long skillId, List<PackageEntry> entries, String actor,
+    public PublishResult updateVersion(Long skillId, List<PackageEntry> entries, String actor,
                                             Set<String> platformRoles, boolean confirmWarnings) {
         Skill skill = skillRepository.findById(skillId)
                 .orElseThrow(() -> new DomainBadRequestException("error.skill.notFound", skillId));
         if (!skill.getOwnerId().equals(actor)) throw new DomainForbiddenException("sharing.ownerOnly");
         return publishFromEntriesInternal(resolveNamespaceSlug(skill.getNamespaceId()), entries, actor,
-                SkillVisibility.PRIVATE, platformRoles, confirmWarnings, false, true, skillId);
+                skill.getVisibility(), platformRoles, confirmWarnings, false, false, skillId);
     }
 
     private PublishResult publishFromEntriesInternal(String namespaceSlug, List<PackageEntry> entries,
@@ -476,6 +476,9 @@ public class SkillPublishService {
         if (targetSkillId != null && !targetSkillId.equals(skill.getId())) {
             throw new DomainBadRequestException("sharing.packageNameMismatch");
         }
+        if (existingOwnedSkill.isPresent() && visibility != skill.getVisibility()) {
+            throw new DomainBadRequestException("sharing.scopeFixed");
+        }
         if (skill.isHidden()) throw new DomainBadRequestException("sharing.skillUnavailable");
         if (skill.getStatus() == SkillStatus.ARCHIVED) {
             throw new DomainBadRequestException("error.skill.publish.archived", skillSlug);
@@ -506,7 +509,8 @@ public class SkillPublishService {
 
         // 7b. Determine review-exempt fast path: a trusted TEAM manager updating an already-published
         // skill may skip human review, letting the security scan act as the sole publish gate.
-        boolean autoReviewExempt = isAutoReviewExempt(namespace, skill, publisherId, visibility, isSuperAdmin);
+        boolean autoReviewExempt = (targetSkillId != null && isSuperAdmin && visibility != SkillVisibility.PRIVATE)
+                || isAutoReviewExempt(namespace, skill, publisherId, visibility, isSuperAdmin);
 
         // 8. Create SkillVersion
         SkillVersion version = new SkillVersion(skill.getId(), metadata.version(), publisherId);

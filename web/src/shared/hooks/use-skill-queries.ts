@@ -53,7 +53,7 @@ async function publishSkill(params: { namespace: string; file: File; visibility:
   formData.append('confirmWarnings', String(params.confirmWarnings === true))
 
   return fetchJson<PublishResult>(params.skillId
-    ? `${WEB_API_PREFIX}/skills/by-id/${params.skillId}/private-versions`
+    ? `${WEB_API_PREFIX}/skills/by-id/${params.skillId}/versions`
     : `${WEB_API_PREFIX}/skills/${cleanNamespace}/publish`, {
     method: 'POST',
     headers: getCsrfHeaders(),

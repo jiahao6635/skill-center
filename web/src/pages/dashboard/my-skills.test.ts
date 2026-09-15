@@ -224,7 +224,7 @@ describe('MySkillsPage', () => {
     renderToStaticMarkup(createElement(MySkillsPage))
 
     const stopPropagation = vi.fn()
-    findButton('sharing.savePrivate').onClick?.({ stopPropagation })
+    findButton('sharing.update').onClick?.({ stopPropagation })
 
     expect(stopPropagation).toHaveBeenCalledTimes(1)
     expect(navigateMock).toHaveBeenCalledWith({
@@ -296,13 +296,13 @@ describe('MySkillsPage', () => {
 
     renderToStaticMarkup(createElement(MySkillsPage))
 
-    findButton('sharing.savePrivate').onClick?.({ stopPropagation: vi.fn() })
+    findButton('sharing.update').onClick?.({ stopPropagation: vi.fn() })
 
     expect(navigateMock).toHaveBeenCalledWith({
       to: '/dashboard/publish',
       search: {
         namespace: 'team-ai',
-        visibility: 'PRIVATE',
+        visibility: 'PUBLIC',
         skillId: 3,
       },
     })

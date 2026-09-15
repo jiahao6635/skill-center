@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise sharing against a local/staging instance with its real database and scanner.
+"""Exercise updates and moves against a local/staging instance with its real database and scanner.
 
 Requires local registration and BOOTSTRAP_ADMIN_PASSWORD. Creates a temporary author and
 skill; removes the skill after validation. The author remains as part of the audit trail.
@@ -72,37 +72,40 @@ def main():
     author.call('POST', '/api/v1/auth/local/register', {'username': 'share_' + suffix, 'password': 'Test!' + uuid.uuid4().hex, 'email': suffix + '@example.test'})
     anonymous = Session(args.base_url)
     skill_id = None
+    team_slug = None
     try:
         first = author.upload('/api/v1/skills/private/publish', name, '0.1.0')
         skill_id = first['skillId']
-        def wait_uploaded(number):
+        def wait_version(number, expected='UPLOADED'):
             deadline = time.monotonic() + 120
             while time.monotonic() < deadline:
                 location = author.call('GET', f'/api/v1/skills/by-id/{skill_id}/location')
                 result = author.call('GET', f'/api/v1/skills/{location["namespace"]}/{name}/versions/{number}')
                 if result['status'] != 'SCANNING':
-                    assert result['status'] == 'UPLOADED', result
-                    return
+                    assert result['status'] == expected, result
+                    return result
                 time.sleep(1)
             raise AssertionError('Upload scan timed out for ' + number)
 
-        wait_uploaded('0.1.0')
+        wait_version('0.1.0')
         author.call('POST', f'/api/web/skills/private/{name}/confirm-publish', {'version': '0.1.0'})
         second = author.upload('/api/v1/skills/private/publish', name, '1.0.0')
         assert second['skillId'] == skill_id
-        wait_uploaded('1.0.0')
+        wait_version('1.0.0')
         share_path = f'/api/web/skills/by-id/{skill_id}/sharing'
         settings = author.call('GET', share_path)
         target = next(item for item in settings['targets'] if item['type'] == 'GLOBAL')
 
-        def share(version_number):
+        def move(version_number):
             settings = author.call('GET', share_path)
             version = next(item for item in settings['versions'] if item['version'] == version_number)
-            command = {'versionId': version['id'], 'targetNamespaceId': target['id'], 'targetVisibility': 'PUBLIC',
-                       'idempotencyKey': uuid.uuid4().hex, 'confirmPublic': True, 'confirmWarnings': True}
+            assert len(settings['versions']) == 1
+            command = {'targetNamespaceId': target['id'], 'idempotencyKey': uuid.uuid4().hex, 'confirmWarnings': True}
             check = author.call('POST', share_path + '/precheck', command)
             assert check['valid'], check
             request = author.call('POST', share_path, command)
+            assert request['versionId'] == version['id']
+            assert request['targetVisibility'] == 'NAMESPACE_ONLY'
             assert author.call('POST', share_path, command)['id'] == request['id']
             deadline = time.monotonic() + 120
             while time.monotonic() < deadline:
@@ -113,37 +116,54 @@ def main():
             assert request['status'] == 'PENDING_REVIEW', request
             review = admin.call('GET', f'/api/v1/reviews/{request["reviewTaskId"]}/skill-detail')
             assert not any(item['version'] == '0.1.0' for item in review['versions'])
-            admin.call('POST', f'/api/v1/reviews/{request["reviewTaskId"]}/approve', {'comment': 'Sharing smoke test: approved selected version.'})
+            admin.call('POST', f'/api/v1/reviews/{request["reviewTaskId"]}/approve', {'comment': 'Move smoke test: approved latest available version.'})
             assert author.call('GET', share_path)['latestRequest']['status'] == 'COMPLETED'
 
-        share('1.0.0')
-        print('PASS: existing version shared after real scan and target review', flush=True)
-        location = anonymous.call('GET', f'/api/v1/skills/by-id/{skill_id}/location')
+        move('1.0.0')
+        print('PASS: latest private version moved after real scan and target review', flush=True)
+        location = author.call('GET', f'/api/v1/skills/by-id/{skill_id}/location')
         assert location['namespace'] == target['slug']
         base = f'/api/v1/skills/{target["slug"]}/{name}'
-        assert anonymous.call('GET', base)['publishedVersion']['version'] == '1.0.0'
-        assert len(anonymous.call('GET', base + '/versions')['items']) == 1
+        assert anonymous.call('GET', base, allow_error=True)[0] in (400, 401, 403, 404)
+        assert author.call('GET', base)['publishedVersion']['version'] == '1.0.0'
         for path in ['/versions/0.1.0', '/versions/0.1.0/files', '/versions/0.1.0/file?path=SKILL.md', '/versions/0.1.0/download', '/versions/compare?from=0.1.0&to=1.0.0']:
-            assert anonymous.call('GET', base + path, allow_error=True)[0] in (400, 401, 403, 404), path
+            assert admin.call('GET', base + path, allow_error=True)[0] in (400, 401, 403, 404), path
         assert author.call('GET', f'/api/v1/skills/private/{name}')['id'] == skill_id
-        third = author.upload(f'/api/web/skills/by-id/{skill_id}/private-versions', name, '1.1.0')
-        assert third['skillId'] == skill_id
-        wait_uploaded('1.1.0')
-        assert anonymous.call('GET', base)['publishedVersion']['version'] == '1.0.0'
-        legacy = author.upload('/api/v1/skills/private/publish', name, '1.2.0')
-        assert legacy['skillId'] == skill_id and legacy['namespace'] == target['slug']
-        wait_uploaded('1.2.0')
-        share('1.2.0')
-        assert anonymous.call('GET', base)['publishedVersion']['version'] == '1.2.0'
-        assert len(author.call('GET', base + '/versions')['items']) == 4
-        assert len(anonymous.call('GET', base + '/versions')['items']) == 2
-        print('PASS: real scan, target review, stable identity, private history isolation, private updates and legacy upload alias', flush=True)
+        third = author.upload(f'/api/web/skills/by-id/{skill_id}/versions', name, '1.1.0')
+        assert third['skillId'] == skill_id and third['namespace'] == target['slug']
+        wait_version('1.1.0', 'PENDING_REVIEW')
+        assert author.call('GET', base)['publishedVersion']['version'] == '1.0.0'
+        pending = admin.call('GET', f'/api/web/reviews?status=PENDING&namespaceId={target["id"]}')
+        update_review = next(item for item in pending['items'] if item['skillSlug'] == name and item['version'] == '1.1.0')
+        admin.call('POST', f'/api/v1/reviews/{update_review["id"]}/approve', {'comment': 'Update smoke test'})
+        assert author.call('GET', base)['publishedVersion']['version'] == '1.1.0'
+        print('PASS: direct update retains scope and switches latest only after review', flush=True)
+
+        fourth = author.upload(f'/api/web/skills/by-id/{skill_id}/versions', name, '1.2.0')
+        assert fourth['skillId'] == skill_id
+        wait_version('1.2.0', 'PENDING_REVIEW')
+        pending = admin.call('GET', f'/api/web/reviews?status=PENDING&namespaceId={target["id"]}')
+        old_review = next(item for item in pending['items'] if item['skillSlug'] == name and item['version'] == '1.2.0')
+        target = admin.call('POST', '/api/v1/namespaces', {'slug': 'move-test-' + suffix, 'displayName': 'Move smoke test'})
+        team_slug = target['slug']
+        author_id = author.call('GET', '/api/v1/auth/me')['userId']
+        admin.call('POST', f'/api/v1/namespaces/{team_slug}/members', {'userId': author_id, 'role': 'MEMBER'})
+        move('1.1.0')
+        moved_base = f'/api/v1/skills/{team_slug}/{name}'
+        assert author.call('GET', moved_base)['publishedVersion']['version'] == '1.1.0'
+        assert author.call('GET', moved_base + '/versions/1.2.0')['status'] == 'UPLOADED'
+        assert len(author.call('GET', moved_base + '/versions')['items']) == 4
+        assert admin.call('POST', f'/api/v1/reviews/{old_review["id"]}/approve', {}, allow_error=True)[0] in (400, 403, 404)
+        assert author.call('GET', base, allow_error=True)[0] in (400, 404)
+        print('PASS: shared skill moves across spaces, pending source review withdrawn, all files retained', flush=True)
     finally:
         if skill_id is not None:
             request = author.call('GET', f'/api/web/skills/by-id/{skill_id}/sharing').get('latestRequest')
             if request and request['status'] in ('SCANNING', 'PENDING_REVIEW'):
                 author.call('POST', f'/api/web/skills/by-id/{skill_id}/sharing/{request["id"]}/withdraw')
             admin.call('DELETE', f'/api/v1/skills/id/{skill_id}')
+        if team_slug is not None:
+            admin.call('DELETE', f'/api/v1/namespaces/{team_slug}')
 
 
 if __name__ == '__main__':

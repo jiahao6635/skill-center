@@ -16,6 +16,8 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ConcurrentModificationException;
+import java.util.Comparator;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -23,7 +25,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Publishes an existing private version in place, retaining identity and all private history. */
+/** Moves a skill using its latest available version, retaining identity and private history. */
 @Service
 @Transactional
 public class SkillSharingService {
@@ -62,43 +64,53 @@ public class SkillSharingService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<SkillVersion> latestAvailableVersion(Skill skill) {
+        if (skill.getVisibility() != SkillVisibility.PRIVATE) {
+            return Optional.ofNullable(skill.getLatestVersionId()).flatMap(versions::findById)
+                    .filter(v -> Objects.equals(v.getSkillId(), skill.getId()))
+                    .filter(v -> v.getStatus() == SkillVersionStatus.PUBLISHED && VersionAccessPolicy.isShared(v))
+                    .filter(v -> v.isBundleReady() && v.isDownloadReady());
+        }
+        return versions.findBySkillId(skill.getId()).stream()
+                .filter(v -> v.getStatus() == SkillVersionStatus.UPLOADED || v.getStatus() == SkillVersionStatus.PUBLISHED)
+                .filter(v -> v.isBundleReady() && v.isDownloadReady())
+                .max(Comparator.comparing(SkillVersion::getCreatedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(SkillVersion::getId));
+    }
+
+    @Transactional(readOnly = true)
     public void validateTarget(Skill skill, Long versionId, Long targetId, SkillVisibility visibility, String actor) {
         if (!Objects.equals(skill.getOwnerId(), actor)) throw new DomainForbiddenException("sharing.ownerOnly");
         if (skill.getStatus() != SkillStatus.ACTIVE || skill.isHidden()) fail("sharing.skillUnavailable");
         Namespace source = namespace(skill.getNamespaceId());
         Namespace target = namespace(targetId);
         if (source.getStatus() != NamespaceStatus.ACTIVE || target.getStatus() != NamespaceStatus.ACTIVE) fail("sharing.namespaceUnavailable");
-        if (target.getType() == NamespaceType.SYSTEM || visibility == null || visibility == SkillVisibility.PRIVATE
-                || (target.getType() != NamespaceType.GLOBAL && visibility != SkillVisibility.NAMESPACE_ONLY)) fail("sharing.invalidScope");
+        if (target.getType() == NamespaceType.SYSTEM || visibility != SkillVisibility.NAMESPACE_ONLY) fail("sharing.invalidScope");
         if (!privileges.isSuperAdmin(actor) && members.findByNamespaceIdAndUserId(targetId, actor).isEmpty()) {
             throw new DomainForbiddenException("sharing.targetPermission");
         }
-        if (skill.getVisibility() != SkillVisibility.PRIVATE
-                && (!Objects.equals(skill.getNamespaceId(), targetId) || skill.getVisibility() != visibility)) fail("sharing.scopeFixed");
+        if (Objects.equals(skill.getNamespaceId(), targetId)) fail("sharing.sameNamespace");
         if (target.getType() == NamespaceType.GLOBAL && skill.getSlug().contains("--")) fail("sharing.invalidGlobalSlug");
         SkillVersion version = version(skill, versionId);
-        if (version.getStatus() != SkillVersionStatus.UPLOADED && version.getStatus() != SkillVersionStatus.PUBLISHED
-                && version.getStatus() != SkillVersionStatus.DRAFT) fail("sharing.versionUnavailable");
-        if (!VersionAccessPolicy.isPrivate(skill, version)) fail("sharing.alreadyShared");
+        if (latestAvailableVersion(skill).filter(v -> Objects.equals(v.getId(), versionId)).isEmpty()) fail("sharing.versionUnavailable");
         if (!version.isBundleReady() || !version.isDownloadReady()) fail("sharing.packageUnavailable");
         if (skills.findByNamespaceIdAndSlug(targetId, skill.getSlug()).stream()
                 .anyMatch(other -> !Objects.equals(other.getId(), skill.getId()))) fail("sharing.nameConflict");
     }
 
-    public SkillShareRequest submit(Long skillId, Long versionId, Long targetId, SkillVisibility visibility,
-                                   String actor, String key, boolean confirmPublic) {
-        namespaceLock.lock(targetId);
+    public SkillShareRequest submit(Long skillId, Long targetId, String actor, String key) {
+        lockNamespaces(requireOwner(skillId, actor).getNamespaceId(), targetId);
         Skill skill = skillLock.lockAndRefresh(skillId).orElseThrow(() -> new DomainNotFoundException("sharing.notFound"));
         if (!Objects.equals(actor, skill.getOwnerId())) throw new DomainForbiddenException("sharing.ownerOnly");
         var previous = requests.findBySkillIdAndIdempotencyKey(skillId, key);
         if (previous.isPresent()) {
             SkillShareRequest existing = previous.get();
-            if (!Objects.equals(existing.getSkillVersionId(), versionId) || !Objects.equals(existing.getTargetNamespaceId(), targetId)
-                    || existing.getTargetVisibility() != visibility) fail("sharing.idempotencyConflict");
+            if (!Objects.equals(existing.getTargetNamespaceId(), targetId)) fail("sharing.idempotencyConflict");
             return existing;
         }
-        if (visibility == SkillVisibility.PUBLIC && !confirmPublic) fail("sharing.confirmPublic");
         if (requests.findFirstBySkillIdOrderByIdDesc(skillId).filter(r -> r.getStatus().isActive()).isPresent()) fail("sharing.activeRequest");
+        Long versionId = latestAvailableVersion(skill).orElseThrow(() -> new DomainBadRequestException("sharing.versionUnavailable")).getId();
+        SkillVisibility visibility = SkillVisibility.NAMESPACE_ONLY;
         validateTarget(skill, versionId, targetId, visibility, actor);
         SkillVersion version = version(skill, versionId);
         version.assertNotSharing();
@@ -187,6 +199,20 @@ public class SkillSharingService {
 
     private void complete(SkillShareRequest request, Skill skill, String actor) {
         SkillVersion version = version(skill, request.getSkillVersionId());
+        // Pending updates were authorized in the source space. Retain their files but withdraw that review.
+        for (SkillVersion pending : versions.findBySkillId(skill.getId())) {
+            if (pending.getStatus() == SkillVersionStatus.PENDING_REVIEW || pending.getStatus() == SkillVersionStatus.SCANNING) {
+                reviews.findBySkillVersionIdAndStatus(pending.getId(), ReviewTaskStatus.PENDING).ifPresent(reviews::delete);
+                pending.setStatus(SkillVersionStatus.UPLOADED);
+                pending.setAutoPublishOnScanPass(false);
+                versions.save(pending);
+            }
+            if (VersionAccessPolicy.isShared(pending)) {
+                pending.setDistributionVisibility(SkillVisibility.NAMESPACE_ONLY);
+                pending.setRequestedVisibility(SkillVisibility.NAMESPACE_ONLY);
+                versions.save(pending);
+            }
+        }
         skill.shareToNamespace(request.getTargetNamespaceId());
         version.setRequestedVisibility(request.getTargetVisibility());
         publication.publishVersion(skill, version, actor);
@@ -212,10 +238,15 @@ public class SkillSharingService {
 
     private SkillShareRequest lockedRequest(Long id) {
         SkillShareRequest request = requests.findById(id).orElseThrow(() -> new DomainNotFoundException("sharing.notFound"));
-        namespaceLock.lock(request.getTargetNamespaceId());
+        lockNamespaces(request.getSourceNamespaceId(), request.getTargetNamespaceId());
         skillLock.lockAndRefresh(request.getSkillId()).orElseThrow(() -> new DomainNotFoundException("sharing.notFound"));
         requests.refresh(request);
         return request;
+    }
+
+    private void lockNamespaces(Long sourceId, Long targetId) {
+        namespaceLock.lock(Math.min(sourceId, targetId));
+        if (!sourceId.equals(targetId)) namespaceLock.lock(Math.max(sourceId, targetId));
     }
 
     private SkillVersion version(Skill skill, Long versionId) {

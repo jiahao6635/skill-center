@@ -802,7 +802,10 @@ export function SkillDetailPage() {
             )}
           </div>
           <h1 className="text-balance text-4xl font-bold font-heading text-foreground">{skill.displayName}</h1>
-          {skill.ownerId === user?.userId && skill.status !== 'ARCHIVED' && <SkillSharingButton skillId={skill.id} shared={skill.visibility !== 'PRIVATE'} />}
+          {skill.ownerId === user?.userId && skill.status !== 'ARCHIVED' && <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => navigate({ to: '/dashboard/publish', search: { skillId: skill.id } })}>{t('sharing.update')}</Button>
+            <SkillSharingButton skillId={skill.id} />
+          </div>}
           {skill.ownerDisplayName && (
             <div className="flex min-w-0">
               <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1.5 text-sm text-muted-foreground shadow-sm backdrop-blur-sm">
@@ -1016,9 +1019,7 @@ export function SkillDetailPage() {
                               {t('skillDetail.confirmPublish')}
                             </Button>
                           )}
-                          {skill.ownerId === user?.userId && (skill.visibility === 'PRIVATE' || version.distributionVisibility === 'PRIVATE') && ['UPLOADED', 'PUBLISHED', 'DRAFT'].includes(version.status) && (
-                            <SkillSharingButton skillId={skill.id} initialVersionId={version.id} shared={skill.visibility !== 'PRIVATE'} />
-                          )}
+
                         </div>
                       </div>
                       {version.changelog && (

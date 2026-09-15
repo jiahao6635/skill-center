@@ -74,13 +74,13 @@ public class SkillPublishController extends BaseApiController {
         return ok("response.success.published", response);
     }
 
-    @PostMapping("/by-id/{skillId}/private-versions")
+    @PostMapping("/by-id/{skillId}/versions")
     @RateLimit(category = "publish", authenticated = 10, anonymous = 0)
-    @Operation(tags = "skill-private-version-controller")
-    public ApiResponse<PublishResponse> save(@PathVariable Long skillId, @RequestParam("file") MultipartFile file,
+    @Operation(tags = "skill-update-controller")
+    public ApiResponse<PublishResponse> update(@PathVariable Long skillId, @RequestParam("file") MultipartFile file,
             @RequestParam(value = "confirmWarnings", defaultValue = "false") boolean confirmWarnings,
             @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
-        var result = skillPublishService.savePrivateVersion(skillId, extractEntries(file, confirmWarnings),
+        var result = skillPublishService.updateVersion(skillId, extractEntries(file, confirmWarnings),
                 principal.userId(), principal.platformRoles(), confirmWarnings);
         return ok("response.success.updated", toResponse(result));
     }

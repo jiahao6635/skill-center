@@ -46,20 +46,22 @@ export function PublishPage() {
   const search = useSearch({ from: '/dashboard/publish' })
   const pinnedSkillId = search.skillId
   const sharingSettings = useSharingSettings(pinnedSkillId ?? 0, !!pinnedSkillId)
-  const prefill = normalizePublishPrefill(pinnedSkillId ? { ...search, visibility: 'PRIVATE' } : search)
+  const prefill = normalizePublishPrefill(search)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<FileErrorState | null>(null)
   const [uploadZoneNonce, setUploadZoneNonce] = useState(0)
-  const [namespaceSlug, setNamespaceSlug] = useState<string>(
+  const [selectedNamespaceSlug, setNamespaceSlug] = useState<string>(
     prefill.visibility === 'PRIVATE' ? PRIVATE_NAMESPACE_SLUG : prefill.namespace
   )
-  const [visibility, setVisibility] = useState<string>(prefill.visibility)
+  const [selectedVisibility, setVisibility] = useState<string>(prefill.visibility)
   const [warningDialogOpen, setWarningDialogOpen] = useState(false)
   const [precheckWarnings, setPrecheckWarnings] = useState<string[]>([])
   const previousNamespaceRef = useRef<string>(prefill.namespace)
 
   const { data: namespaces, isLoading: isLoadingNamespaces } = useMyNamespaces()
   const publishMutation = usePublishSkill()
+  const namespaceSlug = pinnedSkillId ? sharingSettings.data?.namespace ?? '' : selectedNamespaceSlug
+  const visibility = pinnedSkillId ? sharingSettings.data?.visibility ?? '' : selectedVisibility
   const isPrivate = visibility === 'PRIVATE'
   const selectedNamespace = namespaces?.find((ns) => ns.slug === namespaceSlug)
   const namespaceOnlyLabel = selectedNamespace?.type === 'GLOBAL'
@@ -164,7 +166,7 @@ export function PublishPage() {
           t('publish.publishedDescription', { skill: skillLabel })
         )
       } else if (isPrivate) {
-        toast.success(t('sharing.privateSaved'), t('sharing.privateSavedHelp'))
+        toast.success(t('sharing.privateSaved'), t('sharing.privateHelp'))
       } else {
         toast.success(
           t('publish.pendingReviewTitle'),
@@ -229,7 +231,7 @@ export function PublishPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-up">
-      <DashboardPageHeader title={t(pinnedSkillId ? 'sharing.savePrivate' : 'publish.title')} subtitle={t(pinnedSkillId ? 'sharing.privateUploadHelp' : 'publish.subtitle')} />
+      <DashboardPageHeader title={t(pinnedSkillId ? 'sharing.update' : 'publish.title')} subtitle={t(pinnedSkillId ? 'sharing.updateHelp' : 'publish.subtitle')} />
 
       <Card className="p-4 bg-blue-500/5 border-blue-500/20">
         <div className="flex items-start gap-3">
@@ -238,14 +240,15 @@ export function PublishPage() {
           </svg>
           <div className="flex-1">
             <h3 className="text-sm font-semibold text-foreground mb-1">{t('publish.reviewNotice.title')}</h3>
-            <p className="text-sm text-muted-foreground">{t(isPrivate ? 'sharing.privateUploadHelp' : 'publish.reviewNotice.description')}</p>
+            <p className="text-sm text-muted-foreground">{t(isPrivate ? 'sharing.privateHelp' : 'publish.reviewNotice.description')}</p>
           </div>
         </div>
       </Card>
 
       <Card className="p-8 space-y-8">
         {pinnedSkillId && <div className="space-y-2">
-          <p className="font-medium">{sharingSettings.data?.slug}</p>
+          <p className="font-medium">@{namespaceSlug}/{sharingSettings.data?.slug}</p>
+          <p className="text-sm text-muted-foreground">{t('sharing.updateHelp')}</p>
           {sharingSettings.isError && <p role="alert" className="text-sm text-destructive">{sharingSettings.error.message}</p>}
         </div>}
         {!pinnedSkillId && <div className="space-y-3">
@@ -356,7 +359,7 @@ export function PublishPage() {
           onClick={handlePublish}
           disabled={!selectedFile || !namespaceSlug || publishMutation.isPending || (!!pinnedSkillId && !sharingSettings.data)}
         >
-          {publishMutation.isPending ? t('publish.publishing') : t(isPrivate ? 'sharing.savePrivate' : 'publish.confirm')}
+          {publishMutation.isPending ? t('publish.publishing') : t(pinnedSkillId ? 'sharing.update' : 'publish.confirm')}
         </Button>
       </Card>
 

@@ -676,6 +676,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/web/skills/by-id/{skillId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["update"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/skills/by-id/{skillId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["update_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/web/skills/by-id/{skillId}/sharing/{requestId}/withdraw": {
         parameters: {
             query?: never;
@@ -766,38 +798,6 @@ export interface paths {
         get: operations["settings_1"];
         put?: never;
         post: operations["submit_1"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/skills/by-id/{skillId}/private-versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["save"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/web/skills/by-id/{skillId}/private-versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["save_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3974,13 +3974,8 @@ export interface components {
         };
         SkillShareCommand: {
             /** Format: int64 */
-            versionId: number;
-            /** Format: int64 */
             targetNamespaceId: number;
-            /** @enum {string} */
-            targetVisibility: "PUBLIC" | "NAMESPACE_ONLY" | "PRIVATE";
             idempotencyKey: string;
-            confirmPublic?: boolean;
             confirmWarnings?: boolean;
         };
         ApiResponseSkillSharePrecheckResponse: {
@@ -7193,6 +7188,68 @@ export interface operations {
             };
         };
     };
+    update: {
+        parameters: {
+            query?: {
+                confirmWarnings?: boolean;
+            };
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
+                };
+            };
+        };
+    };
+    update_1: {
+        parameters: {
+            query?: {
+                confirmWarnings?: boolean;
+            };
+            header?: never;
+            path: {
+                skillId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
+                };
+            };
+        };
+    };
     withdraw: {
         parameters: {
             query?: never;
@@ -7383,68 +7440,6 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApiResponseSkillShareResponse"];
-                };
-            };
-        };
-    };
-    save: {
-        parameters: {
-            query?: {
-                confirmWarnings?: boolean;
-            };
-            header?: never;
-            path: {
-                skillId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** Format: binary */
-                    file: string;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
-                };
-            };
-        };
-    };
-    save_1: {
-        parameters: {
-            query?: {
-                confirmWarnings?: boolean;
-            };
-            header?: never;
-            path: {
-                skillId: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": {
-                    /** Format: binary */
-                    file: string;
-                };
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["ApiResponsePublishResponse"];
                 };
             };
         };
