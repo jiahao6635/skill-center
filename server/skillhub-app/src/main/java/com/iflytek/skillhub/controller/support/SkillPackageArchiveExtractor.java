@@ -8,6 +8,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -38,12 +41,20 @@ public class SkillPackageArchiveExtractor {
             );
         }
 
+        try {
+            return extract(file, StandardCharsets.UTF_8);
+        } catch (CharacterCodingException ex) {
+            return extract(file, ZipFilenameEncoding.GBK);
+        }
+    }
+
+    private List<PackageEntry> extract(MultipartFile file, Charset filenameCharset) throws IOException {
         List<PackageEntry> entries = new ArrayList<>();
         long totalSize = 0;
 
-        try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
+        try (ZipInputStream zis = new ZipInputStream(file.getInputStream(), filenameCharset)) {
             ZipEntry zipEntry;
-            while ((zipEntry = zis.getNextEntry()) != null) {
+            while ((zipEntry = ZipFilenameEncoding.nextEntry(zis, filenameCharset)) != null) {
                 if (zipEntry.isDirectory()) {
                     zis.closeEntry();
                     continue;

@@ -5,7 +5,6 @@ import com.iflytek.skillhub.controller.BaseApiController;
 import com.iflytek.skillhub.controller.support.SkillPackageArchiveExtractor;
 import com.iflytek.skillhub.domain.shared.exception.DomainBadRequestException;
 import com.iflytek.skillhub.domain.skill.SkillVisibility;
-import com.iflytek.skillhub.domain.skill.validation.PackageEntry;
 import com.iflytek.skillhub.dto.ApiResponse;
 import com.iflytek.skillhub.dto.ApiResponseFactory;
 import com.iflytek.skillhub.dto.cli.*;
@@ -22,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -102,9 +102,9 @@ public class CliSkillController extends BaseApiController {
             @RequestPart("file") MultipartFile file,
             @RequestPart(value = "visibility", required = false) String visibility,
             @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
-        List<PackageEntry> entries;
+        SkillPackageArchiveExtractor.ExtractionResult extracted;
         try {
-            entries = archiveExtractor.extract(file);
+            extracted = archiveExtractor.extractWithWarnings(file);
         } catch (IllegalArgumentException e) {
             throw new DomainBadRequestException("error.skill.publish.package.invalid", e.getMessage());
         }
@@ -115,8 +115,12 @@ public class CliSkillController extends BaseApiController {
             throw new DomainBadRequestException("error.skill.publish.visibility.invalid", visibility);
         }
         var result = cliSkillAppService.validatePublish(
-                namespace, entries, principal.userId(), resolvedVisibility, principal.platformRoles());
-        return ok("response.success.read", result);
+                namespace, extracted.entries(), principal.userId(), resolvedVisibility, principal.platformRoles());
+        var warnings = new ArrayList<>(extracted.warnings());
+        warnings.addAll(result.warnings());
+        return ok("response.success.read", new CliDryRunResponse(
+                result.valid() && warnings.isEmpty(), result.errors(), warnings,
+                result.resolvedSlug(), result.resolvedVersion()));
     }
 
     @PostMapping(value = "/{namespace}/publish", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -126,14 +130,17 @@ public class CliSkillController extends BaseApiController {
             @RequestPart("file") MultipartFile file,
             @RequestPart(value = "visibility", required = false) String visibility,
             @AuthenticationPrincipal PlatformPrincipal principal) throws IOException {
-        List<PackageEntry> entries;
+        SkillPackageArchiveExtractor.ExtractionResult extracted;
         try {
-            entries = archiveExtractor.extract(file);
+            extracted = archiveExtractor.extractWithWarnings(file);
         } catch (IllegalArgumentException e) {
             throw new DomainBadRequestException("error.skill.publish.package.invalid", e.getMessage());
         }
+        if (!extracted.warnings().isEmpty()) {
+            throw new DomainBadRequestException("error.skill.publish.precheck.confirmRequired", String.join("\n", extracted.warnings()));
+        }
         var result = cliSkillAppService.publish(
-                namespace, entries, principal.userId(),
+                namespace, extracted.entries(), principal.userId(),
                 SkillVisibility.valueOf((visibility != null ? visibility : "PUBLIC").toUpperCase()),
                 principal.platformRoles());
         return ok("response.success.published", result);

@@ -9,6 +9,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -33,13 +36,21 @@ public class ZipPackageExtractor {
     }
 
     public List<PackageEntry> extract(MultipartFile file) throws IOException {
+        try {
+            return extract(file, StandardCharsets.UTF_8);
+        } catch (CharacterCodingException ex) {
+            return extract(file, ZipFilenameEncoding.GBK);
+        }
+    }
+
+    private List<PackageEntry> extract(MultipartFile file, Charset filenameCharset) throws IOException {
         List<PackageEntry> entries = new ArrayList<>();
         Set<String> seenPaths = new HashSet<>();
         long totalSize = 0L;
 
-        try (ZipInputStream zis = new ZipInputStream(file.getInputStream())) {
+        try (ZipInputStream zis = new ZipInputStream(file.getInputStream(), filenameCharset)) {
             ZipEntry zipEntry;
-            while ((zipEntry = zis.getNextEntry()) != null) {
+            while ((zipEntry = ZipFilenameEncoding.nextEntry(zis, filenameCharset)) != null) {
                 if (zipEntry.isDirectory()) {
                     zis.closeEntry();
                     continue;

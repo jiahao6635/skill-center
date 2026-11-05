@@ -17,13 +17,21 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -87,6 +95,60 @@ class CliDryRunValidateTest {
                 .andExpect(jsonPath("$.data.valid").value(false))
                 .andExpect(jsonPath("$.data.errors[0]").value("Missing required file: SKILL.md at root"))
                 .andExpect(jsonPath("$.data.resolvedSlug").doesNotExist());
+    }
+
+    @Test
+    void validatePublish_promotesNestedSkillAndIncludesExtractionWarnings() throws Exception {
+        givenValidPublishToken();
+        given(cliSkillAppService.validatePublish(
+                eq("global"), any(), eq("user-1"), eq(SkillVisibility.PUBLIC), eq(Set.of("USER"))))
+                .willReturn(new CliDryRunResponse(true, List.of(), List.of(), "my-skill", "1.0.0"),
+                        new CliDryRunResponse(false, List.of(), List.of("validation warning"), "my-skill", "1.0.0"));
+
+        mockMvc.perform(multipart("/api/cli/v1/skills/global/publish/validate")
+                        .file(nestedSkillZip())
+                        .header("Authorization", "Bearer test-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.valid").value(false))
+                .andExpect(jsonPath("$.data.resolvedSlug").value("my-skill"))
+                .andExpect(jsonPath("$.data.warnings[0]").value("Ignored file outside skill directory: stray.txt"));
+
+        mockMvc.perform(multipart("/api/cli/v1/skills/global/publish/validate")
+                        .file(nestedSkillZip())
+                        .header("Authorization", "Bearer test-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.valid").value(false))
+                .andExpect(jsonPath("$.data.warnings[0]").value("Ignored file outside skill directory: stray.txt"))
+                .andExpect(jsonPath("$.data.warnings[1]").value("validation warning"));
+
+        verify(cliSkillAppService, times(2)).validatePublish(eq("global"),
+                argThat(entries -> entries.size() == 1 && entries.getFirst().path().equals("SKILL.md")),
+                eq("user-1"), eq(SkillVisibility.PUBLIC), eq(Set.of("USER")));
+    }
+
+    @Test
+    void legacyPublish_rejectsUnconfirmedExtractionWarnings() throws Exception {
+        givenValidPublishToken();
+        mockMvc.perform(multipart("/api/cli/v1/skills/global/publish")
+                        .file(nestedSkillZip())
+                        .header("Authorization", "Bearer test-token"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.msg").value(org.hamcrest.Matchers.containsString("stray.txt")));
+
+        verify(cliSkillAppService, never()).publish(any(), any(), any(), any(), any());
+    }
+
+    private MockMultipartFile nestedSkillZip() throws Exception {
+        var output = new ByteArrayOutputStream();
+        try (var zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
+            zip.putNextEntry(new ZipEntry("my-skill/SKILL.md"));
+            zip.write("---\nname: my-skill\ndescription: test\n---\n".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("stray.txt"));
+            zip.write("ignored".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        return new MockMultipartFile("file", "skill.zip", "application/zip", output.toByteArray());
     }
 
     @Test
