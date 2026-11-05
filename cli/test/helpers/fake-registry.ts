@@ -381,7 +381,7 @@ export async function startFakeRegistry(options: FakeRegistryOptions = {}) {
       }
 
       // Publish: POST /api/cli/v1/skills/:namespace/publish
-      const publishMatch = path.match(/^\/api\/cli\/v1\/skills\/([^/]+)\/publish$/)
+      const publishMatch = path.match(/^\/api\/v1\/skills\/([^/]+)\/publish$/)
       if (publishMatch && req.method === 'POST') {
         if (options.failures?.publish) return failureResponse(options.failures.publish)
         const authErr = checkAuth(req)
@@ -408,6 +408,8 @@ export async function startFakeRegistry(options: FakeRegistryOptions = {}) {
               namespace,
               slug: fileName.replace(/\.zip$/, ''),
               version: '1.0.0',
+              skillId: 42,
+              status: 'SCANNING',
               visibility
             }
           })

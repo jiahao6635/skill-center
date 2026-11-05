@@ -7,6 +7,7 @@ import { resolveRegistry, resolveToken } from '../services/registry-service'
 import { CliError } from '../shared/errors'
 import { EXIT } from '../shared/constants'
 import { createZip, isZipFile } from '../platform/archive'
+import { requireId } from './manage'
 
 export interface PublishCommandOptions {
   namespace?: string
@@ -15,9 +16,17 @@ export interface PublishCommandOptions {
   token?: string
   json?: boolean
   dryRun?: boolean
+  skillId?: string
+  confirmWarnings?: boolean
 }
 
 export async function publishCommand(path: string, options: PublishCommandOptions): Promise<string> {
+  if (options.skillId) {
+    requireId(options.skillId)
+    if (options.namespace || options.visibility || options.dryRun) {
+      throw new CliError('update preserves namespace and visibility; use move to change namespace', EXIT.usage)
+    }
+  }
   // Validate local path
   let pathStat
   try {
@@ -32,9 +41,12 @@ export async function publishCommand(path: string, options: PublishCommandOption
   const token = resolveToken(options, process.env, await credentialsStore.getToken(registry))
   const namespace = options.namespace ?? 'global'
   const visibility = options.visibility ?? 'public'
+  if (!['public', 'namespace-only', 'private'].includes(visibility)) {
+    throw new CliError('--visibility must be public, namespace-only, or private', EXIT.usage)
+  }
 
   if (!token) {
-    throw new CliError('authentication required for publish', EXIT.auth, { next: 'run `skillhub login`' })
+    throw new CliError('authentication required for publish', EXIT.auth, { next: 'run `skill-center login`' })
   }
 
   // Create or read archive
@@ -99,9 +111,14 @@ export async function publishCommand(path: string, options: PublishCommandOption
     return lines.join('\n')
   }
 
-  const result = await client.publish(namespace, archiveBlob, toServerVisibility(visibility), archiveName)
+  const result = options.skillId
+    ? await client.updateVersion(options.skillId, archiveBlob, archiveName, options.confirmWarnings)
+    : await client.publish(namespace, archiveBlob, toServerVisibility(visibility), archiveName, options.confirmWarnings)
+  if (!Number.isSafeInteger(result.skillId) || !result.namespace || !result.slug || !result.version || !result.status) {
+    throw new CliError('invalid publish response; check the skill status before retrying', EXIT.network)
+  }
 
-  const detailUrl = `${registry}/space/${result.namespace}/${encodeURIComponent(result.slug)}`
+  const detailUrl = `${registry}/skills/by-id/${result.skillId}`
 
   if (options.json) {
     return JSON.stringify({
@@ -109,11 +126,12 @@ export async function publishCommand(path: string, options: PublishCommandOption
       namespace: result.namespace,
       slug: result.slug,
       version: result.version,
-      visibility: result.visibility.toLowerCase(),
+      skillId: result.skillId,
+      status: result.status,
       detailUrl
     })
   }
-  return `Published successfully: ${result.namespace}/${result.slug}@${result.version}\nDetail: ${detailUrl}`
+  return `Uploaded: @${result.namespace}/${result.slug}@${result.version}\nStatus: ${result.status}\nSkill ID: ${result.skillId}\nDetail: ${detailUrl}`
 }
 
 /**

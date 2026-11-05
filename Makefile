@@ -1,4 +1,4 @@
-.PHONY: build build-backend build-backend-app build-cli build-frontend build-web check clean cli-install db-reset dev dev-all dev-all-down dev-all-reset dev-down dev-logs dev-server dev-server-restart dev-status dev-web docs-build docs-dev docs-preview generate-api help lint-cli lint-web namespace-smoke parallel-down parallel-init parallel-sync parallel-up pr publish-cli publish-cli-major publish-cli-minor staging staging-down staging-logs test test-backend test-backend-app test-cli test-e2e-frontend test-e2e-smoke-frontend test-frontend test-web typecheck-cli typecheck-web validate-release-config web-deps web-install web-install-ci
+.PHONY: build build-backend build-backend-app build-cli build-frontend build-web check clean cli-install db-reset dev dev-all dev-all-down dev-all-reset dev-down dev-logs dev-server dev-server-restart dev-status dev-web docs-build docs-dev docs-preview generate-api help lint-cli lint-web namespace-smoke parallel-down parallel-init parallel-sync parallel-up pr pack-cli publish-cli publish-cli-major publish-cli-minor staging staging-down staging-logs test test-backend test-backend-app test-cli test-e2e-frontend test-e2e-smoke-frontend test-frontend test-web typecheck-cli typecheck-web validate-release-config web-deps web-install web-install-ci
 
 DEV_DIR := .dev
 DEV_SERVER_PID := $(DEV_DIR)/server.pid
@@ -279,14 +279,19 @@ lint-cli: ## CLI 代码检查
 typecheck-cli: ## CLI 类型检查
 	cd cli && bun run typecheck
 
-publish-cli: ## 发布 CLI（patch 版本）- 本地 build+test → 推 release 分支 → 开 PR，合并后手动 tag 触发 CI
-	./scripts/publish-cli.sh patch
+pack-cli: ## 检查 CLI 并生成本地 npm 包（不发布）
+	./scripts/publish-cli.sh --dry-run
 
-publish-cli-minor: ## 发布 CLI（minor 版本）- 本地 build+test → 推 release 分支 → 开 PR，合并后手动 tag 触发 CI
-	./scripts/publish-cli.sh minor
+publish-cli: ## 检查并发布 @jiahao6635/skill-center 到 npm
+	./scripts/publish-cli.sh --publish
 
-publish-cli-major: ## 发布 CLI（major 版本）- 本地 build+test → 推 release 分支 → 开 PR，合并后手动 tag 触发 CI
-	./scripts/publish-cli.sh major
+publish-cli-minor: ## 提升 CLI minor 版本并发布 npm
+	cd cli && npm version minor --no-git-tag-version
+	./scripts/publish-cli.sh --publish
+
+publish-cli-major: ## 提升 CLI major 版本并发布 npm
+	cd cli && npm version major --no-git-tag-version
+	./scripts/publish-cli.sh --publish
 
 db-reset: ## 重置数据库
 	$(DEV_COMPOSE) down -v --remove-orphans

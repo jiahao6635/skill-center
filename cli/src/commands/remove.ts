@@ -64,6 +64,7 @@ export async function removeCommand(skillNameArg: string, options: RemoveCommand
   // Local remove
   const result = await removeLocalSkill({
     registry, slug,
+    namespace: options.namespace ?? (skillNameArg.includes('/') || skillNameArg.includes('--') ? namespace : undefined),
     agents: options.agent,
     all: options.all
   })

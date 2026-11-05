@@ -16,6 +16,7 @@ function isPathUnder(child: string, parent: string): boolean {
 export interface RemoveLocalOptions {
   registry: string
   slug: string
+  namespace?: string | undefined
   agents?: string[] | undefined
   all?: boolean | undefined
   home?: string | undefined
@@ -29,10 +30,11 @@ export async function removeLocalSkill(options: RemoveLocalOptions): Promise<Rem
   const store = new InventoryStore(options.home)
   const inventory = await store.read()
 
-  const items = inventory.items.filter(i => i.registry === options.registry && i.slug === options.slug)
+  const items = inventory.items.filter(i => i.registry === options.registry && i.slug === options.slug
+    && (options.namespace === undefined || i.namespace === options.namespace))
   if (items.length === 0) {
     throw new CliError(`skill not found locally: ${options.slug}`, EXIT.generic, {
-      next: 'run `skillhub list` to see installed skills'
+      next: 'run `skill-center list` to see installed skills'
     })
   }
 
@@ -53,7 +55,7 @@ export async function removeLocalSkill(options: RemoveLocalOptions): Promise<Rem
     if (!target.rootDir || !isPathUnder(target.installDir, target.rootDir)) {
       throw new CliError(`unsafe remove path: ${target.installDir} is not under ${target.rootDir ?? 'unknown root'}`, EXIT.filesystem, {
         path: target.installDir,
-        next: 'verify inventory integrity with `skillhub doctor`'
+        next: 'verify inventory integrity with `skill-center doctor`'
       })
     }
 

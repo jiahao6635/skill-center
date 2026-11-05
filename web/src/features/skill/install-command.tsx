@@ -41,7 +41,7 @@ export function buildAgentPrompt(namespace: string, slug: string, baseUrl: strin
 
 export function buildSkillhubInstallCommand(namespace: string, slug: string, baseUrl: string): string {
   const namespaceArg = namespace === 'global' ? '' : ` --namespace ${namespace}`
-  return `npx @astron-team/skillhub@latest install ${slug}${namespaceArg} --registry ${baseUrl}`
+  return `npx @jiahao6635/skill-center@latest install ${slug}${namespaceArg} --registry ${baseUrl}`
 }
 
 interface CommandBlockProps {

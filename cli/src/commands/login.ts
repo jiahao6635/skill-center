@@ -44,12 +44,7 @@ async function loginWithBrowser(
     codeResponse.userCode
   )
 
-  if (!json) {
-    console.log(`\nPlease open the following URL in your browser to authorize:`)
-    console.log(`\n  ${verificationUrl}\n`)
-    console.log(`Your verification code: ${codeResponse.userCode}`)
-    console.log(`\nWaiting for authorization...`)
-  }
+  process.stderr.write(`Open ${verificationUrl}\nVerification code: ${codeResponse.userCode}\nWaiting for authorization...\n`)
 
   // Step 2: Try to open browser automatically
   deviceAuth.openBrowser(verificationUrl)

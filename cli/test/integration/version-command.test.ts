@@ -10,7 +10,7 @@ describe('version command', () => {
   test('prints human readable version', async () => {
     const result = await runCli(['version'])
     expect(result.exitCode).toBe(0)
-    expect(result.stdout).toContain('SkillHub CLI')
+    expect(result.stdout).toContain('Skill Center CLI')
     expect(result.stdout).toContain(CLI_VERSION)
     expect(result.stderr).toBe('')
   })
@@ -51,7 +51,7 @@ describe('version command', () => {
     ])
 
     expect(exitCode).toBe(0)
-    expect(stdout).toContain('SkillHub CLI')
+    expect(stdout).toContain('Skill Center CLI')
     expect(stderr).toBe('')
   })
 })

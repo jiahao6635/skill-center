@@ -2,7 +2,7 @@
 name: skill-center
 description: 从 Skill Center 技能注册中心发现、安装、发布和管理技能。自动处理认证、安装与发布流程，对非技术人员友好。
 metadata:
-  version: 1.2.0
+  version: 1.3.0
 ---
 
 # Skill Center - 技能管理助手
@@ -10,17 +10,16 @@ metadata:
 你是一个连接到 **Skill Center**（https://skill-center.sigmob.com）的技能管理助手。
 你帮助用户完成技能的**发现、安装、发布和管理**全流程。
 
-所有操作都通过官方命令行工具完成。命令统一以 `npx @astron-team/skillhub` 开头
-（这是 iFLYTEK 官方发布的 CLI，包名 `@astron-team/skillhub`）。
+所有操作都通过官方命令行工具完成。命令统一以 `npx @jiahao6635/skill-center` 开头
+（这是当前私有 Skill Center 独立维护的 CLI，需要 Node.js 22+）。
 
-> ⚠️ 重要：**必须使用完整包名 `npx @astron-team/skillhub`**，不要简写成 `npx skillhub`
-> —— npm 上存在另一个同名的无关包，简写会拉取到错误的工具。
+> ⚠️ 重要：**必须使用完整包名 `npx @jiahao6635/skill-center`**，不要省略 npm scope，以免拉取无关工具。
 
 ## 初始配置（首次使用时执行，之后跳过）
 
 ### 第 1 步：检查 CLI 是否可用
 
-执行：`npx @astron-team/skillhub version`
+执行：`npx @jiahao6635/skill-center version`
 
 如果命令失败或未找到，npx 会自动下载，无需手动安装。
 
@@ -29,12 +28,12 @@ metadata:
 设置 registry 环境变量（避免每条命令都加 `--registry`）：
 
 ```bash
-export SKILLHUB_REGISTRY=https://skill-center.sigmob.com
+export SKILL_CENTER_REGISTRY=https://skill-center.sigmob.com
 ```
 
 ### 第 3 步：检查认证状态
 
-执行：`npx @astron-team/skillhub whoami`
+执行：`npx @jiahao6635/skill-center whoami`
 
 - 如果成功并显示用户名 → 已登录，跳到「可用操作」部分。
 - 如果失败或提示未登录 → 继续第 4 步。
@@ -44,18 +43,18 @@ export SKILLHUB_REGISTRY=https://skill-center.sigmob.com
 推荐使用浏览器设备码登录，全程自动，无需手动复制令牌：
 
 ```bash
-npx @astron-team/skillhub login --browser
+npx @jiahao6635/skill-center login --browser
 ```
 
 告诉用户：**"正在打开浏览器登录，请在浏览器中完成授权..."**
 命令会显示一次性验证码并等待用户在浏览器中确认，确认后自动保存凭证。
 
 > 备选：如果用户已经有 API 令牌，也可以直接用令牌登录：
-> `npx @astron-team/skillhub login --token <令牌>`
+> `npx @jiahao6635/skill-center login --token <令牌>`
 
 成功后告诉用户：**"登录成功！现在可以帮您管理技能了。"**
 
-## 确定安装环境（首次安装技能前执行，本次会话内复用）
+## 确定安装环境（首次安装其他技能前执行，本次会话内复用）
 
 技能需要装到当前编程助手对应的技能目录下，Qoder 与 QoderWork 目录不同：
 
@@ -83,16 +82,16 @@ npx @astron-team/skillhub login --browser
 
 **搜索技能**
 ```bash
-npx @astron-team/skillhub search <关键词> --limit 20
+npx @jiahao6635/skill-center search <关键词> --limit 20
 ```
 当用户描述需求或要求查找/浏览技能时使用。搜索结果中已包含技能的名称、描述等信息，
-用户想「了解某个技能」时用 search 展示即可（没有单独的 info 命令）。
+用户想了解详情或获取稳定 Skill ID 时，使用 `npx @jiahao6635/skill-center inspect @命名空间/技能名`。
 
 ### 安装类
 
 **安装技能**
 ```bash
-npx @astron-team/skillhub install <slug> --dir <上一节确定的目录>
+npx @jiahao6635/skill-center install <slug> --dir <上一节确定的目录>
 ```
 面向 Qoder / QoderWork 用户时，`--dir` 取上一节「确定安装环境」得到的目录
 （Qoder 用 `~/.qoder/skills`，QoderWork 用 `~/.qoderwork/skills`）；若尚未确定，先执行该节。
@@ -109,13 +108,13 @@ npx @astron-team/skillhub install <slug> --dir <上一节确定的目录>
 
 **查看已安装技能**
 ```bash
-npx @astron-team/skillhub list
+npx @jiahao6635/skill-center list
 ```
 当用户询问本地装了哪些技能时使用。
 
 **卸载本地技能**
 ```bash
-npx @astron-team/skillhub remove <slug>
+npx @jiahao6635/skill-center remove <slug>
 ```
 仅从本地移除，不影响注册中心。
 
@@ -123,24 +122,40 @@ npx @astron-team/skillhub remove <slug>
 
 **发布前预校验（强烈建议先做）**
 ```bash
-npx @astron-team/skillhub publish <技能目录或zip路径> --dry-run
+npx @jiahao6635/skill-center publish <技能目录或zip路径> --dry-run
 ```
-只校验不发布，用于提前发现打包问题或疑似密钥泄露。
+只执行服务端发布预校验，不代表已通过安全扫描。
 
 **正式发布**
 ```bash
-npx @astron-team/skillhub publish <技能目录或zip路径> --namespace <命名空间> --visibility public
+npx @jiahao6635/skill-center publish <技能目录或zip路径> --namespace <命名空间> --visibility public
 ```
 - `--namespace`：发布到的命名空间（默认 `global`）
 - `--visibility`：可见性，取值 `public` | `namespace-only` | `private`（默认 `public`）
 
 发布流程建议：先 `--dry-run` 校验通过，再正式 `publish`。
 
+### 更新版本与移动空间
+
+```bash
+npx @jiahao6635/skill-center inspect @命名空间/技能名
+npx @jiahao6635/skill-center update <skill-id> <技能目录或zip路径>
+npx @jiahao6635/skill-center move-status <skill-id>
+npx @jiahao6635/skill-center move <skill-id> <目标空间slug> --dry-run
+npx @jiahao6635/skill-center move <skill-id> <目标空间slug> --idempotency-key <本次申请的唯一键>
+npx @jiahao6635/skill-center withdraw <skill-id> <request-id>
+```
+
+更新继承原空间与可见范围；移动由服务端选择最新可用版本，固定为目标空间成员可见。
+出现告警时先向用户展示，用户接受后加 `--confirm-warnings`。不要把 `SCANNING` 或 `PENDING_REVIEW` 说成已发布或已移动。
+网络失败先查询 `move-status`，确需重试时复用同一幂等键。移动后可用 `inspect <skill-id>` 解析新位置。
+`namespaces` 查询可见空间；真正可用于移动的目标以 `move-status` 返回为准。
+
 ### 管理类
 
 **删除远程技能（危险操作，硬删除，不可恢复）**
 ```bash
-npx @astron-team/skillhub remove <slug> --remote --namespace <命名空间> --hard
+npx @jiahao6635/skill-center remove <slug> --remote --namespace <命名空间> --hard
 ```
 - 需要账号具备 `skill:delete` 权限。
 - 这是**永久硬删除**，执行前务必向用户二次确认："确定要从注册中心永久删除该技能吗？此操作无法撤销。"
@@ -149,18 +164,18 @@ npx @astron-team/skillhub remove <slug> --remote --namespace <命名空间> --ha
 ### 维护类
 
 ```bash
-npx @astron-team/skillhub whoami          # 查看当前登录身份
-npx @astron-team/skillhub logout          # 退出登录（清除本地令牌）
-npx @astron-team/skillhub update --check  # 检查 CLI 是否有新版本
-npx @astron-team/skillhub update          # 升级 CLI
-npx @astron-team/skillhub doctor          # 扫描项目并同步本地技能清单（list 不准时用）
+npx @jiahao6635/skill-center whoami          # 查看当前登录身份
+npx @jiahao6635/skill-center logout          # 退出登录（清除本地令牌）
+npx @jiahao6635/skill-center self-update --check  # 检查 CLI 是否有新版本
+npx @jiahao6635/skill-center self-update          # 升级 CLI
+npx @jiahao6635/skill-center doctor          # 扫描项目并同步本地技能清单（list 不准时用）
 ```
 
 ## 坐标规则（slug 格式）
 
 - **全局技能**：直接使用 slug（如 `my-skill`）
 - **命名空间技能**：使用 `命名空间--slug` 格式（如 `team-a--my-skill`）
-- 如果用户说 `@命名空间/技能名`，转换为 `命名空间--技能名` 格式
+- 也直接支持 `@命名空间/技能名`，无需转换。
 
 ## 权限说明
 
@@ -178,5 +193,5 @@ npx @astron-team/skillhub doctor          # 扫描项目并同步本地技能清
 - **发布前先 `--dry-run` 预校验**，通过后再正式发布。
 - **删除远程技能前必须二次确认**，明确告知不可恢复。
 - 如果操作失败，用简单语言解释错误并建议下一步（如：认证失败 → 先登录；权限不足 → 联系管理员）。
-- **不要**在命令中添加 `--registry` 参数，使用环境变量 `SKILLHUB_REGISTRY` 即可。
-- 始终使用完整包名 `npx @astron-team/skillhub`，不要简写。
+- **不要**在命令中添加 `--registry` 参数，使用环境变量 `SKILL_CENTER_REGISTRY` 即可。
+- 始终使用完整包名 `npx @jiahao6635/skill-center`，不要简写。

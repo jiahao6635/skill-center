@@ -183,8 +183,8 @@
         "cli": "CLI"
       },
       "cli": {
-        "description": "Install the Skill Center CLI locally to run skillhub install for skills.",
-        "command": "npm i -g @astron-team/skillhub"
+        "description": "Install the Skill Center CLI locally to run skill-center install for skills.",
+        "command": "npm i -g @jiahao6635/skill-center"
       },
       "agent": {
         "description": "Copy the prompt below and send it to your AI assistant. It will handle installation and setup automatically.",

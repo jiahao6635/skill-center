@@ -8,7 +8,7 @@ describe('registry-service', () => {
     expect(resolveRegistry({}, { SKILLHUB_REGISTRY: 'https://env.example.com' }, { registry: 'https://config.example.com' }))
       .toBe('https://env.example.com')
     expect(resolveRegistry({}, {}, { registry: 'https://config.example.com' })).toBe('https://config.example.com')
-    expect(resolveRegistry({}, {}, {})).toBe('https://skill.xfyun.cn')
+    expect(resolveRegistry({}, {}, {})).toBe('https://skill-center.sigmob.com')
   })
 
   test('resolves token by cli arg, env, credentials order', () => {
@@ -16,4 +16,11 @@ describe('registry-service', () => {
     expect(resolveToken({}, { SKILLHUB_TOKEN: 'env' }, 'stored')).toBe('env')
     expect(resolveToken({}, {}, 'stored')).toBe('stored')
   })
+})
+
+test('new environment names win and registry URLs cannot contain credentials', () => {
+  expect(resolveRegistry({}, { SKILL_CENTER_REGISTRY: 'https://center.test', SKILLHUB_REGISTRY: 'https://old.test' }, {})).toBe('https://center.test')
+  expect(resolveToken({}, { SKILL_CENTER_TOKEN: 'new', SKILLHUB_TOKEN: 'old' })).toBe('new')
+  expect(() => resolveRegistry({ registry: 'https://user:secret@center.test' }, {}, {})).toThrow()
+  expect(() => resolveRegistry({ registry: 'file:///tmp/server' }, {}, {})).toThrow()
 })

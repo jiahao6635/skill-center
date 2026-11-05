@@ -28,3 +28,7 @@ describe('detectInstallMode', () => {
     expect(result).toBe('unknown')
   })
 })
+
+test('project-local npm bins must not trigger a global self-update', () => {
+  expect(detectInstallMode(['/usr/bin/node', '/project/node_modules/.bin/skill-center'], {})).toBe('unknown')
+})

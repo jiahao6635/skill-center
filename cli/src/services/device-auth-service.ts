@@ -1,4 +1,4 @@
-import { exec } from 'child_process'
+import { execFile } from 'node:child_process'
 import { CliError } from '../shared/errors'
 import { EXIT } from '../shared/constants'
 
@@ -30,6 +30,8 @@ export class DeviceAuthService {
     try {
       response = await fetch(`${this.registry}/api/v1/auth/device/code`, {
         method: 'POST',
+        signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
         headers: { 'Content-Type': 'application/json' }
       })
     } catch {
@@ -46,6 +48,11 @@ export class DeviceAuthService {
     }
 
     const body = (await response.json()) as ApiEnvelope<DeviceCodeResponse>
+    if (!body.data?.deviceCode || !body.data.userCode || typeof body.data.verificationUri !== 'string'
+      || !Number.isFinite(body.data.expiresIn) || body.data.expiresIn <= 0 || body.data.expiresIn > 3600
+      || !Number.isFinite(body.data.interval) || body.data.interval < 1) {
+      throw new CliError('invalid device authorization response', EXIT.network)
+    }
     return body.data
   }
 
@@ -64,6 +71,8 @@ export class DeviceAuthService {
       try {
         response = await fetch(`${this.registry}/api/v1/auth/device/token`, {
           method: 'POST',
+          signal: AbortSignal.timeout(Math.max(1, Math.min(30_000, deadline - Date.now()))),
+          redirect: 'error',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deviceCode })
         })
@@ -78,6 +87,7 @@ export class DeviceAuthService {
 
       const body = (await response.json()) as ApiEnvelope<DeviceTokenResponse>
       const data = body.data
+      if (!data) throw new CliError('invalid device token response', EXIT.network)
 
       if (data.accessToken) {
         return data.accessToken
@@ -113,30 +123,19 @@ export class DeviceAuthService {
   }
 
   buildVerificationUrl(verificationUri: string, userCode: string): string {
-    // verificationUri might be a path like "/cli/auth" or a full URL
-    const base = verificationUri.startsWith('http')
-      ? verificationUri
-      : `${this.registry}${verificationUri}`
-    const separator = base.includes('?') ? '&' : '?'
-    return `${base}${separator}user_code=${encodeURIComponent(userCode)}`
+    const url = new URL(verificationUri, `${this.registry}/`)
+    if (url.origin !== new URL(this.registry).origin || url.username || url.password) {
+      throw new CliError('authorization URL must belong to the configured server', EXIT.auth)
+    }
+    url.searchParams.set('user_code', userCode)
+    return url.toString()
   }
 
   openBrowser(url: string): void {
     const platform = process.platform
-    let command: string
-
-    if (platform === 'darwin') {
-      command = `open "${url}"`
-    } else if (platform === 'win32') {
-      command = `start "${url}"`
-    } else {
-      command = `xdg-open "${url}"`
-    }
-
-    exec(command, (err) => {
-      if (err) {
-        // Silently fail - user can open manually
-      }
+    const command = platform === 'darwin' ? 'open' : platform === 'win32' ? 'rundll32.exe' : 'xdg-open'
+    execFile(command, platform === 'win32' ? ['url.dll,FileProtocolHandler', url] : [url], () => {
+      // The URL is also printed for headless environments.
     })
   }
 

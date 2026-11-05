@@ -195,3 +195,10 @@ describe('SkillHubClient', () => {
     await err.toHaveProperty('exitCode', EXIT.network)
   })
 })
+
+test('rejects successful HTTP responses carrying errors or malformed envelopes', async () => {
+  for (const body of [{ code: 400, msg: 'scan required', data: {} }, {}, { code: 0, data: null }]) {
+    const fetchImpl = (async () => Response.json(body)) as unknown as typeof fetch
+    await expect(new SkillHubClient('http://registry.test', 'token', fetchImpl).whoami()).rejects.toBeInstanceOf(CliError)
+  }
+})

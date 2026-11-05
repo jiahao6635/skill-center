@@ -15,10 +15,10 @@ describe('landing quick start locales', () => {
 
   it('exposes CLI install command in both locales', () => {
     expect(zh.landing.quickStart.tabs.cli).toBe('CLI')
-    expect(zh.landing.quickStart.cli.command).toBe('npm i -g @astron-team/skillhub')
-    expect(zh.landing.quickStart.cli.description).toBe('安装 Skill Center CLI 到本地，后续可运行 skillhub install 安装技能')
+    expect(zh.landing.quickStart.cli.command).toBe('npm i -g @jiahao6635/skill-center')
+    expect(zh.landing.quickStart.cli.description).toBe('安装 Skill Center CLI 到本地，后续可运行 skill-center install 安装技能')
     expect(en.landing.quickStart.tabs.cli).toBe('CLI')
-    expect(en.landing.quickStart.cli.command).toBe('npm i -g @astron-team/skillhub')
-    expect(en.landing.quickStart.cli.description).toBe('Install the Skill Center CLI locally to run skillhub install for skills.')
+    expect(en.landing.quickStart.cli.command).toBe('npm i -g @jiahao6635/skill-center')
+    expect(en.landing.quickStart.cli.description).toBe('Install the Skill Center CLI locally to run skill-center install for skills.')
   })
 })

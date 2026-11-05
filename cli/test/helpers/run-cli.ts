@@ -11,7 +11,7 @@ function sanitizeProcessEnv(): Record<string, string> {
   const cleaned: Record<string, string> = {}
   for (const [key, value] of Object.entries(process.env)) {
     if (typeof value !== 'string') continue
-    if (key.startsWith('SKILLHUB_')) continue
+    if (key.startsWith('SKILLHUB_') || key.startsWith('SKILL_CENTER_')) continue
     cleaned[key] = value
   }
   return cleaned
@@ -36,10 +36,11 @@ export async function runCli(
   const bunPath = (whichBun && existsSync(whichBun)) ? whichBun : process.execPath
 
   const cliRoot = fileURLToPath(new URL('../../', import.meta.url))
-  const entry = `${cliRoot}src/index.ts`
+  const builtEntry = process.env.SKILL_CENTER_TEST_ENTRY
+  const entry = builtEntry ?? `${cliRoot}src/index.ts`
 
   const proc = Bun.spawn({
-    cmd: [bunPath, entry, ...args],
+    cmd: [builtEntry ? 'node' : bunPath, entry, ...args],
     cwd: options.cwd ?? cliRoot,
     env: { ...sanitizeProcessEnv(), ...env },
     stdout: 'pipe',

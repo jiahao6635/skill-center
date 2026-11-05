@@ -183,8 +183,8 @@
         "cli": "CLI"
       },
       "cli": {
-        "description": "安装 Skill Center CLI 到本地，后续可运行 skillhub install 安装技能",
-        "command": "npm i -g @astron-team/skillhub"
+        "description": "安装 Skill Center CLI 到本地，后续可运行 skill-center install 安装技能",
+        "command": "npm i -g @jiahao6635/skill-center"
       },
       "agent": {
         "description": "复制下方提示词发送给你的 AI 助手，它会自动完成安装和配置",

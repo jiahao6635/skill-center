@@ -17,7 +17,7 @@ export async function whoamiCommand(options: WhoamiCommandOptions): Promise<stri
   const registry = resolveRegistry(options, process.env, await configStore.read())
   const token = resolveToken(options, process.env, await credentialsStore.getToken(registry))
   if (!token) {
-    throw new CliError('not logged in', EXIT.auth, { registry, next: 'run `skillhub login`' })
+    throw new CliError('not logged in', EXIT.auth, { registry, next: 'run `skill-center login`' })
   }
   const user = await new SkillHubClient(registry, token).whoami()
   return options.json

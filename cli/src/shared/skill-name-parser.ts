@@ -1,9 +1,18 @@
+import { CliError } from './errors'
+
 export interface ParsedSkillName {
   namespace: string
   slug: string
 }
 
 export function parseSkillName(skillName: string, defaultNamespace = 'global'): ParsedSkillName {
+  if (skillName.includes('/')) {
+    const parts = skillName.replace(/^@/, '').split('/')
+    if (parts.length !== 2 || !parts[0] || !parts[1] || parts.some(part => !/^[a-z0-9][a-z0-9-]*$/.test(part))) {
+      throw new CliError('invalid skill coordinate; use @namespace/slug', 5)
+    }
+    return { namespace: parts[0], slug: parts[1] }
+  }
   const separatorIndex = skillName.indexOf('--')
 
   if (separatorIndex <= 0) {

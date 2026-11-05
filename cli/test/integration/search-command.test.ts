@@ -107,7 +107,7 @@ describe('search command', () => {
       expect(parsed.exitCode).toBe(2)
       expect(parsed.details.registry).toBe(registryUrl)
       expect(typeof parsed.details.next).toBe('string')
-      expect(parsed.details.next).toContain('skillhub login')
+      expect(parsed.details.next).toContain('skill-center login')
     } finally {
       server.stop()
     }

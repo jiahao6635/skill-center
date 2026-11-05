@@ -25,7 +25,7 @@ export class CredentialsStore {
   async setToken(registry: string, token: string): Promise<void> {
     const current = await this.read()
     await ensureDir(dirname(this.path))
-    await writeFile(this.path, JSON.stringify({ tokens: { ...current.tokens, [registry]: token } }, null, 2))
+    await writeFile(this.path, JSON.stringify({ tokens: { ...current.tokens, [registry]: token } }, null, 2), { mode: 0o600 })
     await applyCredentialPermissions(this.path)
   }
 
@@ -34,7 +34,7 @@ export class CredentialsStore {
     const tokens = { ...current.tokens }
     delete tokens[registry]
     await ensureDir(dirname(this.path))
-    await writeFile(this.path, JSON.stringify({ tokens }, null, 2))
+    await writeFile(this.path, JSON.stringify({ tokens }, null, 2), { mode: 0o600 })
     await applyCredentialPermissions(this.path)
   }
 }

@@ -33,6 +33,13 @@ export function renderError(error: unknown, json: boolean): string {
   if (typeof cliError.details.next === 'string') {
     lines.push(`Next: ${cliError.details.next}`)
   }
+  for (const field of ['errors', 'warnings']) {
+    const items = cliError.details[field]
+    if (Array.isArray(items)) lines.push(...items.map(item => `${field}: ${String(item)}`))
+  }
+  if (typeof cliError.details.idempotencyKey === 'string') {
+    lines.push(`Retry with --idempotency-key ${cliError.details.idempotencyKey}`)
+  }
   return lines.join('\n')
 }
 

@@ -1,3 +1,5 @@
+import { realpathSync } from 'node:fs'
+
 export type InstallMode = 'npx' | 'npm-global' | 'bun-global' | 'unknown'
 
 /**
@@ -13,7 +15,8 @@ export function detectInstallMode(
   argv: string[] = process.argv,
   env: NodeJS.ProcessEnv = process.env
 ): InstallMode {
-  const execPath = argv[1] ?? ''
+  let execPath = argv[1] ?? ''
+  try { execPath = realpathSync(execPath) } catch { /* Keep the original path if it cannot be resolved. */ }
 
   // npx detection: npx injects `_npx/` into the path
   if (execPath.includes('_npx/') || execPath.includes('_npx\\')) {
@@ -41,7 +44,7 @@ export function detectInstallMode(
     return 'npm-global'
   }
   // Common npm global paths
-  if (execPath.includes('/lib/node_modules/') || execPath.includes('/node_modules/.bin/')) {
+  if (execPath.includes('/lib/node_modules/') || execPath.includes('\\npm\\node_modules\\')) {
     return 'npm-global'
   }
 

@@ -88,3 +88,9 @@ describe('parseSkillName', () => {
     })
   })
 })
+
+test('accepts native coordinates and rejects traversal before installation', () => {
+  expect(parseSkillName('@team/demo')).toEqual({ namespace: 'team', slug: 'demo' })
+  expect(parseSkillName('team/demo')).toEqual({ namespace: 'team', slug: 'demo' })
+  expect(() => parseSkillName('@team/../demo')).toThrow()
+})

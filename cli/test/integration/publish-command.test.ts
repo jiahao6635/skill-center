@@ -215,10 +215,10 @@ describe('publish command — P1', () => {
     expect(json.namespace).toBe('global')
     expect(typeof json.slug).toBe('string')
     expect(typeof json.version).toBe('string')
-    expect(typeof json.visibility).toBe('string')
+    expect(json.skillId).toBe(42)
+    expect(json.status).toBe('SCANNING')
     expect(json.detailUrl).toContain(registry.url)
-    expect(json.detailUrl).toContain('global')
-    expect(json.detailUrl).toContain(encodeURIComponent(json.slug))
+    expect(json.detailUrl).toBe(`${registry.url}/skills/by-id/42`)
   })
 
   test('server error during publish returns EXIT.generic', async () => {
@@ -268,7 +268,7 @@ describe('publish command — content shape', () => {
           }
           return Response.json({
             code: 0,
-            data: { namespace: 'global', slug: 'captured', version: '1.0.0', visibility: 'PUBLIC' }
+            data: { skillId: 42, namespace: 'global', slug: 'captured', version: '1.0.0', status: 'SCANNING' }
           })
         }
         return Response.json({ code: 404, message: 'not found' }, { status: 404 })

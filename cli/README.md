@@ -1,406 +1,101 @@
-# SkillHub CLI
+# Skill Center CLI
 
-SkillHub CLI is the official command-line tool for SkillHub, designed for searching, installing, managing, and publishing Agent skill packages.
-
-## 📦 Installation
+私有 Skill Center 的独立 CLI，npm 包为 `@jiahao6635/skill-center`，命令为 `skill-center`。需要 Node.js 22 或更新版本。
 
 ```bash
-# Install globally via npm
-npm install -g @astron-team/skillhub
-
-# Or run directly with npx
-npx @astron-team/skillhub@latest version
-
-# Or install globally via Bun
-bun add -g @astron-team/skillhub
+npm install -g @jiahao6635/skill-center
+# 或不做全局安装
+npx @jiahao6635/skill-center@latest help
 ```
 
-## 🚀 Quick Start
+默认连接 `https://skill-center.sigmob.com`。业务服务地址与 npm 包仓库是两个独立配置。
+
+## 登录与查找
 
 ```bash
-# Login
-skillhub login --token sk_xxx
-
-# Search skills
-skillhub search pdf
-
-# Install skill to Agent directory
-skillhub install pdf-parser --agent codex
-
-# List installed skills
-skillhub list
-
-# Publish skill
-skillhub publish ./my-skill --namespace myspace
+skill-center login --browser
+# 自动化环境建议使用 SKILL_CENTER_TOKEN，避免令牌进入 shell 历史
+skill-center whoami
+skill-center search pdf --limit 20
+skill-center inspect @global/pdf-parser
+skill-center namespaces --page 0 --size 20
 ```
 
-## 🌐 Registry Configuration
+服务地址优先级：`--registry` → `SKILL_CENTER_REGISTRY` → 旧 `SKILLHUB_REGISTRY` → 已保存配置 → 默认地址。
+令牌优先级：`--token` → `SKILL_CENTER_TOKEN` → 旧 `SKILLHUB_TOKEN` → 当前服务的已保存令牌。
 
-The active registry is resolved in the following priority order:
-
-1. `--registry <url>` command-line argument
-2. `SKILLHUB_REGISTRY` environment variable
-3. `registry` in `~/.skillhub/config.json`
-4. Default value `https://skill.xfyun.cn`
+`login --token <token>` 可保存令牌；`logout` 只删除当前服务的令牌。兼容旧版 `~/.skillhub/config.json`、`credentials.json` 和 `inventory.json`，无需重新安装已有技能。若旧配置指向上游，请先执行：
 
 ```bash
-# Temporarily use another registry
-skillhub search pdf --registry https://skillhub.example.com
-
-# Set via environment variable (Linux/macOS)
-export SKILLHUB_REGISTRY=https://skillhub.example.com
+skill-center login --browser --registry https://skill-center.sigmob.com
 ```
 
-**Windows PowerShell:**
-
-```powershell
-$env:SKILLHUB_REGISTRY="https://skillhub.example.com"
-```
-
-**Windows CMD:**
-
-```cmd
-set SKILLHUB_REGISTRY=https://skillhub.example.com
-```
-
-## 🔐 Authentication
-
-Token resolution priority:
-
-1. `--token <token>` command-line argument
-2. `SKILLHUB_TOKEN` environment variable
-3. Token stored in `~/.skillhub/credentials.json` (per registry)
-
-### Login
+## 安装与本地管理
 
 ```bash
-# Login with API token
-skillhub login --token sk_xxx
-
-# Login to specific registry
-skillhub login --token sk_xxx --registry https://skillhub.example.com
+skill-center install @my-team/pdf-parser --agent codex --scope user
+skill-center install my-team--pdf-parser --dir ./skills --version 1.2.0
+skill-center list --json
+skill-center remove pdf-parser --agent codex
+skill-center doctor
 ```
 
-`login` validates the token, stores it in `~/.skillhub/credentials.json`, and writes the registry to `~/.skillhub/config.json`.
+支持 `@namespace/slug`、`namespace/slug`、旧 `namespace--slug`，仅提供 slug 时默认 `global`。`--namespace` 可覆盖空间。
+保留旧版 Agent 目录识别；`--dir` 可使用任意 Agent 的技能目录，不能与 `--agent` / `--scope` 同用。
+安装已有技能的新版本使用 `install ... --force`。`update` 用于上传服务端版本。
 
-### Check Current Identity
+## 发布与更新
 
 ```bash
-skillhub whoami
-
-# Check specific registry
-skillhub whoami --registry https://skillhub.example.com
-
-# Temporarily use different token
-skillhub whoami --token sk_other
+skill-center publish ./my-skill --namespace my-team --visibility namespace-only --dry-run
+skill-center publish ./my-skill --namespace my-team --visibility namespace-only
+skill-center publish ./personal-skill --namespace private --visibility private
+skill-center inspect @my-team/my-skill
+skill-center update 42 ./my-skill
 ```
 
-### Logout
+目录自动打包，也可传 ZIP。发布、更新返回 Skill ID 和真实状态，例如 `SCANNING`、`PENDING_REVIEW`、`PUBLISHED`；上传成功不等于已发布。
+更新按稳定 Skill ID 定位，继承现有空间和可见范围，不能用更新参数移动技能。包有告警时先阅读错误信息，确认后添加 `--confirm-warnings`。
+`publish --dry-run` 是现有服务端包校验，不会上传发布或完成安全扫描；定向更新没有服务端 dry-run 接口，CLI 不提供假的更新预检查。
+
+## 移动
 
 ```bash
-skillhub logout
-
-# Logout from specific registry
-skillhub logout --registry https://skillhub.example.com
+skill-center move-status 42
+skill-center move 42 target-team --dry-run
+skill-center move 42 target-team --idempotency-key move-42-20260916
+skill-center move-status 42
+skill-center withdraw 42 123
 ```
 
-Logout only removes the token for the specified registry, preserving registry configuration and installation records.
+目标可使用 `move-status` 返回的空间 slug 或 ID。CLI 先预检查，出现告警时需要 `--confirm-warnings`。服务端选择最新可用版本，固定为目标空间成员可见；扫描、审核期间原技能保持可用。
+提交返回申请状态和幂等键。网络失败时先查询 `move-status`；确需重试时复用同一幂等键，避免新建申请。`inspect 42` 可在移动后按稳定 ID 查询新坐标。
 
-## 🔍 Search
+## 删除与升级 CLI
 
 ```bash
-# Keyword search
-skillhub search pdf
-
-# Search with a one-off token
-skillhub search pdf --token sk_xxx
-
-# List all skills (empty query)
-skillhub search "" --limit 50
-
-# JSON output
-skillhub search pdf --json
+skill-center remove @my-team/my-skill --remote --hard
+skill-center self-update --check
+skill-center self-update
 ```
 
-Output format: `namespace/slug  version  summary`
+远端删除需要权限和显式确认；`--hard` 是旧 CLI 兼容的确认开关，不用于绕过服务端权限。
+自更新只查询本包 `@jiahao6635/skill-center`，使用 npm 原生配置与 `.npmrc` 鉴权。识别为 npm 全局安装时自动更新；npx、Bun 或未知安装方式会给出安装命令。
+`--npm-registry` / `SKILL_CENTER_NPM_REGISTRY` 可显式指定 npm 源，不影响业务服务地址。
 
-## 📥 Install Skills
+所有命令支持 `--json`。结果写 stdout，错误与浏览器登录进度写 stderr；自动化应同时检查退出码。退出码：1 一般错误，2 鉴权，3 网络，4 文件，5 用法，6 校验失败。
+
+## 开发与发布
+
+开发构建使用 Bun 1.3.13；发布后的 CLI 使用 Node.js，不要求用户安装 Bun。
 
 ```bash
-# Install to auto-detected Agent directory
-skillhub install pdf-parser
-
-# Choose install scope explicitly
-skillhub install pdf-parser --scope user
-skillhub install pdf-parser --scope project --agent codex
-
-# Specify namespace (default: global)
-skillhub install pdf-parser --namespace myspace
-
-# Specify version
-skillhub install pdf-parser --version 1.2.0
-
-# Install to specific Agent
-skillhub install pdf-parser --agent codex
-
-# Install to multiple Agents
-skillhub install pdf-parser --agent codex --agent claude-code
-
-# Install to custom directory
-skillhub install pdf-parser --dir ~/.claude/skills
-
-# Force overwrite existing installation
-skillhub install pdf-parser --force
+bun install --frozen-lockfile
+bun run check
+# 仓库根目录，执行检查并生成本地 npm 包（不发布）
+make pack-cli
 ```
 
-### Install Target Resolution
+发布与迁移步骤见 [RELEASE.md](RELEASE.md)。本版本复用原 SkillHub 的安装、目录识别与本地清单实现，重写命令入口、HTTP 请求层和发布路径，并直接适配当前服务端更新/移动接口。保留原有来源与版权说明。
 
-The CLI determines the installation location using the following logic:
-
-1. If `--dir` is specified: Install to that directory, agent marked as `custom`. `--dir` is mutually exclusive with `--scope` and `--agent`.
-2. If `--scope user|project` is specified: Limit detection to the chosen scope.
-   - With `--agent <profile>`: Install to that profile's user or project skills directory directly.
-   - Without `--agent`: Detect existing skills directories within the chosen scope only.
-   - No detected directory in the chosen scope → Fallback to `<home>/.agents/skills/` for `--scope user` or `<cwd>/.agents/skills/` for `--scope project`.
-3. If `--agent` is specified (no `--scope`): Install to the corresponding Agent's skills directory (existing behaviour, unchanged).
-4. If none of the above is specified:
-   - **Interactive mode** (stdin and stdout are both TTY, no `--json`): Prompt for `user` or `project` scope first, then continue per the `--scope` rule above.
-   - **Non-interactive mode**: Auto-scan current directory to detect existing Agent config directories. 1 Agent detected → install directly; multiple → error; none detected → fallback to `<cwd>/.agents/skills/`.
-
-> `--dir` cannot be combined with `--scope` or `--agent`.
-
-### Install Paths
-
-Each Agent has both project-level and user-level skills directories. Use `--scope user|project` to control which one is used.
-
-| Agent | Project-level Path | User-level Path |
-|-------|-------------------|-----------------|
-| `claude-code` | `<project>/.claude/skills/` | `~/.claude/skills/` |
-| `codex` | `<project>/.codex/skills/` | `~/.codex/skills/` |
-| `cursor` | `<project>/.cursor/skills/` | `~/.cursor/skills/` |
-| `github-copilot` | `<project>/.github-copilot/skills/` | `~/.github-copilot/skills/` |
-| `gemini-cli` | `<project>/.gemini/skills/` | `~/.gemini/skills/` |
-| `windsurf` | `<project>/.windsurf/skills/` | `~/.windsurf/skills/` |
-| `kiro-cli` | `<project>/.kiro/skills/` | `~/.kiro/skills/` |
-| `roo` | `<project>/.roo/skills/` | `~/.roo/skills/` |
-| `trae` | `<project>/.trae/skills/` | `~/.trae/skills/` |
-| `trae-cn` | `<project>/.trae-cn/skills/` | `~/.trae-cn/skills/` |
-| `openhands` | `<project>/.openhands/skills/` | `~/.openhands/skills/` |
-| `openclaw` | `<project>/.openclaw/skills/` | `~/.openclaw/skills/` |
-| `opencode` | `<project>/.opencode/skills/` | `~/.opencode/skills/` |
-| `kilo` | `<project>/.kilo/skills/` | `~/.kilo/skills/` |
-| _fallback_ | `<project>/.agents/skills/` | `~/.agents/skills/` |
-
-For Agents not in the list, use `--dir` to specify the installation path. When `--scope user|project` finds no matching agent directory, the CLI falls back to the `_fallback_` row above.
-
-### File Structure After Installation
-
-```
-.codex/skills/pdf-parser/
-├── ...                          # Extracted skill package files
-└── .skillhub/
-    └── metadata.json            # Installation metadata
-```
-
-`metadata.json` example:
-
-```json
-{
-  "registry": "https://skill.xfyun.cn",
-  "namespace": "global",
-  "slug": "pdf-parser",
-  "version": "1.0.0",
-  "agent": "codex",
-  "installedAt": "2026-04-28T06:00:00.000Z"
-}
-```
-
-## 📋 Local Management
-
-### List Installed Skills
-
-```bash
-# List all installed skills
-skillhub list
-
-# Filter by Agent
-skillhub list --agent codex
-
-# Filter by multiple Agents
-skillhub list --agent codex --agent claude-code
-
-# Filter by directory
-skillhub list --dir ~/.codex/skills
-
-# JSON output
-skillhub list --json
-```
-
-### Remove Skills
-
-```bash
-# Remove all local installation targets
-skillhub remove pdf-parser
-
-# Remove only specific Agent's installation
-skillhub remove pdf-parser --agent codex
-
-# Remove all targets (skip interactive confirmation)
-skillhub remove pdf-parser --all
-
-# Remove remote skill (requires authentication, prompts for confirmation)
-skillhub remove pdf-parser --remote --namespace myspace
-
-# Skip remote deletion confirmation
-skillhub remove pdf-parser --remote --hard --namespace myspace
-```
-
-> Parameter exclusivity rules:
-> - `--all` cannot be used with `--agent`
-> - `--remote` cannot be used with `--agent` or `--all`
-> - Remote deletion in non-interactive environments requires `--hard`
-
-### Rebuild Local Inventory
-
-```bash
-skillhub doctor
-```
-
-`doctor` performs the following operations:
-
-1. Scans `<cwd>/.<agent>/skills/<slug>/.skillhub/metadata.json`
-2. Groups by `registry + namespace + slug`
-3. Backs up old `inventory.json` (if exists)
-4. Writes new `inventory.json`
-
-If the same skill has version conflicts across different targets, that skill will be skipped and reported.
-
-## 🚢 Publishing
-
-```bash
-# Publish directory (auto-packaged as zip)
-skillhub publish ./my-skill --namespace myspace
-
-# Publish existing zip file
-skillhub publish ./my-skill.zip --namespace myspace
-
-# Specify visibility
-skillhub publish ./my-skill --namespace myspace --visibility private
-```
-
-Visibility options:
-- `public` (default) — Visible to everyone
-- `namespace-only` — Visible to namespace members only
-- `private` — Visible to yourself only
-
-After successful publication, the skill detail page URL will be displayed.
-
-## ⬆️ Self-Update
-
-```bash
-# Check for new version
-skillhub update --check
-
-# Execute update
-skillhub update
-```
-
-Update mechanism:
-- Installed via npm globally: Auto-executes `npm install -g @astron-team/skillhub@latest`
-- Installed via Bun globally: Auto-executes `bun add -g @astron-team/skillhub@latest`
-- Run via npx: Prompts manual update command
-- Unknown installation method: Prompts manual update
-
-## 🔧 Environment Variables
-
-| Variable | Description | Priority |
-|----------|-------------|----------|
-| `SKILLHUB_REGISTRY` | Default registry URL | Lower than `--registry` parameter |
-| `SKILLHUB_TOKEN` | API token | Lower than `--token` parameter, higher than stored token |
-
-## 📂 Local File Structure
-
-```
-~/.skillhub/
-├── config.json           # User configuration (registry, defaultAgent, etc.)
-├── credentials.json      # API tokens (stored per registry, permissions 0600)
-└── inventory.json        # Installed skills inventory
-```
-
-## 📖 Command Reference
-
-| Command | Description |
-|---------|-------------|
-| `skillhub help [command]` | Display help information |
-| `skillhub version [--json]` | Display CLI version |
-| `skillhub login --token <token> [--registry <url>] [--json]` | Save token and registry configuration |
-| `skillhub logout [--registry <url>] [--json]` | Remove token for specified registry |
-| `skillhub whoami [--registry <url>] [--token <token>] [--json]` | Validate current token and display user information |
-| `skillhub search <query> [--registry <url>] [--token <token>] [--limit <n>] [--json]` | Search published skills |
-| `skillhub install <slug> [--scope <user\|project>] [--namespace <slug>] [--version <v>] [--agent <profile>] [--dir <path>] [--force] [--registry <url>] [--token <token>] [--json]` | Install a skill |
-| `skillhub list [--agent <profile>] [--dir <path>] [--registry <url>] [--json]` | List installed skills |
-| `skillhub remove <slug> [--agent <profile>] [--all] [--remote] [--hard] [--namespace <slug>] [--registry <url>] [--token <token>] [--json]` | Remove a skill |
-| `skillhub doctor [--json]` | Scan project directory and rebuild local inventory |
-| `skillhub publish <path> [--namespace <slug>] [--visibility <v>] [--registry <url>] [--token <token>] [--json]` | Publish a skill |
-| `skillhub update [--check] [--json]` | Check or execute CLI self-update |
-
-## 🔒 Security Notes
-
-- Tokens are stored only in user directory `~/.skillhub/credentials.json`
-- On Linux/macOS, credential file permissions are automatically set to `0600`
-- Tokens are never written to any project-local files
-- Remote delete operations require explicit confirmation or `--hard` parameter
-- `remove` command validates path safety to prevent deletion of non-skill directories
-
-## 🐛 Troubleshooting
-
-### Authentication Failure
-
-```bash
-# Verify token validity
-skillhub whoami
-
-# Re-login
-skillhub login --token sk_xxx
-```
-
-### Network Error
-
-```bash
-# Check if registry is accessible
-curl https://skill.xfyun.cn/api/cli/v1/skills/search?q=test&limit=1
-
-# Use alternative registry
-skillhub search test --registry https://skillhub.example.com
-```
-
-### Installation Directory Conflict
-
-```bash
-# Use --force to overwrite
-skillhub install pdf-parser --force
-
-# Or remove first then install
-skillhub remove pdf-parser
-skillhub install pdf-parser
-```
-
-### Corrupted Inventory
-
-```bash
-# Rebuild inventory
-skillhub doctor
-```
-
-## 📚 Documentation
-
-- [SkillHub Homepage](https://skill.xfyun.cn)
-- [GitHub Repository](https://github.com/iflytek/skillhub)
-- [CLI Documentation](https://github.com/iflytek/skillhub/blob/main/docs/skillhub/en/guide/cli.md)
-- [Issue Tracker](https://github.com/iflytek/skillhub/issues)
-
-## 📄 License
-
-Apache-2.0
-
-Copyright 2026 iFlytek Co., Ltd.
+上游来源：[iFLYTEK SkillHub](https://github.com/iflytek/skillhub)。原 SkillHub CLI 部分版权：Copyright 2026 iFlytek Co., Ltd.
