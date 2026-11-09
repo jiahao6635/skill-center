@@ -5,13 +5,15 @@ import { useTranslation } from 'react-i18next'
 import { UploadZone } from '@/features/publish/upload-zone.tsx'
 import {
   extractPrecheckWarnings,
+  extractSingleFileLimit,
   isFrontmatterFailureMessage,
   isPackageTooLargeError,
   isPrecheckConfirmationMessage,
   isPrecheckFailureMessage,
+  isSingleFileTooLargeMessage,
   isVersionExistsMessage,
 } from '@/features/publish/publish-error-utils.ts'
-import { isPackageOverSizeLimit, MAX_PACKAGE_BYTES } from '@/features/publish/package-limits.ts'
+import { isPackageOverSizeLimit, MAX_PACKAGE_BYTES, MAX_SINGLE_FILE_BYTES } from '@/features/publish/package-limits.ts'
 import { normalizePublishPrefill } from '@/features/publish/publish-prefill.ts'
 import { formatFileSize } from '@/shared/lib/file-size.ts'
 import { Button } from '@/shared/ui/button.tsx'
@@ -211,11 +213,26 @@ export function PublishPage() {
         return
       }
 
+      if (error instanceof ApiError && isSingleFileTooLargeMessage(error.serverMessage || error.message)) {
+        const serverMessage = error.serverMessage || error.message
+        const fileLimit = extractSingleFileLimit(serverMessage)
+        const title = t('publish.singleFileTooLargeTitle')
+        const description = fileLimit
+          ? t('publish.singleFileTooLargeDescription', { name: fileLimit.path, limit: formatFileSize(fileLimit.limitBytes) })
+          : serverMessage
+        setFileError({ title, description })
+        toast.error(title, description)
+        return
+      }
+
       if (error instanceof ApiError && isPackageTooLargeError(error.status, error.serverMessage || error.message)) {
-        const title = t('publish.packageTooLargeTitle')
-        const description = t('publish.packageTooLargeServerDescription', {
-          limit: formatFileSize(MAX_PACKAGE_BYTES),
-        })
+        const title = t(error.status === 413 ? 'publish.uploadTooLargeTitle' : 'publish.packageTooLargeTitle')
+        const description = error.status === 413
+          ? t('publish.uploadTooLargeUnknownDescription', {
+              packageLimit: formatFileSize(MAX_PACKAGE_BYTES),
+              fileLimit: formatFileSize(MAX_SINGLE_FILE_BYTES),
+            })
+          : t('publish.packageTooLargeServerDescription', { limit: formatFileSize(MAX_PACKAGE_BYTES) })
         setFileError({ title, description })
         toast.error(title, description)
         return

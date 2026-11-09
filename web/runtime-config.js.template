@@ -6,5 +6,6 @@ window.__SKILLHUB_RUNTIME_CONFIG__ = {
   authSessionBootstrapEnabled: "${SKILLHUB_WEB_AUTH_SESSION_BOOTSTRAP_ENABLED}",
   authSessionBootstrapProvider: "${SKILLHUB_WEB_AUTH_SESSION_BOOTSTRAP_PROVIDER}",
   authSessionBootstrapAuto: "${SKILLHUB_WEB_AUTH_SESSION_BOOTSTRAP_AUTO}",
-  i18nEnabled: "${SKILLHUB_WEB_I18N_ENABLED}"
+  i18nEnabled: "${SKILLHUB_WEB_I18N_ENABLED}",
+  maxSingleFileSize: "${SKILLHUB_WEB_MAX_SINGLE_FILE_SIZE}"
 };

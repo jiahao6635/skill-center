@@ -2,9 +2,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PublishPage } from './publish.tsx'
+import { ApiError } from '@/shared/lib/api-error.ts'
 
 const useSearchMock = vi.fn()
 const toastError = vi.fn()
+const mutateAsyncMock = vi.fn()
 
 vi.mock('@/features/skill/sharing-api', () => ({
   useSharingSettings: () => ({ data: undefined, isError: false }),
@@ -25,6 +27,11 @@ vi.mock('react-i18next', async () => {
           'publish.packageTooLargeTitle': 'Skill package is too large',
           'publish.packageTooLargeDescription': '{{name}} is {{size}}. The limit is {{limit}}.',
           'publish.packageTooLargeUnknownSize': 'over the limit',
+          'publish.packageTooLargeServerDescription': 'Package exceeds {{limit}}.',
+          'publish.singleFileTooLargeTitle': 'A file in the package is too large',
+          'publish.singleFileTooLargeDescription': 'File {{name}} exceeds {{limit}}.',
+          'publish.uploadTooLargeTitle': 'Upload exceeds a size limit',
+          'publish.uploadTooLargeUnknownDescription': 'Package limit {{packageLimit}}, file limit {{fileLimit}}.',
           'publish.confirm': 'Confirm Publish',
           'publish.removeSelectedFile': 'Remove selected file',
           'upload.dragHint': 'Drag a ZIP file here, or click to select',
@@ -43,7 +50,7 @@ vi.mock('react-i18next', async () => {
 })
 
 vi.mock('@/shared/hooks/use-skill-queries', () => ({
-  usePublishSkill: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  usePublishSkill: () => ({ mutateAsync: mutateAsyncMock, isPending: false }),
 }))
 
 vi.mock('@/shared/hooks/use-namespace-queries', () => ({
@@ -68,6 +75,7 @@ function createZipFile(name: string, size: number): File {
 describe('PublishPage package size UX', () => {
   beforeEach(() => {
     toastError.mockReset()
+    mutateAsyncMock.mockReset()
     useSearchMock.mockReturnValue({})
   })
 
@@ -110,5 +118,33 @@ describe('PublishPage package size UX', () => {
       expect(screen.getByText('ok.zip (2 MB)')).toBeTruthy()
     })
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it.each([
+    {
+      error: new ApiError('bad request', 400, 'Package validation failed: File too large: bin/tool (52433102 bytes, max: 52428800)'),
+      expected: 'File bin/tool exceeds 50 MB.',
+    },
+    {
+      error: new ApiError('bad request', 400, 'Package too large: 104857601 bytes (max: 104857600)'),
+      expected: 'Package exceeds 100 MB.',
+    },
+    {
+      error: new ApiError('too large', 413),
+      expected: 'Package limit 100 MB, file limit 10 MB.',
+    },
+    {
+      error: new ApiError('bad request', 400, 'File too large: unknown format'),
+      expected: 'File too large: unknown format',
+    },
+  ])('shows the correct server limit for $expected', async ({ error, expected }) => {
+    useSearchMock.mockReturnValue({ visibility: 'PRIVATE' })
+    mutateAsyncMock.mockRejectedValue(error)
+    render(<PublishPage />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [createZipFile('ok.zip', 1024)] } })
+    await waitFor(() => expect(screen.getByText('ok.zip (1 KB)')).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Publish' }))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain(expected))
   })
 })

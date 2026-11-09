@@ -1329,7 +1329,7 @@
     "dropHint": "Drop to upload...",
     "dragHint": "Drag a ZIP file here, or click to select",
     "formatHint": "Only .zip format supported",
-    "limitsHint": "Package ≤ {{packageSize}}, each file ≤ {{fileSize}}, up to {{fileCount}} files"
+    "limitsHint": "ZIP and extracted files total ≤ {{packageSize}}, each file ≤ {{fileSize}}, up to {{fileCount}} files"
   },
   "layout": {
     "footerDescription": "Skill registry, providing efficient skill management and distribution for developers."
@@ -1516,7 +1516,11 @@
     "packageTooLargeTitle": "Skill package is too large",
     "packageTooLargeDescription": "{{name}} is {{size}}. The limit is {{limit}}. Remove large assets, models, or dependencies and pack again.",
     "packageTooLargeUnknownSize": "over the limit",
-    "packageTooLargeServerDescription": "The skill package exceeds the {{limit}} limit. Reduce the ZIP and upload again."
+    "packageTooLargeServerDescription": "The ZIP or extracted files exceed the {{limit}} limit. Remove files and pack again.",
+    "singleFileTooLargeTitle": "A file in the package is too large",
+    "singleFileTooLargeDescription": "The file {{name}} exceeds the single-file limit of {{limit}}. Reduce or remove it and pack again.",
+    "uploadTooLargeTitle": "Upload exceeds a size limit",
+    "uploadTooLargeUnknownDescription": "Check the package size (limit {{packageLimit}}) and each file in it (limit {{fileLimit}}), then reduce and upload again."
   },
   "toast": {
     "success": "Success",

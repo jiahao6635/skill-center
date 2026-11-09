@@ -67,6 +67,7 @@ type RuntimeConfig = {
   authSessionBootstrapProvider?: string
   authSessionBootstrapAuto?: string
   i18nEnabled?: string
+  maxSingleFileSize?: string
 }
 
 declare global {

@@ -24,7 +24,6 @@ const FRONTMATTER_FAILURE_MARKERS = [
 const PACKAGE_TOO_LARGE_MARKERS = [
   'error.skill.publish.packageTooLarge',
   'Package too large',
-  'File too large',
   'payload too large',
   'exceeds the 100MB size limit',
   '超过 100MB',
@@ -56,6 +55,18 @@ export function isFrontmatterFailureMessage(message?: string): boolean {
 
 export function isPackageTooLargeError(status?: number, message?: string): boolean {
   return status === 413 || includesAnyMarker(message, PACKAGE_TOO_LARGE_MARKERS)
+}
+
+export function isSingleFileTooLargeMessage(message?: string): boolean {
+  return message?.includes('File too large') ?? false
+}
+
+export function extractSingleFileLimit(message: string): { path: string; limitBytes: number } | undefined {
+  const match = message.match(/File too large: (.*?) \((?:\d+ bytes,\s*)?max:?\s*(\d+)(?:\s*bytes)?\)/)
+  if (!match) return undefined
+  const limitBytes = Number(match[2])
+  if (!Number.isSafeInteger(limitBytes) || limitBytes <= 0) return undefined
+  return { path: match[1], limitBytes }
 }
 
 export function extractPrecheckWarnings(message?: string): string[] {

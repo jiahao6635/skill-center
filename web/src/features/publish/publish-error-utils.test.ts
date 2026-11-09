@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   extractPrecheckWarnings,
+  extractSingleFileLimit,
   isFrontmatterFailureMessage,
   isPackageTooLargeError,
   isPrecheckConfirmationMessage,
   isPrecheckFailureMessage,
+  isSingleFileTooLargeMessage,
   isVersionExistsMessage,
 } from './publish-error-utils.ts'
 
@@ -40,5 +42,16 @@ describe('publish-error-utils', () => {
     expect(isPackageTooLargeError(400, 'Package too large: 184191181 bytes (max: 104857600)')).toBe(true)
     expect(isPackageTooLargeError(400, '技能包超过 100MB 大小限制，请缩小后再上传。')).toBe(true)
     expect(isPackageTooLargeError(400, 'Invalid request')).toBe(false)
+    expect(isPackageTooLargeError(400, 'File too large: bin/tool (11 bytes, max: 10 bytes)')).toBe(false)
+  })
+
+  it('identifies the oversized file and the actual server limit', () => {
+    const message = 'Package validation failed: File too large: folder/my tool (52433102 bytes, max: 52428800)'
+    expect(isSingleFileTooLargeMessage(message)).toBe(true)
+    expect(extractSingleFileLimit(message)).toEqual({ path: 'folder/my tool', limitBytes: 52428800 })
+    expect(extractSingleFileLimit('File too large: bin/tool (max 52428800 bytes)'))
+      .toEqual({ path: 'bin/tool', limitBytes: 52428800 })
+    expect(extractSingleFileLimit('File too large: unrecognized format')).toBeUndefined()
+    expect(isSingleFileTooLargeMessage('Package too large')).toBe(false)
   })
 })
